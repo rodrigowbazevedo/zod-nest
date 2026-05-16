@@ -28,8 +28,7 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Upgrade npm (for OIDC trusted publishing)
-        run: npm install -g npm@11
+      - run: npm --version
 
       - run: npm ci
 
