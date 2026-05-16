@@ -17,6 +17,8 @@ jobs:
       issues: write
       pull-requests: write
       id-token: write
+    env:
+      HUSKY: '0'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -25,10 +27,12 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          # Node 24 bundles npm >= 11, required for OIDC trusted publishing.
+          # Node 22 still ships npm 10.x as of mid-2026; consumers can still
+          # use this package on >=22 (engines), only the publish runner needs
+          # the newer npm.
+          node-version: '24'
           cache: npm
-
-      - run: npm --version
 
       - run: npm ci
 
