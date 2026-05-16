@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE_PATH=$(jq -r '.tool_input.file_path // empty' <<< \"$CLAUDE_TOOL_INPUT\"); case \"$FILE_PATH\" in *.ts) cd \"$CLAUDE_PROJECT_DIR\" && npx tsc --noEmit -p tsconfig.json 2>&1 | head -50 ;; esac"
+          },
+          {
+            "type": "command",
+            "command": "FILE_PATH=$(jq -r '.tool_input.file_path // empty' <<< \"$CLAUDE_TOOL_INPUT\"); case \"$FILE_PATH\" in *.ts) cd \"$CLAUDE_PROJECT_DIR\" && npx eslint --fix --cache \"$FILE_PATH\" 2>&1 | head -50 ;; esac"
+          },
+          {
+            "type": "command",
+            "command": "FILE_PATH=$(jq -r '.tool_input.file_path // empty' <<< \"$CLAUDE_TOOL_INPUT\"); case \"$FILE_PATH\" in *.ts|*.mts|*.cts|*.json|*.md) cd \"$CLAUDE_PROJECT_DIR\" && npx prettier --write \"$FILE_PATH\" 2>&1 | head -20 ;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}
