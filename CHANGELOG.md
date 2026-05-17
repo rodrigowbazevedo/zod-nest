@@ -1,3 +1,10 @@
+# [0.7.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.6.0...v0.7.0) (2026-05-17)
+
+
+### Features
+
+* **schema:** composition layer v0.2 — extend, allOf emission, experimental ([#20](https://github.com/rodrigowbazevedo/zod-nest/issues/20)) ([b7f4ea4](https://github.com/rodrigowbazevedo/zod-nest/commit/b7f4ea44066df67057718379cafa4a4a24a01962)), closes [#19](https://github.com/rodrigowbazevedo/zod-nest/issues/19) [#19](https://github.com/rodrigowbazevedo/zod-nest/issues/19)
+
 # [0.6.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.5.0...v0.6.0) (2026-05-17)
 
 
