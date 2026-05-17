@@ -16,7 +16,6 @@ describe('createZodDto — TypeScript inference (compile-only)', () => {
     type Instance = InstanceType<typeof Types_User_Dto>;
     const sample: Instance = { id: 'a', age: 1 };
 
-    // Negative: assigning a wrong-typed instance should be a TS error.
     // @ts-expect-error - `age` is a number, not a string
     const wrong: Instance = { id: 'a', age: 'one' };
 

@@ -13,7 +13,7 @@ export type ResponseVariantKind = 'single' | 'array' | 'tuple';
 
 /**
  * Description payload accepted by `@ZodResponse(...)` and passed through to
- * Phase 2e's `@ApiResponse(...)` emitter. String form is shorthand for
+ * `applyZodNest`'s `@ApiResponse(...)` emitter. String form is shorthand for
  * `{ description }`; the object form lets users declare OpenAPI response
  * `headers` / `links` alongside the description.
  */
@@ -27,8 +27,8 @@ export type ZodResponseDescription =
 
 /**
  * One variant record per `@ZodResponse(...)` call. `dto` is kept alongside
- * `validationSchema` so Phase 2e can emit `@ApiResponse({ type })` without
- * unwrapping the runtime-only `z.array(...)` / `z.tuple([...])` wrapper.
+ * `validationSchema` so `applyZodNest` can emit `@ApiResponse({ type })`
+ * without unwrapping the runtime-only `z.array(...)` / `z.tuple([...])` wrapper.
  *
  * `status` is `undefined` when the user didn't pass one explicitly — the
  * effective status is resolved lazily by `resolveEffectiveStatus(variant,

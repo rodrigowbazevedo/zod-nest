@@ -57,8 +57,8 @@ interface UnrepresentableHit {
 
 /**
  * Parameters for `buildToJsonSchemaOptions` — the shared option-bag builder
- * used by both `toOpenApi` (single-schema mode) and Phase 2e's `bulkEmit`
- * (registry-mode). Centralizes the override chain, unrepresentable detection,
+ * used by both `toOpenApi` (single-schema mode) and `bulkEmit` (registry-mode).
+ * Centralizes the override chain, unrepresentable detection,
  * metadata wiring, and target/cycles defaults so both paths emit equivalent
  * JSON Schema for the same input.
  */

@@ -1,7 +1,7 @@
 /**
  * Composition layer — emits OpenAPI `allOf` for schemas derived via `extend`.
  *
- * **EXPERIMENTAL (v0.2)**: output shape may change as edge cases surface.
+ * **EXPERIMENTAL**: output shape may change as edge cases surface.
  */
 
 import { z } from 'zod';
@@ -17,7 +17,7 @@ import { DEFS_PREFIX } from './constants.js';
  * Lineage record for a composition-derived schema. Read by the override to
  * emit `allOf` instead of a flat body.
  *
- * @experimental v0.2 — shape may change.
+ * @experimental — shape may change.
  */
 export interface LineageEntry {
   readonly op: 'extend';
@@ -59,7 +59,7 @@ const computeShapeKeys = (
  * Wraps a derived `z.ZodObject` and records the parent → child link so
  * emission rewrites the body to `allOf: [{ $ref: <parent> }, <delta>]`.
  *
- * @experimental v0.2 — output shape may change as the surface stabilizes.
+ * @experimental — output shape may change as the surface stabilizes.
  *
  * @example
  *   const Base  = z.object({ id: z.string() }).meta({ id: 'Base' });
@@ -80,7 +80,7 @@ export const extend = <P extends z.ZodObject, S extends z.ZodObject>(
 /**
  * Read the lineage entry for a composition-derived schema, or `undefined`.
  *
- * @experimental v0.2 — `LineageEntry` shape may change.
+ * @experimental — `LineageEntry` shape may change.
  */
 export const getLineage = (schema: z.ZodType): LineageEntry | undefined => lineageMap.get(schema);
 
