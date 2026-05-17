@@ -1,0 +1,92 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. The faster we can reproduce the issue, the faster we can fix it — please share enough detail for us to recreate the problem locally.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing what's wrong.
+      placeholder: "`@ZodResponse` with `passthroughOnError: true` still throws a 500 when the response shape diverges from the DTO…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: |
+        Smallest snippet (or link to a repo) that demonstrates the bug. Inline code blocks are great if the repro fits in a few dozen lines.
+      placeholder: |
+        ```ts
+        const schema = z.object({ id: z.string() });
+        class FooDto extends createZodDto(schema, { id: 'Foo' }) {}
+
+        @Get()
+        @ZodResponse({ type: FooDto, passthroughOnError: true })
+        get(): unknown {
+          return { id: 42 }; // wrong shape
+        }
+        ```
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include the error message / stack trace if one is thrown.
+    validations:
+      required: true
+
+  - type: input
+    id: zod-nest-version
+    attributes:
+      label: zod-nest version
+      placeholder: "0.7.0"
+    validations:
+      required: true
+
+  - type: input
+    id: zod-version
+    attributes:
+      label: zod version
+      placeholder: "4.4.0"
+    validations:
+      required: true
+
+  - type: input
+    id: nestjs-version
+    attributes:
+      label: NestJS + @nestjs/swagger versions
+      placeholder: "@nestjs/core 11.0.0, @nestjs/swagger 11.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      placeholder: "22.11.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Workarounds you've tried, related issues, anything else useful.

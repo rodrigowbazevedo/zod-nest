@@ -137,12 +137,13 @@ describe('ZodSerializerInterceptor — end-to-end smoke', () => {
     expect(res.body).toEqual([{ id: 'u1', email: 'a@b.com' }, { name: 'admin' }]);
   });
 
-  it('200 strict failure: returns 500 with treeified errors', async () => {
+  it('200 strict failure: returns 500 without leaking the zod error tree', async () => {
     const res = await request(app.getHttpServer()).get('/users/strict-broken');
     expect(res.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(res.body.statusCode).toBe(500);
     expect(res.body.message).toBe('Response validation failed');
-    expect(res.body.errors).toBeDefined();
+    // 5xx is opaque to clients — the diagnostic tree goes to logs, not the wire.
+    expect(res.body.errors).toBeUndefined();
   });
 
   it("200 soft failure: emits handler's raw value untouched", async () => {

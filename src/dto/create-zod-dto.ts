@@ -34,8 +34,9 @@ const resolveId = (
     // eslint-disable-next-line no-console
     console.warn(
       `[zod-nest] Could not resolve a DTO id from class name (got "${className}"). ` +
-        `Using "${fallback}". Pass \`createZodDto(schema, { id: 'Foo' })\` to set a stable ` +
-        `name — important under minification, where class names become single mangled characters.`,
+        `Using "${fallback}". Set an explicit id via \`schema.meta({ id: 'Foo' })\` ` +
+        `(preferred) or \`createZodDto(schema, { id: 'Foo' })\` — important under ` +
+        `minification, where class names become single mangled characters.`,
     );
   }
   return fallback;

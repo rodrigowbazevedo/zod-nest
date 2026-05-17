@@ -1,0 +1,31 @@
+name: Question
+description: Ask a question about using zod-nest.
+title: "[question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a question, please check the docs:
+
+        - [README](../../README.md) — quickstart, features, differences from nestjs-zod
+        - [`docs/`](../../docs) — feature deep-dives (DTOs, validation pipe, responses, module options, logging, composition, swagger integration, exceptions)
+        - [`docs/recipes/`](../../docs/recipes) — concrete patterns
+        - [`MIGRATION.md`](../../MIGRATION.md) — coming from nestjs-zod
+
+        If the answer isn't there, fire away.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to figure out?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: |
+        What you've tried, what the surrounding code looks like, what you've already read. Concrete > abstract.

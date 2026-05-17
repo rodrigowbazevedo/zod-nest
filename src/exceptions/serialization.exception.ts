@@ -1,7 +1,7 @@
 import { HttpStatus, InternalServerErrorException } from '@nestjs/common';
-import { z } from 'zod';
 
 import type { ExecutionContext } from '@nestjs/common';
+import type { z } from 'zod';
 
 /**
  * Default exception thrown by `ZodSerializerInterceptor` in strict mode
@@ -13,13 +13,18 @@ import type { ExecutionContext } from '@nestjs/common';
  * {
  *   statusCode: 500,
  *   message: 'Response validation failed',
- *   errors: z.treeifyError(zodError),
  * }
  * ```
  *
- * Carries `zodError` and `executionContext` so custom exception filters
- * can introspect the original validation failure and the request that
- * produced it.
+ * The zod error tree is **deliberately not exposed in the response body** —
+ * a serialization failure is a server-side contract violation, and leaking
+ * the schema-shape error tree to clients discloses internal structure. The
+ * full treeified error is logged through `ZodNestModule`'s validation-log
+ * channel (with redaction + truncation) so operators get the diagnostic
+ * information without it reaching the wire.
+ *
+ * Custom exception filters can still introspect the failure: `zodError` and
+ * `executionContext` are kept as own properties on the instance.
  */
 export class ZodSerializationException extends InternalServerErrorException {
   readonly zodError: z.ZodError;
@@ -30,7 +35,6 @@ export class ZodSerializationException extends InternalServerErrorException {
       {
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Response validation failed',
-        errors: z.treeifyError(zodError),
       },
       { cause: zodError },
     );
