@@ -21,8 +21,7 @@ export interface ApplyZodNestOptions {
   /**
    * `ZodNestRegistry` instance that holds the zod-nest DTOs. Defaults to
    * `defaultRegistry` (the process-wide singleton populated by `createZodDto`).
-   * Pass an explicit registry for multi-app isolation (planned formalization
-   * in v0.2).
+   * Pass an explicit registry for multi-app isolation.
    */
   registry?: ZodNestRegistry;
   /** User override pipe applied on top of the built-in override during emission. */

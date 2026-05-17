@@ -49,7 +49,6 @@ export const createRegistry = (): ZodNestRegistry => {
 /**
  * Process-wide default registry. `createZodDto` registers schemas here unless
  * the caller passes `options.registry`. `applyZodNest` reads from the same
- * instance for bulk emission. Multi-app WeakMap isolation is deferred
- * to v0.2.
+ * instance for bulk emission.
  */
 export const defaultRegistry: ZodNestRegistry = createRegistry();
