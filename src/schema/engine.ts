@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import type { $ZodTypes } from 'zod/v4/core';
 import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
 import type { ZodNestRegistry } from './registry.js';
@@ -7,8 +8,35 @@ import type { ZodNestRegistry } from './registry.js';
 import { createCompositionOverride, DEFAULT_BUILD_REF } from './composition.js';
 import { ZOD_NEST_ERROR_DUPLICATE_ID, ZOD_NEST_ERROR_EXTENSION } from './constants.js';
 import { ZodNestUnrepresentableError } from './errors.js';
-import { combine, isStrictlyUnrepresentable, primitiveOverride } from './override.js';
+import { combine, primitiveOverride } from './override.js';
 import { postProcess } from './post-process.js';
+
+/**
+ * Zod constructs that JSON Schema can't represent without an override. When
+ * one of these shows up and our combined override chain didn't produce any
+ * body for it, strict mode collects the hit and surfaces it as a
+ * `ZodNestUnrepresentableError`. Bound to `engine.ts` since the strict-hit
+ * collection lives here too.
+ */
+const STRICT_REQUIRES_OVERRIDE: ReadonlySet<string> = new Set([
+  'bigint',
+  'date',
+  'symbol',
+  'undefined',
+  'void',
+  'map',
+  'set',
+  'transform',
+  'nan',
+  'custom',
+]);
+
+const isStrictlyUnrepresentable = (jsonSchema: SchemaObject, zodSchema: $ZodTypes): boolean => {
+  if (!STRICT_REQUIRES_OVERRIDE.has(zodSchema._zod.def.type)) {
+    return false;
+  }
+  return Object.keys(jsonSchema).length === 0;
+};
 
 export interface ToOpenApiOptions {
   io: 'input' | 'output';
@@ -68,6 +96,7 @@ export const buildToJsonSchemaOptions = (
   // directly via the configured `uri` callback (post-process is skipped).
   const compositionOverride = createCompositionOverride({
     buildRef: params.uri ?? DEFAULT_BUILD_REF,
+    registry: params.registry,
   });
   const merged = combine(primitiveOverride, compositionOverride, params.override);
   const unrepresentableHits: UnrepresentableHit[] = [];

@@ -23,11 +23,14 @@ export class ZodValidationException extends BadRequestException {
   readonly argMetadata?: ArgumentMetadata;
 
   constructor(zodError: z.ZodError, argMetadata?: ArgumentMetadata) {
-    super({
-      statusCode: HttpStatus.BAD_REQUEST,
-      message: 'Validation failed',
-      errors: z.treeifyError(zodError),
-    });
+    super(
+      {
+        statusCode: HttpStatus.BAD_REQUEST,
+        message: 'Validation failed',
+        errors: z.treeifyError(zodError),
+      },
+      { cause: zodError },
+    );
     this.zodError = zodError;
     this.argMetadata = argMetadata;
   }

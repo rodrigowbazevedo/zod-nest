@@ -1,9 +1,8 @@
-import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 
 import type { LoggerService } from '@nestjs/common';
 
-const DEFAULT_LOGGER_CONTEXT = 'ZodValidation';
+export const DEFAULT_LOGGER_CONTEXT = 'ZodValidation';
 const REDACTED = '[REDACTED]';
 const PREVIEW_RESERVE_BYTES = 100;
 
@@ -23,7 +22,7 @@ export interface ValidationLogContext {
 }
 
 export interface ValidationLoggerOptions {
-  logger?: LoggerService;
+  logger: LoggerService;
   redactKeys: readonly string[];
   maxLoggedValueBytes: number;
 }
@@ -101,7 +100,7 @@ const messageFor = (side: 'input' | 'output'): string =>
 
 export const createValidationLogger = (opts: ValidationLoggerOptions): LogValidationFailure => {
   const redactSet = new Set(opts.redactKeys.map((key) => key.toLowerCase()));
-  const logger: LoggerService = opts.logger ?? new Logger(DEFAULT_LOGGER_CONTEXT);
+  const { logger } = opts;
 
   return (err, value, ctx) => {
     const redacted = redactValue(value, redactSet);

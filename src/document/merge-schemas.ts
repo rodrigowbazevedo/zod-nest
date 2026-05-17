@@ -9,6 +9,7 @@ import {
   ZOD_NEST_ERROR_DUPLICATE_ID,
   ZOD_NEST_ERROR_EXTENSION,
 } from '../schema/constants.js';
+import { OUTPUT_SUFFIX } from './constants.js';
 import { ZodNestDocumentError } from './errors.js';
 
 export interface MergeSchemasParams {
@@ -31,8 +32,6 @@ export interface MergeSchemasResult {
    */
   renames: ReadonlyMap<string, string>;
 }
-
-const OUTPUT_SUFFIX = 'Output';
 
 /**
  * Applies the I/O suffix truth table and class-name → dtoId rename pass to

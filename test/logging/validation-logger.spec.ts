@@ -219,13 +219,6 @@ describe('createValidationLogger', () => {
     const [payload] = logger.error.mock.calls[0] ?? [];
     expect((payload as { value: unknown }).value).toEqual({ tiny: true });
   });
-
-  it('falls back to NestJS Logger when no logger is supplied', () => {
-    const log = createValidationLogger({ redactKeys: [], maxLoggedValueBytes: 4096 });
-    expect(() =>
-      log(failingError(), { x: 1 }, { side: 'output', severity: 'error', dto: 'UserDto' }),
-    ).not.toThrow();
-  });
 });
 
 describe('noopLogValidationFailure', () => {

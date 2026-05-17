@@ -38,4 +38,10 @@ describe('ZodSerializationException', () => {
     const err = new ZodSerializationException(failingError(), ctx);
     expect(err.executionContext).toBe(ctx);
   });
+
+  it('sets ES2022 cause to the original ZodError', () => {
+    const zodErr = failingError();
+    const err = new ZodSerializationException(zodErr);
+    expect(err.cause).toBe(zodErr);
+  });
 });
