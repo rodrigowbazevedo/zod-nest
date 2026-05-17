@@ -461,6 +461,21 @@ If you're coming from `nestjs-zod`, the headline changes are:
 
 Full guide with side-by-side diffs and a 19-row breaking-changes table in [`MIGRATION.md`](MIGRATION.md).
 
+## AI tooling — `npx skills`
+
+`zod-nest` ships two AI-agent skills you can install into your project via [`npx skills`](https://github.com/vercel-labs/skills) (Claude Code primary; Cursor / Continue best-effort):
+
+- **`zod-nest-migrate`** — walks an agent through the 8-step `nestjs-zod` → `zod-nest` migration, plan-then-apply per step.
+- **`zod-nest`** — diagnostic best-practices skill for schema and `@ZodResponse` ergonomics; auto-triggers on edits to `*.controller.ts` / `*.dto.ts` files that import from `zod-nest`.
+
+```bash
+npx skills add rodrigowbazevedo/zod-nest                                   # both skills
+npx skills add rodrigowbazevedo/zod-nest --skill zod-nest-migrate          # migration only
+npx skills add rodrigowbazevedo/zod-nest --skill zod-nest                  # best-practices only
+```
+
+Full details, agent compatibility notes, and what each skill diagnoses: [`docs/skills.md`](docs/skills.md).
+
 ## Contributing
 
 `zod-nest` is a young, single-maintainer OSS project — contributions and issues are welcome. The codebase is well-tested (>340 tests, full coverage on document/schema layers) and is meant to stay small enough that a first-time contributor can hold the whole surface in their head.
