@@ -12,6 +12,7 @@ jobs:
   release:
     name: semantic-release
     runs-on: ubuntu-latest
+    environment: packages
     permissions:
       contents: write
       issues: write
