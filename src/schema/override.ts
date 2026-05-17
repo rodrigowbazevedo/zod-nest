@@ -9,7 +9,15 @@ export interface OverrideContext {
 
 export type Override = (ctx: OverrideContext) => void;
 
-export const builtInOverride: Override = ({ zodSchema, jsonSchema }) => {
+/**
+ * Type-driven override for primitive Zod constructs that JSON Schema can't
+ * represent directly (bigint → integer, date → string + date-time format).
+ * Composition's `allOf`-form emission lives in `composition.ts`; the engine
+ * combines both into the full override chain per call site (since composition
+ * needs a uri-aware `buildRef` that differs between single-schema and bulk
+ * emission).
+ */
+export const primitiveOverride: Override = ({ zodSchema, jsonSchema }) => {
   const type = zodSchema._zod.def.type;
   if (type === 'bigint') {
     jsonSchema.type = 'integer';

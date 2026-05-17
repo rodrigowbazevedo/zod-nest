@@ -1,6 +1,9 @@
 /** OpenAPI 3.1 `$ref` prefix for entries in `components.schemas`. */
 export const COMPONENTS_SCHEMAS_PREFIX = '#/components/schemas/';
 
+/** JSON Schema `$ref` prefix for entries in `$defs` (single-schema emission). */
+export const DEFS_PREFIX = '#/$defs/';
+
 /** OpenAPI extension key zod-nest uses to surface engine errors inside emitted schemas. */
 export const ZOD_NEST_ERROR_EXTENSION = 'x-zod-nest-error';
 

@@ -4,9 +4,10 @@ import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
 import type { ZodNestRegistry } from './registry.js';
 
+import { createCompositionOverride, DEFAULT_BUILD_REF } from './composition.js';
 import { ZOD_NEST_ERROR_DUPLICATE_ID, ZOD_NEST_ERROR_EXTENSION } from './constants.js';
 import { ZodNestUnrepresentableError } from './errors.js';
-import { builtInOverride, combine, isStrictlyUnrepresentable } from './override.js';
+import { combine, isStrictlyUnrepresentable, primitiveOverride } from './override.js';
 import { postProcess } from './post-process.js';
 
 export interface ToOpenApiOptions {
@@ -38,7 +39,14 @@ export interface BuildToJsonSchemaOptionsParams {
   io: 'input' | 'output';
   override?: Override;
   strict?: boolean;
-  /** Single-schema mode inlines reused branches; bulk mode prefers shared refs. */
+  /**
+   * Zod's strategy for anonymous reused sub-schemas. Both single-schema and
+   * bulk modes use `'inline'` — `'ref'` extracts anonymous reused branches
+   * into a virtual `__shared/$defs` table whose refs don't resolve against
+   * `components.schemas`, producing dangling refs. Registered schemas
+   * (`metadata.id` present) always go through the `uri` callback regardless,
+   * so DTO-to-DTO `$ref`s are unaffected.
+   */
   reused: 'inline' | 'ref';
   /** Bulk-mode only — shapes internal `$ref`s to `#/components/schemas/<id>`. */
   uri?: (id: string) => string;
@@ -54,7 +62,14 @@ export const buildToJsonSchemaOptions = (
   params: BuildToJsonSchemaOptionsParams,
 ): BuiltJsonSchemaOptions => {
   const strict = params.strict ?? true;
-  const merged = combine(builtInOverride, params.override);
+  // Composition's `buildRef` differs between single-schema and bulk modes:
+  // single-schema emits `#/$defs/<id>` (post-process rewrites to
+  // `#/components/schemas/<id>`); bulk emits `#/components/schemas/<id>`
+  // directly via the configured `uri` callback (post-process is skipped).
+  const compositionOverride = createCompositionOverride({
+    buildRef: params.uri ?? DEFAULT_BUILD_REF,
+  });
+  const merged = combine(primitiveOverride, compositionOverride, params.override);
   const unrepresentableHits: UnrepresentableHit[] = [];
 
   const wrapped: Override = (ctx) => {

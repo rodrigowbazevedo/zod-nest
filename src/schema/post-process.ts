@@ -1,13 +1,11 @@
 import type { SchemaObject } from './openapi.types.js';
 
-import { COMPONENTS_SCHEMAS_PREFIX } from './constants.js';
+import { COMPONENTS_SCHEMAS_PREFIX, DEFS_PREFIX } from './constants.js';
 
 export interface PostProcessResult {
   schema: SchemaObject;
   refs: Map<string, SchemaObject>;
 }
-
-const DEFS_PREFIX = '#/$defs/';
 
 const rewriteRefs = (node: unknown, selfRef: string | undefined): void => {
   if (Array.isArray(node)) {
