@@ -4,9 +4,10 @@ import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
 import type { ZodNestRegistry } from './registry.js';
 
+import { createCompositionOverride, DEFAULT_BUILD_REF } from './composition.js';
 import { ZOD_NEST_ERROR_DUPLICATE_ID, ZOD_NEST_ERROR_EXTENSION } from './constants.js';
 import { ZodNestUnrepresentableError } from './errors.js';
-import { builtInOverride, combine, isStrictlyUnrepresentable } from './override.js';
+import { combine, isStrictlyUnrepresentable, primitiveOverride } from './override.js';
 import { postProcess } from './post-process.js';
 
 export interface ToOpenApiOptions {
@@ -54,7 +55,14 @@ export const buildToJsonSchemaOptions = (
   params: BuildToJsonSchemaOptionsParams,
 ): BuiltJsonSchemaOptions => {
   const strict = params.strict ?? true;
-  const merged = combine(builtInOverride, params.override);
+  // Composition's `buildRef` differs between single-schema and bulk modes:
+  // single-schema emits `#/$defs/<id>` (post-process rewrites to
+  // `#/components/schemas/<id>`); bulk emits `#/components/schemas/<id>`
+  // directly via the configured `uri` callback (post-process is skipped).
+  const compositionOverride = createCompositionOverride({
+    buildRef: params.uri ?? DEFAULT_BUILD_REF,
+  });
+  const merged = combine(primitiveOverride, compositionOverride, params.override);
   const unrepresentableHits: UnrepresentableHit[] = [];
 
   const wrapped: Override = (ctx) => {
