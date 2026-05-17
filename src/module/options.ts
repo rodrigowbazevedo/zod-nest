@@ -66,15 +66,18 @@ export interface NormalizedZodNestOptions {
 }
 
 export const DEFAULT_REDACT_KEYS: readonly string[] = [
+  // Credentials
   'password',
-  'token',
-  'authorization',
   'secret',
   'apiKey',
+  // Auth headers + tokens
+  'authorization',
+  'bearer',
+  'token',
   'accessToken',
   'refreshToken',
-  'bearer',
   'jwt',
+  // Session cookies
   'cookie',
   'set-cookie',
 ];
