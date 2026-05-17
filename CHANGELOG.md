@@ -1,3 +1,10 @@
+# [0.4.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.3.0...v0.4.0) (2026-05-17)
+
+
+### Features
+
+* **response:** @ZodResponse + ZodSerializerInterceptor + ZodNestModule (Phase 2d) ([#15](https://github.com/rodrigowbazevedo/zod-nest/issues/15)) ([4a0d04f](https://github.com/rodrigowbazevedo/zod-nest/commit/4a0d04f032685290204dd723cbe78aee231c8325)), closes [#14](https://github.com/rodrigowbazevedo/zod-nest/issues/14) [#14](https://github.com/rodrigowbazevedo/zod-nest/issues/14)
+
 # [0.3.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.2.0...v0.3.0) (2026-05-17)
 
 
