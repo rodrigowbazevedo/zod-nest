@@ -64,7 +64,10 @@ Every command runs from the repo root with `npm`. The package manager is npm; pl
 - **Don't commit without being asked.** Stage + show the diff, wait for explicit "commit". Same applies to pushing and PR-opening.
 - **Don't `npm publish` ever.** CI is the only publish path; running it locally bypasses semantic-release versioning.
 - **Run lint + typecheck + test + build before presenting changes.** `npm run prepublishOnly` is the convenience chain.
-- **Before `gh pr create` with src/ changes**: run `/sync-docs` first to detect README / docs / examples drift. The `.claude/` PreToolUse hook blocks `gh pr create` when drift is detected; bypass with `ZOD_NEST_SKIP_DOCS_CHECK=1` for refactors that genuinely don't touch the public surface.
+- **Before `gh pr create`**: the `.claude/` PreToolUse hook runs two checks and blocks the PR if either fires. Run the relevant skill first to clear them:
+  - If `src/` changed without README / docs / MIGRATION updates → run `/sync-docs`.
+  - If `src/index.ts` or any `src/*/index.ts` changed → run `/api-surface-audit`.
+  - Bypass both with `ZOD_NEST_SKIP_PRE_PR_CHECKS=1` for refactor-only PRs that genuinely don't need either.
 
 ## Conventions
 
