@@ -28,10 +28,10 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          # Node 24 bundles npm >= 11, required for OIDC trusted publishing.
-          # Node 22 still ships npm 10.x as of mid-2026; consumers can still
-          # use this package on >=22 (engines), only the publish runner needs
-          # the newer npm.
+          # Node 24.15.0 still ships npm 10.9.8, which lacks trusted-publisher
+          # OIDC support. We upgrade to npm@11 explicitly in the step below.
+          # Consumers can still use this package on >=22 (engines); only the
+          # publish runner needs the newer npm.
           node-version: '24'
           # `registry-url` is mandatory for npm OIDC trusted publishing — it
           # writes a `.npmrc` that pins the registry, which is what triggers
@@ -39,6 +39,11 @@ jobs:
           # Without it, npm falls through to "needs auth" and ENEEDAUTH.
           registry-url: 'https://registry.npmjs.org'
           cache: npm
+
+      # OIDC trusted publishers require npm >= 11.5.1. Node 24.15.0 bundles
+      # npm 10.9.8, which silently skips the trusted-publisher exchange and
+      # the registry then returns an opaque 404. Upgrade before anything else.
+      - run: npm install -g npm@11
 
       - run: npm ci
 
