@@ -37,6 +37,23 @@ That sets up the `husky` git hooks too. The pre-commit hook runs `prettier --wri
 
 `npm run prepublishOnly` chains lint + typecheck + test + build — that's the gate semantic-release uses, so running it locally is a good last check before pushing.
 
+## Working with Claude Code (optional)
+
+If you happen to use [Claude Code](https://claude.com/claude-code), the repo ships a `.claude/` config that wires up a few conveniences. **None of this is required to contribute** — every step in this guide works without it.
+
+- **PostToolUse chain** runs `tsc --noEmit` + `eslint --fix --cache` + `prettier --write` automatically after Claude edits a TypeScript file. Purely a speed-up; the same checks run in CI either way.
+- **PreToolUse pre-PR checks** fire before `gh pr create` and ask you to run a skill first when:
+  - `src/` has changed without a matching update under `README.md` / `docs/` / `MIGRATION.md` → run `/sync-docs`.
+  - `src/index.ts` or any `src/*/index.ts` has changed → run `/api-surface-audit`.
+
+  Skip with `ZOD_NEST_SKIP_PRE_PR_CHECKS=1` for refactors that genuinely don't need either. Only fires inside Claude Code sessions.
+- **Skills** under `.claude/skills/`:
+  - `/sync-docs` — surface docs that need updating against the branch's `src/` diff.
+  - `/api-surface-audit` — verify every public export has a test + follows naming conventions. Use before cutting a release.
+  - `/schema-fixture` — add a parameterized Zod → OpenAPI test case to the engine spec suite.
+  - `/check-upstream-updates` — audit `zod`, `@nestjs/swagger`, `@nestjs/common`/`core`, `rxjs` and file GitHub issues on actionable findings.
+  - `/scan-zod-features`, `/scan-nest-features` — source-aware scanners that the upstream-updates orchestrator delegates to.
+
 ## Test layout
 
 Tests live under `test/<area>/`, mirroring the `src/<area>/` structure:

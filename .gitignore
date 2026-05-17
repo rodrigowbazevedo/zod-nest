@@ -36,8 +36,5 @@ yarn-error.log*
 .discovery/
 .plan/
 
-# Workspace-orientation placeholder — replaced by Phase 4 with the public CLAUDE.md
-CLAUDE.md
-
 # Local Claude transcripts and plans
 .claude/transcripts/
