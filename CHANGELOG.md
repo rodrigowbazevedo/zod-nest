@@ -1,3 +1,10 @@
+## [0.1.5](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.4...v0.1.5) (2026-05-17)
+
+
+### Bug Fixes
+
+* **release:** drive npm publish through npx --package=npm@11 ([#8](https://github.com/rodrigowbazevedo/zod-nest/issues/8)) ([9e3df47](https://github.com/rodrigowbazevedo/zod-nest/commit/9e3df4780fc80873eb6f473b57f488b2d4a133ed))
+
 ## [0.1.4](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.3...v0.1.4) (2026-05-17)
 
 
