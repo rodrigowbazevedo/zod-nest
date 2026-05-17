@@ -44,3 +44,11 @@ jobs:
           files: ./coverage/lcov.info
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload test results to Codecov
+        if: matrix.node == '24' && !cancelled()
+        uses: codecov/test-results-action@v1
+        with:
+          files: ./reports/junit.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
