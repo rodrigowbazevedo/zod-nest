@@ -54,4 +54,17 @@ describe('ZodValidationPipe — explicit constructor arg', () => {
     const value = { anything: 1 };
     expect(await pipe.transform(value, meta())).toBe(value);
   });
+
+  it('falls back to pass-through when arg is a primitive (defensive guard)', async () => {
+    // Type assertions used to deliberately violate the public signature —
+    // exercises the runtime defensive guard for misuse from JS callers.
+    const pipeFromString = new ZodValidationPipe('whoops' as unknown as undefined);
+    const pipeFromNumber = new ZodValidationPipe(42 as unknown as undefined);
+    const pipeFromNull = new ZodValidationPipe(null as unknown as undefined);
+
+    const value = { anything: 1 };
+    expect(await pipeFromString.transform(value, meta())).toBe(value);
+    expect(await pipeFromNumber.transform(value, meta())).toBe(value);
+    expect(await pipeFromNull.transform(value, meta())).toBe(value);
+  });
 });
