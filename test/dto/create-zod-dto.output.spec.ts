@@ -46,4 +46,33 @@ describe('createZodDto — .Output sibling', () => {
 
     expect(Output_SameId_Dto.Output.id).toBe(Output_SameId_Dto.id);
   });
+
+  it('sibling exposes parse / safeParse mirroring the schema', () => {
+    const schema = z.object({ x: z.string() });
+    class Output_Parse_Dto extends createZodDto(schema, { id: 'Output_Parse' }) {}
+
+    const sibling = Output_Parse_Dto.Output;
+    expect(sibling.parse({ x: 'hello' })).toEqual({ x: 'hello' });
+
+    const ok = sibling.safeParse({ x: 'hi' });
+    expect(ok.success).toBe(true);
+
+    const bad = sibling.safeParse({ x: 42 });
+    expect(bad.success).toBe(false);
+  });
+
+  it('sibling _OPENAPI_METADATA_FACTORY emits an output-side marker', () => {
+    const schema = z.object({ x: z.string() });
+    class Output_Factory_Dto extends createZodDto(schema, { id: 'Output_Factory' }) {}
+
+    const factoryOutput = Output_Factory_Dto.Output._OPENAPI_METADATA_FACTORY() as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const marker = factoryOutput['x-zod-nest-dto'];
+    expect(marker).toBeDefined();
+    expect(marker?.__zodNestDto).toBe(true);
+    expect(marker?.dtoId).toBe('Output_Factory');
+    expect(marker?.io).toBe('output');
+  });
 });
