@@ -1,3 +1,10 @@
+# [0.2.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.5...v0.2.0) (2026-05-17)
+
+
+### Features
+
+* **dto:** createZodDto with placeholder bridge for @nestjs/swagger (Phase 2b) ([#11](https://github.com/rodrigowbazevedo/zod-nest/issues/11)) ([291a87b](https://github.com/rodrigowbazevedo/zod-nest/commit/291a87be709ceebbc490ac292b1465792f0a6219)), closes [#10](https://github.com/rodrigowbazevedo/zod-nest/issues/10)
+
 ## [0.1.5](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.4...v0.1.5) (2026-05-17)
 
 
