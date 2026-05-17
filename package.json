@@ -70,6 +70,7 @@
     "@ianvs/prettier-plugin-sort-imports": "^4.4.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.1.21",
     "@nestjs/swagger": "^11.0.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/exec": "^7.0.3",

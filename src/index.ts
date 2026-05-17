@@ -1,7 +1,9 @@
 export {
   COMPONENTS_SCHEMAS_PREFIX,
   createRegistry,
+  defaultRegistry,
   toOpenApi,
+  ZOD_NEST_DTO_EXTENSION,
   ZOD_NEST_ERROR_DUPLICATE_ID,
   ZOD_NEST_ERROR_EXTENSION,
   ZodNestError,
@@ -15,3 +17,5 @@ export type {
   ToOpenApiResult,
   ZodNestRegistry,
 } from './schema/index.js';
+export { createZodDto, ZOD_DTO_SYMBOL } from './dto/index.js';
+export type { CreateZodDtoOptions, Io, ZodDto } from './dto/index.js';
