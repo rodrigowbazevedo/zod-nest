@@ -1,15 +1,7 @@
 /**
- * Composition layer — emits OpenAPI `allOf` form for schemas derived via the
- * `extend` helper.
+ * Composition layer — emits OpenAPI `allOf` for schemas derived via `extend`.
  *
- * **EXPERIMENTAL (v0.2).** The composition surface (`extend`, `getLineage`,
- * `LineageEntry`) is shipped for early feedback against real-world DTO
- * compositions. Output shape and helper signatures may change in subsequent
- * releases as edge cases surface (deeply nested anonymous deltas,
- * discriminated unions composed with extend, single-schema-mode parent
- * embedding, subtractive variants `omit` / `pick` / `partial`). Pin a minor
- * version and validate against your own snapshots before relying on the
- * output shape downstream.
+ * **EXPERIMENTAL (v0.2)**: output shape may change as edge cases surface.
  */
 
 import { z } from 'zod';
@@ -18,34 +10,27 @@ import type { $ZodType } from 'zod/v4/core';
 import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
 
+import { DEFS_PREFIX } from './constants.js';
+
 /**
- * Lineage record stored for each composition-derived schema. v0.2 only emits
- * this for the `extend` helper; `omit` / `pick` / `partial` defer to v0.3.
+ * Lineage record for a composition-derived schema. Read by the override to
+ * emit `allOf` instead of a flat body.
  *
- * The override hook reads this map to discriminate composition-derived schemas
- * from plain `z.object()`s and replaces their flat JSON Schema body with an
- * `allOf` form that references the parent's `$id`.
- *
- * @experimental v0.2 — shape may change as the composition surface stabilizes.
+ * @experimental v0.2 — shape may change.
  */
 export interface LineageEntry {
   readonly op: 'extend';
   readonly parent: z.ZodObject;
 }
 
-/**
- * Module-internal lineage table. `WeakMap` (not `z.registry`) so transient
- * derived schemas can GC — Zod's own docs warn against long-running
- * registries pinning short-lived schemas alive.
- */
+// `WeakMap` (not `z.registry`) so transient derived schemas can GC — Zod's
+// own docs warn against long-running registries pinning short-lived schemas.
 const lineageMap = new WeakMap<$ZodType, LineageEntry>();
 
-/**
- * Per-schema flat key cache, populated as each schema's override fires. By
- * "children-before-parents" ordering, a parent's entry is always present
- * by the time the child's override needs to subtract the parent's keys
- * to compute the delta.
- */
+// Parent flat-key cache, populated eagerly by `extend()` at registration.
+// `reused: 'inline'` inlines the parent's shape into the child rather than
+// firing the override on the parent as a separate node, so the override
+// can't be relied on to populate this — extend() does it eagerly.
 const propsMap = new WeakMap<
   $ZodType,
   { properties: readonly string[]; required: readonly string[] }
@@ -70,24 +55,14 @@ const computeShapeKeys = (
 };
 
 /**
- * Wraps `parent.extend(...)` (or any builder that produces a derived
- * `z.ZodObject`) and records the parent → child link in the lineage map.
- * Subsequent `z.toJSONSchema` emission picks this up and rewrites the
- * derived schema's body to `allOf: [{ $ref: '<parent>' }, <delta>]`.
+ * Wraps a derived `z.ZodObject` and records the parent → child link so
+ * emission rewrites the body to `allOf: [{ $ref: <parent> }, <delta>]`.
  *
- * Type inference flows through Zod's own `.extend()` machinery — `S` is
- * whatever the `build` callback returns, so `z.infer<typeof result>`
- * resolves to the full extended shape at the call site.
- *
- * @experimental v0.2 — shipped for early feedback. Validate the emitted
- *   JSON Schema against your own snapshots; details (delta shape,
- *   anonymous-parent fallback, single-schema-mode parent embedding) may
- *   change as the surface stabilizes.
+ * @experimental v0.2 — output shape may change as the surface stabilizes.
  *
  * @example
  *   const Base  = z.object({ id: z.string() }).meta({ id: 'Base' });
  *   const Child = extend(Base, (s) => s.extend({ role: z.string() }).meta({ id: 'Child' }));
- *   type ChildOut = z.infer<typeof Child>;  // { id: string; role: string }
  */
 export const extend = <P extends z.ZodObject, S extends z.ZodObject>(
   parent: P,
@@ -95,10 +70,6 @@ export const extend = <P extends z.ZodObject, S extends z.ZodObject>(
 ): S => {
   const result = build(parent);
   lineageMap.set(result, { op: 'extend', parent });
-  // Pre-cache the parent's keys. `reused: 'inline'` mode doesn't fire the
-  // override on the parent as a separate node (its shape is inlined into the
-  // child), so we can't rely on a parent-first override visit to populate
-  // `propsMap`. Compute it eagerly from Zod's shape.
   if (!propsMap.has(parent)) {
     propsMap.set(parent, computeShapeKeys(parent));
   }
@@ -106,22 +77,18 @@ export const extend = <P extends z.ZodObject, S extends z.ZodObject>(
 };
 
 /**
- * Public read-only accessor over the lineage table. Returns `undefined` for
- * schemas that weren't built through the composition helpers. Useful for
- * tooling that wants to walk composition trees outside the OpenAPI output.
+ * Read the lineage entry for a composition-derived schema, or `undefined`.
  *
  * @experimental v0.2 — `LineageEntry` shape may change.
  */
 export const getLineage = (schema: z.ZodType): LineageEntry | undefined => lineageMap.get(schema);
 
 /**
- * Default ref builder for single-schema mode (`toOpenApi`). Refs land in
- * `#/$defs/<id>` and the engine's `post-process` rewrites them to
- * `#/components/schemas/<id>`. Bulk mode (`bulkEmit`) passes its `uri`
- * callback as the buildRef instead, so refs land at the final location
- * directly (no rewrite pass on the bulk path).
+ * Default ref builder for single-schema mode (`toOpenApi`) — refs land in
+ * `#/$defs/<id>` and `post-process` rewrites them to `#/components/schemas/<id>`.
+ * Bulk mode passes its own `uri` callback so refs land at the final location.
  */
-export const DEFAULT_BUILD_REF = (id: string): string => `#/$defs/${id}`;
+export const DEFAULT_BUILD_REF = (id: string): string => `${DEFS_PREFIX}${id}`;
 
 export interface CreateCompositionOverrideOptions {
   /** Shape the `$ref` string for a parent id. Defaults to `#/$defs/<id>`. */
@@ -129,15 +96,9 @@ export interface CreateCompositionOverrideOptions {
 }
 
 /**
- * Factory for the composition override. Returns an `Override` that:
- * 1. Caches the current node's flat key set in `propsMap`.
- * 2. If the node has a lineage entry AND its parent has a registered id,
- *    subtracts the parent's keys to compute the delta and replaces the
- *    body's structural keys with `{ allOf: [{ $ref: buildRef(parentId) },
- *    delta], unevaluatedProperties: false }`. Meta keys (`title`,
- *    `description`, etc.) stay on `jsonSchema` untouched.
- * 3. Otherwise (no lineage, or anonymous parent), leaves Zod's flat
- *    emission in place — that's the v0.2 fallback.
+ * Factory for the composition override. Returns an `Override` that rewrites
+ * composition-derived schemas to `allOf` form, falling back to Zod's flat
+ * emission when no lineage entry exists or the parent has no registered id.
  *
  * Mutation happens in-place — Zod's override doesn't propagate
  * `ctx.jsonSchema = newBody` reassignments; only mutations on the existing
@@ -147,11 +108,6 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
   const { buildRef } = opts;
   return (ctx) => {
     const { jsonSchema, zodSchema } = ctx;
-    propsMap.set(zodSchema, {
-      properties: jsonSchema.properties !== undefined ? Object.keys(jsonSchema.properties) : [],
-      required: jsonSchema.required ?? [],
-    });
-
     const entry = lineageMap.get(zodSchema);
     if (entry === undefined) {
       return;
@@ -159,17 +115,14 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
 
     const parentCache = propsMap.get(entry.parent);
     if (parentCache === undefined) {
-      // Should never happen — `extend` pre-caches the parent at registration
-      // time, so by the time the child's override fires, the parent's keys
-      // are already in `propsMap`. Defensive bail.
+      // Defensive: `extend()` pre-caches the parent at registration time, so
+      // by the time the child's override fires this should be set.
       return;
     }
 
     const parentId = z.globalRegistry.get(entry.parent)?.id;
     if (parentId === undefined) {
-      // Anonymous parent (no `.meta({ id })` registration) — v0.2 falls back
-      // to Zod's flat emission. Documented limitation; users opt in to
-      // `allOf` form by registering a parent id.
+      // Anonymous parent — fall back to Zod's flat emission.
       return;
     }
 
@@ -192,8 +145,6 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
       delta.required = deltaRequired;
     }
 
-    // Drop the now-replaced structural keys; leave user meta (title,
-    // description, examples, x-* extensions, etc.) untouched on jsonSchema.
     delete jsonSchema.type;
     delete jsonSchema.properties;
     delete jsonSchema.required;
