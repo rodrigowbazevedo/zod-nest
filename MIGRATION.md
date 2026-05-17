@@ -1,5 +1,7 @@
 # Migrating from `nestjs-zod`
 
+> **Prefer driving this migration with Claude / Cursor?** `npx skills add rodrigowbazevedo/zod-nest --skill zod-nest-migrate` installs an AI-agent skill that walks through the 8 steps below with per-step confirmation. See [`docs/skills.md`](docs/skills.md) for details.
+
 This guide is for projects on the public [`nestjs-zod`](https://github.com/BenLorantfy/nestjs-zod) package migrating to `zod-nest`. The mechanical bits (uninstall, reinstall, swap imports) are quick; the behavioural changes (status resolution, I/O suffix, no `cleanupOpenApiDoc`) take a more careful read.
 
 ## TL;DR — 5 bullets
