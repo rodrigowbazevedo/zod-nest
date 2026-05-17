@@ -113,4 +113,23 @@ describe('collectUsage — controller walk edge cases', () => {
 
     await localApp.close();
   });
+
+  it('skips DiscoveryService wrappers with null/undefined instances + non-function methods', () => {
+    // Mock DiscoveryService directly to feed pathological wrappers that
+    // exercise the defensive null-instance + non-function-handler guards.
+    const fakeApp = {
+      get: () => ({
+        getControllers: () => [
+          { instance: null },
+          { instance: undefined },
+          // A "controller" whose prototype has a non-function property —
+          // exercises the `typeof handler !== 'function'` skip.
+          { instance: Object.assign(Object.create({ someProp: 'not-a-function' }), {}) },
+        ],
+      }),
+    } as unknown as INestApplication;
+
+    const { outputExposedIds } = collectUsage(emptyDoc(), fakeApp);
+    expect(outputExposedIds.size).toBe(0);
+  });
 });

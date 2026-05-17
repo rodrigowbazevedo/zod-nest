@@ -306,4 +306,46 @@ describe('mergeSchemas — edge cases', () => {
     expect(doc.components?.schemas).toBeDefined();
     expect((doc.components?.schemas as Record<string, unknown>).Foo).toEqual({ type: 'object' });
   });
+
+  it('AMBIGUOUS_RENAME fires even when the existing body is a non-object (string)', () => {
+    // Covers the `isMarkerPlaceholder(value) → value === null || typeof !== 'object'`
+    // branch — existing schema is a string, fails the placeholder check, and
+    // also differs canonically from the incoming body.
+    const doc = emptyDoc();
+    doc.components = {
+      schemas: { Foo: 'pre-existing-string' as unknown as Record<string, unknown> },
+    };
+
+    expect(() =>
+      mergeSchemas({
+        doc,
+        inputSchemas: new Map([['Foo', { type: 'object' }]]),
+        outputSchemas: new Map(),
+        collected: usage({ inputExposedIds: new Set(['Foo']) }),
+        collisions: NO_COLLISIONS,
+      }),
+    ).toThrow(ZodNestDocumentError);
+  });
+
+  it('canonicalEqual hits the reference-equality fast path when input ref === output ref', () => {
+    // Pass the SAME body reference for both input and output to hit `a === b`
+    // → no Output suffix, no extra entry.
+    const doc = emptyDoc();
+    const sharedBody = { type: 'object', properties: { x: { type: 'string' } } };
+
+    const result = mergeSchemas({
+      doc,
+      inputSchemas: new Map([['Refeq', sharedBody]]),
+      outputSchemas: new Map([['Refeq', sharedBody]]),
+      collected: usage({
+        inputExposedIds: new Set(['Refeq']),
+        outputExposedIds: new Set(['Refeq']),
+      }),
+      collisions: NO_COLLISIONS,
+    });
+
+    expect(schemasOf(doc).Refeq).toBe(sharedBody);
+    expect(schemasOf(doc).RefeqOutput).toBeUndefined();
+    expect(result.divergentOutputIds.size).toBe(0);
+  });
 });

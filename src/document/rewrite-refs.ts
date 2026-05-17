@@ -1,20 +1,10 @@
 import type { OpenAPIObject } from '@nestjs/swagger';
 
+import { COMPONENTS_SCHEMAS_PREFIX } from '../schema/constants.js';
+import { HTTP_METHODS } from './http-methods.js';
 import { walkRefs } from './walk-refs.js';
 
-const SCHEMA_PREFIX = '#/components/schemas/';
 const OUTPUT_SUFFIX = 'Output';
-
-const HTTP_METHODS: readonly string[] = [
-  'get',
-  'put',
-  'post',
-  'delete',
-  'options',
-  'head',
-  'patch',
-  'trace',
-];
 
 export interface RewriteRefsParams {
   doc: OpenAPIObject;
@@ -45,15 +35,15 @@ export const rewriteRefs = (params: RewriteRefsParams): void => {
 
   if (renames.size > 0) {
     walkRefs(doc, (ref) => {
-      if (!ref.startsWith(SCHEMA_PREFIX)) {
+      if (!ref.startsWith(COMPONENTS_SCHEMAS_PREFIX)) {
         return undefined;
       }
-      const target = ref.slice(SCHEMA_PREFIX.length);
+      const target = ref.slice(COMPONENTS_SCHEMAS_PREFIX.length);
       const renamed = renames.get(target);
       if (renamed === undefined) {
         return undefined;
       }
-      return `${SCHEMA_PREFIX}${renamed}`;
+      return `${COMPONENTS_SCHEMAS_PREFIX}${renamed}`;
     });
   }
 
@@ -84,14 +74,14 @@ const rewriteResponseSubtree = (
       continue;
     }
     walkRefs(responses, (ref) => {
-      if (!ref.startsWith(SCHEMA_PREFIX)) {
+      if (!ref.startsWith(COMPONENTS_SCHEMAS_PREFIX)) {
         return undefined;
       }
-      const target = ref.slice(SCHEMA_PREFIX.length);
+      const target = ref.slice(COMPONENTS_SCHEMAS_PREFIX.length);
       if (!divergentOutputIds.has(target)) {
         return undefined;
       }
-      return `${SCHEMA_PREFIX}${target}${OUTPUT_SUFFIX}`;
+      return `${COMPONENTS_SCHEMAS_PREFIX}${target}${OUTPUT_SUFFIX}`;
     });
   }
 };

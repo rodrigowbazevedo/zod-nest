@@ -54,16 +54,17 @@ const runPass = (
     reused: 'ref',
     uri: URI,
   });
+  // Zod v4's bulk-mode emission always returns `{ schemas: Record<...> }` —
+  // even for an empty registry the `schemas` key is present with `{}`.
   const raw = z.toJSONSchema(opts.registry.zodRegistry, built.options) as {
-    schemas?: Record<string, unknown>;
+    schemas: Record<string, unknown>;
   };
   built.consumeUnrepresentable();
 
   const filtered = new Map<string, unknown>();
-  const schemas = raw.schemas ?? {};
   for (const id of knownIds) {
-    if (Object.prototype.hasOwnProperty.call(schemas, id)) {
-      filtered.set(id, schemas[id]);
+    if (Object.prototype.hasOwnProperty.call(raw.schemas, id)) {
+      filtered.set(id, raw.schemas[id]);
     }
   }
   return filtered;
