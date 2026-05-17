@@ -1,3 +1,10 @@
+## [0.1.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.0...v0.1.1) (2026-05-17)
+
+
+### Bug Fixes
+
+* **release:** claim packages environment for npm OIDC handshake ([2a93c44](https://github.com/rodrigowbazevedo/zod-nest/commit/2a93c44a2b4d8c16cdaeb8c1cc7637ad51940f37))
+
 # [0.1.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.0.1...v0.1.0) (2026-05-17)
 
 
