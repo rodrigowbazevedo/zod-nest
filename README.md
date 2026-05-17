@@ -162,11 +162,13 @@ Stack `@ZodResponse` to declare multiple status codes on one handler:
 
 ```ts
 @Get(':id')
-@ZodResponse({ status: 200, type: UserDto })
+@ZodResponse({ type: UserDto })                       // success variant — status inferred (200 for GET)
 @ZodResponse({ status: 404, type: ErrorDto })
 @ZodResponse({ status: 500, type: FatalDto })
 getUser(): void {}
 ```
+
+**Recommended style:** omit `status` for the success variant and let it infer from the route, then set `status` explicitly only for the off-happy-path variants. Keeps the signal-to-noise high — the explicit numbers in the snippet above are the ones the reader actually needs to scan for.
 
 At request time, `ZodSerializerInterceptor` looks at `response.statusCode` and picks the matching variant. If you don't pass `status`, the variant matches on the handler's default (computed once at request time, in this order: `@HttpCode(n)` → `POST → 201`, everything else → `200`). `@ZodResponse` does **not** internally apply `@HttpCode` — you stay in charge of the actual HTTP status.
 
@@ -281,7 +283,7 @@ class FatalDto extends createZodDto(z.object({ trace: z.string() }), { id: 'Fata
 
 class UsersController {
   @Get(':id')
-  @ZodResponse({ status: HttpStatus.OK,                    type: UserDto })
+  @ZodResponse({                                           type: UserDto })  // 200 inferred
   @ZodResponse({ status: HttpStatus.NOT_FOUND,             type: ErrorDto })
   @ZodResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, type: FatalDto })
   getUser(): void {}

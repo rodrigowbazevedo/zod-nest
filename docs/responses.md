@@ -40,12 +40,14 @@ class FatalDto   extends createZodDto(z.object({ trace: z.string() }), { id: 'Fa
 
 class Controller {
   @Get(':id')
-  @ZodResponse({ status: HttpStatus.OK,                    type: UserDto })
+  @ZodResponse({                                           type: UserDto })  // success — 200 inferred
   @ZodResponse({ status: HttpStatus.NOT_FOUND,             type: ErrorDto })
   @ZodResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, type: FatalDto })
   getUser(): void {}
 }
 ```
+
+**Recommended style:** omit `status` for the success variant (let the precedence chain infer it from the route) and set `status` explicitly only for the off-happy-path variants. The numbers you can see are the ones that aren't already encoded in the route. This is a style preference, not a correctness rule — an explicit `status: 200` works identically.
 
 At request time, `ZodSerializerInterceptor` looks at `response.statusCode` and finds the variant where `resolveEffectiveStatus(variant, handler) === statusCode`. The matching variant's `validationSchema` is then applied to the return value.
 
@@ -110,8 +112,8 @@ The transformed shape (e.g. `email.toLowerCase()` from a `transform`) is **not**
 ```ts
 class Controller {
   @Get(':id')
-  @ZodResponse({ status: 200, type: UserDto })                              // strict
-  @ZodResponse({ status: 500, type: FatalDto, passthroughOnError: true })  // soft
+  @ZodResponse({              type: UserDto })                             // strict, success (200 inferred)
+  @ZodResponse({ status: 500, type: FatalDto, passthroughOnError: true }) // soft
   getUser(): void {}
 }
 ```
