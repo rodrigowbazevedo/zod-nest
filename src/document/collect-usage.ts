@@ -1,0 +1,208 @@
+import { DiscoveryService } from '@nestjs/core';
+
+import type { INestApplication } from '@nestjs/common';
+import type { OpenAPIObject } from '@nestjs/swagger';
+import type { ResponseVariant } from '../response/metadata.js';
+
+import { isZodDtoMarker } from '../dto/marker.js';
+import { isZodDto } from '../dto/predicates.js';
+import { getResponseVariants } from '../response/metadata.js';
+import { ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
+
+const REF_PREFIX = '#/components/schemas/';
+
+export interface CollectedUsage {
+  /** dtoIds referenced as input via requestBody / parameters `$ref`s in the doc. */
+  inputExposedIds: ReadonlySet<string>;
+  /** dtoIds referenced as output via `@ZodResponse` on any controller handler. */
+  outputExposedIds: ReadonlySet<string>;
+  /** Map of `components.schemas` key (NestJS class name) → dtoId from the marker. */
+  classToDtoId: ReadonlyMap<string, string>;
+}
+
+/**
+ * Pre-pass over an `applyZodNest` input. Walks the already-built OpenAPI doc
+ * for input-side ids (reliable — `@nestjs/swagger` materializes
+ * `requestBody`/`parameters` schemas with `$ref`s back to `components.schemas`
+ * entries) and walks the NestJS app's controller graph via `DiscoveryService`
+ * for output-side ids (`@nestjs/swagger` is currently anemic on response
+ * shapes — the source of truth lives in `@ZodResponse` metadata).
+ */
+export const collectUsage = (doc: OpenAPIObject, app: INestApplication): CollectedUsage => {
+  const classToDtoId = buildClassToDtoIdMap(doc);
+  const inputExposedIds = collectInputExposedIds(doc, classToDtoId);
+  const outputExposedIds = collectOutputExposedIds(app);
+  return { inputExposedIds, outputExposedIds, classToDtoId };
+};
+
+const buildClassToDtoIdMap = (doc: OpenAPIObject): Map<string, string> => {
+  const map = new Map<string, string>();
+  const schemas = doc.components?.schemas ?? {};
+  for (const [className, schema] of Object.entries(schemas)) {
+    const marker = readMarker(schema);
+    if (marker === undefined) {
+      continue;
+    }
+    map.set(className, marker.dtoId);
+  }
+  return map;
+};
+
+const readMarker = (schema: unknown): { dtoId: string } | undefined => {
+  if (schema === null || typeof schema !== 'object') {
+    return undefined;
+  }
+  const properties = (schema as { properties?: unknown }).properties;
+  if (properties === null || typeof properties !== 'object') {
+    return undefined;
+  }
+  const marker = (properties as Record<string, unknown>)[ZOD_NEST_DTO_EXTENSION];
+  if (!isZodDtoMarker(marker)) {
+    return undefined;
+  }
+  return { dtoId: marker.dtoId };
+};
+
+const collectInputExposedIds = (
+  doc: OpenAPIObject,
+  classToDtoId: ReadonlyMap<string, string>,
+): Set<string> => {
+  const ids = new Set<string>();
+  const paths = doc.paths ?? {};
+  for (const pathItem of Object.values(paths)) {
+    if (pathItem === null || typeof pathItem !== 'object') {
+      continue;
+    }
+    for (const operation of operationsOf(pathItem as Record<string, unknown>)) {
+      collectRefsFromOperation(operation, classToDtoId, ids);
+    }
+  }
+  return ids;
+};
+
+const HTTP_METHODS: readonly string[] = [
+  'get',
+  'put',
+  'post',
+  'delete',
+  'options',
+  'head',
+  'patch',
+  'trace',
+];
+
+const operationsOf = (pathItem: Record<string, unknown>): Record<string, unknown>[] => {
+  const out: Record<string, unknown>[] = [];
+  for (const method of HTTP_METHODS) {
+    const op = pathItem[method];
+    if (op !== null && typeof op === 'object') {
+      out.push(op as Record<string, unknown>);
+    }
+  }
+  return out;
+};
+
+const collectRefsFromOperation = (
+  operation: Record<string, unknown>,
+  classToDtoId: ReadonlyMap<string, string>,
+  ids: Set<string>,
+): void => {
+  // requestBody.content.*.schema.$ref
+  const requestBody = operation.requestBody;
+  if (requestBody !== null && typeof requestBody === 'object') {
+    const content = (requestBody as { content?: unknown }).content;
+    collectRefsFromContent(content, classToDtoId, ids);
+  }
+  // parameters[*].schema.$ref
+  const parameters = operation.parameters;
+  if (Array.isArray(parameters)) {
+    for (const param of parameters) {
+      if (param === null || typeof param !== 'object') {
+        continue;
+      }
+      const schema = (param as { schema?: unknown }).schema;
+      collectRefFromSchema(schema, classToDtoId, ids);
+    }
+  }
+};
+
+const collectRefsFromContent = (
+  content: unknown,
+  classToDtoId: ReadonlyMap<string, string>,
+  ids: Set<string>,
+): void => {
+  if (content === null || typeof content !== 'object') {
+    return;
+  }
+  for (const mediaType of Object.values(content as Record<string, unknown>)) {
+    if (mediaType === null || typeof mediaType !== 'object') {
+      continue;
+    }
+    collectRefFromSchema((mediaType as { schema?: unknown }).schema, classToDtoId, ids);
+  }
+};
+
+const collectRefFromSchema = (
+  schema: unknown,
+  classToDtoId: ReadonlyMap<string, string>,
+  ids: Set<string>,
+): void => {
+  if (schema === null || typeof schema !== 'object') {
+    return;
+  }
+  const ref = (schema as { $ref?: unknown }).$ref;
+  if (typeof ref !== 'string' || !ref.startsWith(REF_PREFIX)) {
+    return;
+  }
+  const className = ref.slice(REF_PREFIX.length);
+  const dtoId = classToDtoId.get(className);
+  if (dtoId !== undefined) {
+    ids.add(dtoId);
+  }
+};
+
+const collectOutputExposedIds = (app: INestApplication): Set<string> => {
+  const ids = new Set<string>();
+  const discovery = app.get(DiscoveryService);
+  for (const wrapper of discovery.getControllers()) {
+    const instance = wrapper.instance as object | null | undefined;
+    if (instance === null || instance === undefined) {
+      continue;
+    }
+    const proto = Object.getPrototypeOf(instance) as Record<string, unknown>;
+    if (proto === null) {
+      continue;
+    }
+    for (const methodName of Object.getOwnPropertyNames(proto)) {
+      if (methodName === 'constructor') {
+        continue;
+      }
+      const handler = proto[methodName];
+      if (typeof handler !== 'function') {
+        continue;
+      }
+      const variants = getResponseVariants(handler);
+      if (variants === undefined) {
+        continue;
+      }
+      for (const variant of variants) {
+        addVariantDtoIds(variant, ids);
+      }
+    }
+  }
+  return ids;
+};
+
+const addVariantDtoIds = (variant: ResponseVariant, ids: Set<string>): void => {
+  if (variant.kind === 'single') {
+    if (isZodDto(variant.dto)) {
+      ids.add(variant.dto.id);
+    }
+    return;
+  }
+  for (const dto of variant.dto as readonly unknown[]) {
+    if (isZodDto(dto)) {
+      ids.add(dto.id);
+    }
+  }
+};
