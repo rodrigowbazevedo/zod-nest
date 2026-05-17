@@ -40,7 +40,7 @@ describe('createZodDto — .Output sibling', () => {
     expect(sibling.Output).toBe(sibling);
   });
 
-  it('sibling.id === parent.id (suffix logic lives in Phase 2e)', () => {
+  it('sibling.id === parent.id (suffix logic lives in applyZodNest)', () => {
     const schema = z.object({ x: z.string() });
     class Output_SameId_Dto extends createZodDto(schema, { id: 'Output_SameId' }) {}
 

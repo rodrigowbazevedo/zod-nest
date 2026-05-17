@@ -41,8 +41,8 @@ describe('createZodDto — @nestjs/swagger smoke', () => {
     const properties = (userSchema as { properties?: Record<string, unknown> }).properties ?? {};
     const marker = properties[ZOD_NEST_DTO_EXTENSION] as Record<string, unknown> | undefined;
     expect(marker).toBeDefined();
-    // Marker carries the Phase 2e payload — type/required are benign filler
-    // (see comment in create-zod-dto.ts) that 2e strips.
+    // Marker carries the doc-merger payload — type/required are benign filler
+    // (see comment in create-zod-dto.ts) that `applyZodNest` strips.
     expect(marker?.__zodNestDto).toBe(true);
     expect(marker?.dtoId).toBe('SmokeUserDto');
     expect(marker?.io).toBe('input');

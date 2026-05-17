@@ -11,9 +11,9 @@ export const ZOD_NEST_ERROR_EXTENSION = 'x-zod-nest-error';
 export const ZOD_NEST_ERROR_DUPLICATE_ID = 'duplicate-id';
 
 /**
- * OpenAPI extension key used by `createZodDto` to mark a class for Phase 2e's
- * doc-merger. The marker carries `{ __zodNestDto: true, dtoId, io }` so the
- * merger can locate every zod-nest DTO in the @nestjs/swagger document and
- * inject the real Zod-derived schema.
+ * OpenAPI extension key used by `createZodDto` to mark a class for `applyZodNest`.
+ * The marker carries `{ __zodNestDto: true, dtoId, io }` so `applyZodNest` can
+ * locate every zod-nest DTO in the @nestjs/swagger document and inject the
+ * real Zod-derived schema.
  */
 export const ZOD_NEST_DTO_EXTENSION = 'x-zod-nest-dto';

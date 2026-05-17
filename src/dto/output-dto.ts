@@ -13,7 +13,7 @@ const outputCache = new WeakMap<ZodDto<z.ZodType>, ZodDto<z.ZodType>>();
 
 /**
  * `.Output` is always a distinct sibling class — it carries `io: 'output'` so
- * the Phase 2e doc-merger can run the output-side emission and apply the
+ * `applyZodNest` can run the output-side emission and apply the
  * suffix truth table (`Foo` alone vs `Foo` + `FooOutput`) based on actual JSON
  * Schema equality at doc-build time. The earlier "return self when io-identical"
  * optimization was dropped because `z.object()` already diverges at the JSON

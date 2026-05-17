@@ -2,7 +2,7 @@ import type { Io } from './dto.types.js';
 
 /**
  * Payload of the `x-zod-nest-dto` placeholder property that
- * `_OPENAPI_METADATA_FACTORY` returns. Phase 2e's doc merger reads this off
+ * `_OPENAPI_METADATA_FACTORY` returns. `applyZodNest` reads this off
  * each `components.schemas.<DtoName>.properties[x-zod-nest-dto]` entry,
  * uses `dtoId` to look up the schema in the registry, and replaces the
  * synthetic schema body with the real Zod-derived schema.
@@ -10,7 +10,7 @@ import type { Io } from './dto.types.js';
  * `type` and `required` are benign filler that satisfy @nestjs/swagger's
  * property-type guard (without them, the explorer throws "A circular
  * dependency has been detected"). They have no semantic meaning and are
- * stripped along with the rest of the marker by Phase 2e.
+ * stripped along with the rest of the marker by `applyZodNest`.
  */
 export interface ZodDtoMarker {
   readonly type: () => typeof Object;
@@ -28,7 +28,7 @@ export const makeZodDtoMarker = (dtoId: string, io: Io): ZodDtoMarker => ({
   io,
 });
 
-/** Phase 2e (and tests) use this to discriminate a marker from a real schema. */
+/** `applyZodNest` (and tests) use this to discriminate a marker from a real schema. */
 export const isZodDtoMarker = (value: unknown): value is ZodDtoMarker => {
   if (value === null || typeof value !== 'object') {
     return false;

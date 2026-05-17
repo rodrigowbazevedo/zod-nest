@@ -6,10 +6,10 @@ export interface ZodNestRegistry {
   hasCollision(id: string): boolean;
   getCollisions(): ReadonlyMap<string, ReadonlySet<z.ZodType>>;
   /**
-   * Snapshot of every id registered through this `ZodNestRegistry`. Phase 2e's
-   * bulk-mode emitter uses it to filter `z.toJSONSchema(registry.zodRegistry,
-   * ...)` output to zod-nest-known ids only (the underlying Zod registry is
-   * `z.globalRegistry`, which can hold third-party entries).
+   * Snapshot of every id registered through this `ZodNestRegistry`. `bulkEmit`
+   * uses it to filter `z.toJSONSchema(registry.zodRegistry, ...)` output to
+   * zod-nest-known ids only (the underlying Zod registry is `z.globalRegistry`,
+   * which can hold third-party entries).
    */
   ids(): readonly string[];
 }
@@ -48,8 +48,8 @@ export const createRegistry = (): ZodNestRegistry => {
 
 /**
  * Process-wide default registry. `createZodDto` registers schemas here unless
- * the caller passes `options.registry`. Phase 2e's doc merger reads from the
- * same instance for bulk emission. Multi-app WeakMap isolation is deferred
+ * the caller passes `options.registry`. `applyZodNest` reads from the same
+ * instance for bulk emission. Multi-app WeakMap isolation is deferred
  * to v0.2.
  */
 export const defaultRegistry: ZodNestRegistry = createRegistry();

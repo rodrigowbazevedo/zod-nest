@@ -30,8 +30,8 @@ const URI = (id: string): string => `#/components/schemas/${id}`;
  * Uses `buildToJsonSchemaOptions` so emission semantics (override chain,
  * cycles, unrepresentable detection, metadata) match the single-schema
  * `toOpenApi` path. The `uri` callback shapes every registered-schema
- * `$ref` directly to `#/components/schemas/<id>` — Phase 2e's doc-level
- * refs need no rewrite at emission time. `reused: 'inline'` keeps Zod
+ * `$ref` directly to `#/components/schemas/<id>` — doc-level refs need no
+ * rewrite at emission time. `reused: 'inline'` keeps Zod
  * from extracting anonymous reused sub-schemas into a virtual `__shared`
  * defs table whose refs would dangle against `components.schemas`.
  */

@@ -17,7 +17,7 @@ import { appendResponseVariant } from '../response/metadata.js';
  *   `@ApiResponse({ isArray: true })` convention without minting a separate
  *   `*sDto` id.
  * - `[A, B, ...]` (length ≥ 2) → validates as `z.tuple([A.schema, B.schema, ...])`;
- *   surfaces as an OpenAPI 3.1 `prefixItems` tuple in Phase 2e.
+ *   surfaces as an OpenAPI 3.1 `prefixItems` tuple via `applyZodNest`.
  *
  * Empty arrays and non-DTO elements throw `TypeError` at decoration time
  * so typos surface at module load, not the first request.
