@@ -25,11 +25,7 @@ export interface MergeSchemasParams {
 export interface MergeSchemasResult {
   /** dtoIds whose input and output schemas diverged — output landed at `<id>Output`. */
   divergentOutputIds: ReadonlySet<string>;
-  /**
-   * `className → dtoId` map for renames where they differ. Commit 5 uses it to
-   * rewrite doc-level `$ref`s from `#/components/schemas/<className>` to
-   * `#/components/schemas/<dtoId>`.
-   */
+  /** `className → dtoId` map for renames where they differ. */
   renames: ReadonlyMap<string, string>;
 }
 

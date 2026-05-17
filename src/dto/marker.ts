@@ -28,7 +28,6 @@ export const makeZodDtoMarker = (dtoId: string, io: Io): ZodDtoMarker => ({
   io,
 });
 
-/** `applyZodNest` (and tests) use this to discriminate a marker from a real schema. */
 export const isZodDtoMarker = (value: unknown): value is ZodDtoMarker => {
   if (value === null || typeof value !== 'object') {
     return false;

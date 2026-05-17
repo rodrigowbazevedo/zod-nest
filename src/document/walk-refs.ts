@@ -8,7 +8,6 @@ export type RefVisitor = (ref: string) => string | undefined;
 /**
  * Deeply walks an OpenAPI sub-tree, invoking `visit` on every `$ref` string
  * value. Mutates the tree in place when the visitor returns a replacement.
- * Used by `rewrite-refs` (mutating) and `dangling-refs` (read-only).
  */
 export const walkRefs = (node: unknown, visit: RefVisitor): void => {
   if (node === null || typeof node !== 'object') {

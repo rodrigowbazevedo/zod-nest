@@ -1,8 +1,4 @@
-/**
- * Shared HTTP method list used to walk OpenAPI path items. Imported by
- * `collect-usage` (input-side ref scan) and `rewrite-refs` (response-side
- * Output suffix rewrite). Matches the OpenAPI 3.1 spec's operation methods.
- */
+/** OpenAPI 3.1 operation methods, in spec order. */
 export const HTTP_METHODS: readonly string[] = [
   'get',
   'put',

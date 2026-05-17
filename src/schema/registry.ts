@@ -6,10 +6,10 @@ export interface ZodNestRegistry {
   hasCollision(id: string): boolean;
   getCollisions(): ReadonlyMap<string, ReadonlySet<z.ZodType>>;
   /**
-   * Snapshot of every id registered through this `ZodNestRegistry`. `bulkEmit`
-   * uses it to filter `z.toJSONSchema(registry.zodRegistry, ...)` output to
-   * zod-nest-known ids only (the underlying Zod registry is `z.globalRegistry`,
-   * which can hold third-party entries).
+   * Snapshot of every id registered through this `ZodNestRegistry`. The
+   * underlying Zod registry is `z.globalRegistry`, which may hold third-party
+   * entries — bulk emission filters its output against this snapshot to keep
+   * only zod-nest-known ids.
    */
   ids(): readonly string[];
 }
@@ -46,9 +46,5 @@ export const createRegistry = (): ZodNestRegistry => {
   };
 };
 
-/**
- * Process-wide default registry. `createZodDto` registers schemas here unless
- * the caller passes `options.registry`. `applyZodNest` reads from the same
- * instance for bulk emission.
- */
+/** Process-wide default registry, used when no explicit `options.registry` is passed. */
 export const defaultRegistry: ZodNestRegistry = createRegistry();
