@@ -1,3 +1,10 @@
+## [0.1.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.1...v0.1.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **release:** set registry-url on setup-node so npm initiates OIDC ([4098776](https://github.com/rodrigowbazevedo/zod-nest/commit/4098776f6d57b77b67a81f1ccf0cb907984f327b)), closes [#4](https://github.com/rodrigowbazevedo/zod-nest/issues/4)
+
 ## [0.1.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.0...v0.1.1) (2026-05-17)
 
 
