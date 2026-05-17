@@ -130,6 +130,47 @@ describe('normalizeZodNestOptions', () => {
     expect(DEFAULT_MAX_LOGGED_VALUE_BYTES).toBe(4096);
   });
 
+  it('redacts auth + session token patterns by default (security-sensitive keys)', () => {
+    const logger = makeFakeLogger();
+    const opts = normalizeZodNestOptions({ validationLogs: { output: true }, logger });
+
+    opts.logOutputFailure(
+      failingError(),
+      {
+        accessToken: 'a',
+        refreshToken: 'r',
+        Bearer: 'b',
+        jwt: 'j',
+        Cookie: 'c',
+        'set-cookie': 's',
+        keep: 'shown',
+      },
+      { side: 'output', severity: 'error', dto: 'D' },
+    );
+
+    const [payload] = logger.error.mock.calls[0] ?? [];
+    expect((payload as { value: unknown }).value).toEqual({
+      accessToken: '[REDACTED]',
+      refreshToken: '[REDACTED]',
+      Bearer: '[REDACTED]',
+      jwt: '[REDACTED]',
+      Cookie: '[REDACTED]',
+      'set-cookie': '[REDACTED]',
+      keep: 'shown',
+    });
+  });
+
+  it('instantiates a default NestJS Logger when none is supplied (no throw)', () => {
+    const opts = normalizeZodNestOptions({ validationLogs: true });
+    expect(() =>
+      opts.logOutputFailure(
+        failingError(),
+        { x: 1 },
+        { side: 'output', severity: 'error', dto: 'D' },
+      ),
+    ).not.toThrow();
+  });
+
   it('ZOD_NEST_OPTIONS is a Symbol DI token', () => {
     expect(typeof ZOD_NEST_OPTIONS).toBe('symbol');
   });

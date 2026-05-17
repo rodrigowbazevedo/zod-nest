@@ -26,11 +26,14 @@ export class ZodSerializationException extends InternalServerErrorException {
   readonly executionContext?: ExecutionContext;
 
   constructor(zodError: z.ZodError, executionContext?: ExecutionContext) {
-    super({
-      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      message: 'Response validation failed',
-      errors: z.treeifyError(zodError),
-    });
+    super(
+      {
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Response validation failed',
+        errors: z.treeifyError(zodError),
+      },
+      { cause: zodError },
+    );
     this.zodError = zodError;
     this.executionContext = executionContext;
   }

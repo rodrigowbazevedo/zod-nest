@@ -1,8 +1,14 @@
+import { Logger } from '@nestjs/common';
+
 import type { ArgumentMetadata, ExecutionContext, LoggerService } from '@nestjs/common';
 import type { z } from 'zod';
 import type { LogValidationFailure } from '../logging/validation-logger.js';
 
-import { createValidationLogger, noopLogValidationFailure } from '../logging/validation-logger.js';
+import {
+  createValidationLogger,
+  DEFAULT_LOGGER_CONTEXT,
+  noopLogValidationFailure,
+} from '../logging/validation-logger.js';
 
 /**
  * Module-scope factory for the exception thrown by `ZodValidationPipe` on
@@ -65,6 +71,12 @@ export const DEFAULT_REDACT_KEYS: readonly string[] = [
   'authorization',
   'secret',
   'apiKey',
+  'accessToken',
+  'refreshToken',
+  'bearer',
+  'jwt',
+  'cookie',
+  'set-cookie',
 ];
 
 export const DEFAULT_MAX_LOGGED_VALUE_BYTES = 4096;
@@ -91,7 +103,8 @@ export const normalizeZodNestOptions = (opts?: ZodNestModuleOptions): Normalized
   const flags = resolveLogFlags(opts?.validationLogs);
   const redactKeys = opts?.redactKeys ?? DEFAULT_REDACT_KEYS;
   const maxLoggedValueBytes = opts?.maxLoggedValueBytes ?? DEFAULT_MAX_LOGGED_VALUE_BYTES;
-  const loggerOpts = { logger: opts?.logger, redactKeys, maxLoggedValueBytes };
+  const logger: LoggerService = opts?.logger ?? new Logger(DEFAULT_LOGGER_CONTEXT);
+  const loggerOpts = { logger, redactKeys, maxLoggedValueBytes };
 
   return {
     createValidationException: opts?.createValidationException,
