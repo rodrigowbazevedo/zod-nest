@@ -3,7 +3,12 @@ import stringify from 'fast-json-stable-stringify';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import type { CollectedUsage } from './collect-usage.js';
 
-import { ZOD_NEST_ERROR_DUPLICATE_ID, ZOD_NEST_ERROR_EXTENSION } from '../schema/constants.js';
+import { isZodDtoMarker } from '../dto/marker.js';
+import {
+  ZOD_NEST_DTO_EXTENSION,
+  ZOD_NEST_ERROR_DUPLICATE_ID,
+  ZOD_NEST_ERROR_EXTENSION,
+} from '../schema/constants.js';
 import { ZodNestDocumentError } from './errors.js';
 
 export interface MergeSchemasParams {
@@ -146,9 +151,8 @@ const isMarkerPlaceholder = (value: unknown): boolean => {
   if (properties === null || typeof properties !== 'object') {
     return false;
   }
-  // `x-zod-nest-dto` is the only marker key Phase 2b adds. If properties has
-  // it, the schema body is a NestJS-emitted placeholder we own and can replace.
-  return 'x-zod-nest-dto' in (properties as Record<string, unknown>);
+  const marker = (properties as Record<string, unknown>)[ZOD_NEST_DTO_EXTENSION];
+  return isZodDtoMarker(marker);
 };
 
 const canonicalEqual = (a: unknown, b: unknown): boolean => {

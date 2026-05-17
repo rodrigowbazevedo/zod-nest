@@ -300,3 +300,114 @@ describe('rewriteRefs — output-suffix pass', () => {
     }
   });
 });
+
+describe('rewriteRefs — defensive guards', () => {
+  it('ignores null pathItem entries during the Output-suffix pass', () => {
+    const doc = docOf({
+      '/null-pathitem': null,
+      '/real': {
+        get: {
+          responses: {
+            '200': {
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/X' } } },
+            },
+          },
+        },
+      },
+    } as unknown as Record<string, unknown>);
+
+    expect(() =>
+      rewriteRefs({ doc, renames: new Map(), divergentOutputIds: new Set(['X']) }),
+    ).not.toThrow();
+
+    expect(
+      refAt(
+        doc.paths,
+        '/real',
+        'get',
+        'responses',
+        '200',
+        'content',
+        'application/json',
+        'schema',
+        '$ref',
+      ),
+    ).toBe('#/components/schemas/XOutput');
+  });
+
+  it('ignores null operation entries during the Output-suffix pass', () => {
+    const doc = docOf({
+      '/x': {
+        get: null,
+        post: {
+          responses: {
+            '200': {
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/X' } } },
+            },
+          },
+        },
+      },
+    } as unknown as Record<string, unknown>);
+
+    expect(() =>
+      rewriteRefs({ doc, renames: new Map(), divergentOutputIds: new Set(['X']) }),
+    ).not.toThrow();
+
+    expect(
+      refAt(
+        doc.paths,
+        '/x',
+        'post',
+        'responses',
+        '200',
+        'content',
+        'application/json',
+        'schema',
+        '$ref',
+      ),
+    ).toBe('#/components/schemas/XOutput');
+  });
+
+  it('ignores operations whose responses field is null/non-object', () => {
+    const doc = docOf({
+      '/x': {
+        get: { responses: null },
+        post: { responses: 'not-an-object' },
+      },
+    } as unknown as Record<string, unknown>);
+
+    expect(() =>
+      rewriteRefs({ doc, renames: new Map(), divergentOutputIds: new Set(['X']) }),
+    ).not.toThrow();
+  });
+
+  it('skips non-schemas-prefixed refs during the Output-suffix pass', () => {
+    const doc = docOf({
+      '/x': {
+        get: {
+          responses: {
+            '200': { $ref: '#/components/responses/SomeShared' },
+          },
+        },
+      },
+    });
+
+    rewriteRefs({ doc, renames: new Map(), divergentOutputIds: new Set(['SomeShared']) });
+
+    expect(refAt(doc.paths, '/x', 'get', 'responses', '200', '$ref')).toBe(
+      '#/components/responses/SomeShared',
+    );
+  });
+
+  it('handles a doc with no paths block (no-op)', () => {
+    const doc = {
+      openapi: '3.1.0',
+      info: { title: 't', version: 'v' },
+      components: { schemas: {} },
+    } as unknown as OpenAPIObject;
+
+    expect(() =>
+      rewriteRefs({ doc, renames: new Map(), divergentOutputIds: new Set(['X']) }),
+    ).not.toThrow();
+  });
+});

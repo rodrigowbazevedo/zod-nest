@@ -1,9 +1,8 @@
 import type { OpenAPIObject } from '@nestjs/swagger';
 
+import { COMPONENTS_SCHEMAS_PREFIX } from '../schema/constants.js';
 import { ZodNestDocumentError } from './errors.js';
 import { walkRefs } from './walk-refs.js';
-
-const SCHEMA_PREFIX = '#/components/schemas/';
 
 /**
  * Final assertion pass over the doc. Walks every `$ref` and confirms that
@@ -19,10 +18,10 @@ export const assertNoDanglingRefs = (doc: OpenAPIObject): void => {
   const schemas = (doc.components?.schemas ?? {}) as Record<string, unknown>;
   const dangling: string[] = [];
   walkRefs(doc, (ref) => {
-    if (!ref.startsWith(SCHEMA_PREFIX)) {
+    if (!ref.startsWith(COMPONENTS_SCHEMAS_PREFIX)) {
       return undefined;
     }
-    const target = ref.slice(SCHEMA_PREFIX.length);
+    const target = ref.slice(COMPONENTS_SCHEMAS_PREFIX.length);
     if (!(target in schemas)) {
       dangling.push(ref);
     }

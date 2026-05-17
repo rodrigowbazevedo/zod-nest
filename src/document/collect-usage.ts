@@ -7,9 +7,8 @@ import type { ResponseVariant } from '../response/metadata.js';
 import { isZodDtoMarker } from '../dto/marker.js';
 import { isZodDto } from '../dto/predicates.js';
 import { getResponseVariants } from '../response/metadata.js';
-import { ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
-
-const REF_PREFIX = '#/components/schemas/';
+import { COMPONENTS_SCHEMAS_PREFIX, ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
+import { HTTP_METHODS } from './http-methods.js';
 
 export interface CollectedUsage {
   /** dtoIds referenced as input via requestBody / parameters `$ref`s in the doc. */
@@ -80,17 +79,6 @@ const collectInputExposedIds = (
   return ids;
 };
 
-const HTTP_METHODS: readonly string[] = [
-  'get',
-  'put',
-  'post',
-  'delete',
-  'options',
-  'head',
-  'patch',
-  'trace',
-];
-
 const operationsOf = (pathItem: Record<string, unknown>): Record<string, unknown>[] => {
   const out: Record<string, unknown>[] = [];
   for (const method of HTTP_METHODS) {
@@ -151,10 +139,10 @@ const collectRefFromSchema = (
     return;
   }
   const ref = (schema as { $ref?: unknown }).$ref;
-  if (typeof ref !== 'string' || !ref.startsWith(REF_PREFIX)) {
+  if (typeof ref !== 'string' || !ref.startsWith(COMPONENTS_SCHEMAS_PREFIX)) {
     return;
   }
-  const className = ref.slice(REF_PREFIX.length);
+  const className = ref.slice(COMPONENTS_SCHEMAS_PREFIX.length);
   const dtoId = classToDtoId.get(className);
   if (dtoId !== undefined) {
     ids.add(dtoId);
@@ -169,10 +157,10 @@ const collectOutputExposedIds = (app: INestApplication): Set<string> => {
     if (instance === null || instance === undefined) {
       continue;
     }
+    // `Object.getPrototypeOf(instance)` only returns null when called on a
+    // null-prototype object (`Object.create(null)`). NestJS controllers are
+    // always class instances, so the prototype is always a real object.
     const proto = Object.getPrototypeOf(instance) as Record<string, unknown>;
-    if (proto === null) {
-      continue;
-    }
     for (const methodName of Object.getOwnPropertyNames(proto)) {
       if (methodName === 'constructor') {
         continue;
