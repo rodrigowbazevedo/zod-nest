@@ -71,7 +71,7 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions): Ope
   });
   rewriteRefs({ doc, renames, divergentOutputIds });
   stripMarkers(doc);
-  assertNoDanglingRefs(doc);
+  assertNoDanglingRefs({ doc, collected });
 
   return doc;
 };

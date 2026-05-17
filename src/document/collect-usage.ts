@@ -19,6 +19,9 @@ export interface CollectedUsage {
   classToDtoId: ReadonlyMap<string, string>;
 }
 
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
 /**
  * Pre-pass over an `applyZodNest` input. Walks the already-built OpenAPI doc
  * for input-side ids (reliable — `@nestjs/swagger` materializes
@@ -48,14 +51,13 @@ const buildClassToDtoIdMap = (doc: OpenAPIObject): Map<string, string> => {
 };
 
 const readMarker = (schema: unknown): { dtoId: string } | undefined => {
-  if (schema === null || typeof schema !== 'object') {
+  if (!isPlainRecord(schema)) {
     return undefined;
   }
-  const properties = (schema as { properties?: unknown }).properties;
-  if (properties === null || typeof properties !== 'object') {
+  if (!isPlainRecord(schema.properties)) {
     return undefined;
   }
-  const marker = (properties as Record<string, unknown>)[ZOD_NEST_DTO_EXTENSION];
+  const marker = schema.properties[ZOD_NEST_DTO_EXTENSION];
   if (!isZodDtoMarker(marker)) {
     return undefined;
   }
@@ -69,10 +71,10 @@ const collectInputExposedIds = (
   const ids = new Set<string>();
   const paths = doc.paths ?? {};
   for (const pathItem of Object.values(paths)) {
-    if (pathItem === null || typeof pathItem !== 'object') {
+    if (!isPlainRecord(pathItem)) {
       continue;
     }
-    for (const operation of operationsOf(pathItem as Record<string, unknown>)) {
+    for (const operation of operationsOf(pathItem)) {
       collectRefsFromOperation(operation, classToDtoId, ids);
     }
   }
@@ -83,8 +85,8 @@ const operationsOf = (pathItem: Record<string, unknown>): Record<string, unknown
   const out: Record<string, unknown>[] = [];
   for (const method of HTTP_METHODS) {
     const op = pathItem[method];
-    if (op !== null && typeof op === 'object') {
-      out.push(op as Record<string, unknown>);
+    if (isPlainRecord(op)) {
+      out.push(op);
     }
   }
   return out;
@@ -96,20 +98,17 @@ const collectRefsFromOperation = (
   ids: Set<string>,
 ): void => {
   // requestBody.content.*.schema.$ref
-  const requestBody = operation.requestBody;
-  if (requestBody !== null && typeof requestBody === 'object') {
-    const content = (requestBody as { content?: unknown }).content;
-    collectRefsFromContent(content, classToDtoId, ids);
+  if (isPlainRecord(operation.requestBody)) {
+    collectRefsFromContent(operation.requestBody.content, classToDtoId, ids);
   }
   // parameters[*].schema.$ref
   const parameters = operation.parameters;
   if (Array.isArray(parameters)) {
     for (const param of parameters) {
-      if (param === null || typeof param !== 'object') {
+      if (!isPlainRecord(param)) {
         continue;
       }
-      const schema = (param as { schema?: unknown }).schema;
-      collectRefFromSchema(schema, classToDtoId, ids);
+      collectRefFromSchema(param.schema, classToDtoId, ids);
     }
   }
 };
@@ -119,14 +118,14 @@ const collectRefsFromContent = (
   classToDtoId: ReadonlyMap<string, string>,
   ids: Set<string>,
 ): void => {
-  if (content === null || typeof content !== 'object') {
+  if (!isPlainRecord(content)) {
     return;
   }
-  for (const mediaType of Object.values(content as Record<string, unknown>)) {
-    if (mediaType === null || typeof mediaType !== 'object') {
+  for (const mediaType of Object.values(content)) {
+    if (!isPlainRecord(mediaType)) {
       continue;
     }
-    collectRefFromSchema((mediaType as { schema?: unknown }).schema, classToDtoId, ids);
+    collectRefFromSchema(mediaType.schema, classToDtoId, ids);
   }
 };
 
@@ -135,10 +134,10 @@ const collectRefFromSchema = (
   classToDtoId: ReadonlyMap<string, string>,
   ids: Set<string>,
 ): void => {
-  if (schema === null || typeof schema !== 'object') {
+  if (!isPlainRecord(schema)) {
     return;
   }
-  const ref = (schema as { $ref?: unknown }).$ref;
+  const ref = schema.$ref;
   if (typeof ref !== 'string' || !ref.startsWith(COMPONENTS_SCHEMAS_PREFIX)) {
     return;
   }
@@ -188,7 +187,10 @@ const addVariantDtoIds = (variant: ResponseVariant, ids: Set<string>): void => {
     }
     return;
   }
-  for (const dto of variant.dto as readonly unknown[]) {
+  if (!Array.isArray(variant.dto)) {
+    return;
+  }
+  for (const dto of variant.dto) {
     if (isZodDto(dto)) {
       ids.add(dto.id);
     }

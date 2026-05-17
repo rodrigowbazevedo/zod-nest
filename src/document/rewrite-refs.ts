@@ -1,10 +1,9 @@
 import type { OpenAPIObject } from '@nestjs/swagger';
 
 import { COMPONENTS_SCHEMAS_PREFIX } from '../schema/constants.js';
+import { OUTPUT_SUFFIX } from './constants.js';
 import { HTTP_METHODS } from './http-methods.js';
 import { walkRefs } from './walk-refs.js';
-
-const OUTPUT_SUFFIX = 'Output';
 
 export interface RewriteRefsParams {
   doc: OpenAPIObject;
