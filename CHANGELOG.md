@@ -1,3 +1,10 @@
+# [0.1.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.0.1...v0.1.0) (2026-05-17)
+
+
+### Features
+
+* **schema:** add Zod v4 → OpenAPI 3.1 schema engine ([088ecd1](https://github.com/rodrigowbazevedo/zod-nest/commit/088ecd1ee911f28bf81c8d53709fccfb5837c5dc))
+
 ## [0.0.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.0.0...v0.0.1) (2026-05-16)
 
 
