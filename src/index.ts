@@ -56,3 +56,5 @@ export type {
   NormalizedZodNestOptions,
   ZodNestModuleOptions,
 } from './module/index.js';
+export { applyZodNest, ZodNestDocumentError } from './document/index.js';
+export type { ApplyZodNestOptions, ZodNestDocumentErrorCode } from './document/index.js';
