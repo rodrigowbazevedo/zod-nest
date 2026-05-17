@@ -1,3 +1,10 @@
+## [0.8.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.8.0...v0.8.1) (2026-05-17)
+
+
+### Bug Fixes
+
+* **release:** explicit pipeline steps; CI runs on PRs only ([#28](https://github.com/rodrigowbazevedo/zod-nest/issues/28)) ([6c8317c](https://github.com/rodrigowbazevedo/zod-nest/commit/6c8317cad8cf5e18fb7692d9e8cac6744f06a19b))
+
 # [0.8.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.7.0...v0.8.0) (2026-05-17)
 
 
