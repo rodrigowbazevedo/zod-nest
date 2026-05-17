@@ -40,11 +40,6 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: npm
 
-      # OIDC trusted publishers require npm >= 11.5.1. Node 24.15.0 bundles
-      # npm 10.9.8, which silently skips the trusted-publisher exchange and
-      # the registry then returns an opaque 404. Upgrade before anything else.
-      - run: npm install -g npm@11
-
       - run: npm ci
 
       # No explicit `npm run build` — `prepublishOnly` (lint/typecheck/test/

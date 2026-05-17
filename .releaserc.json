@@ -18,7 +18,7 @@
     [
       "@semantic-release/exec",
       {
-        "publishCmd": "npm publish --provenance --access public"
+        "publishCmd": "npx --yes --package=npm@11 -- npm publish --provenance --access public"
       }
     ],
     [
