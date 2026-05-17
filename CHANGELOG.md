@@ -1,3 +1,10 @@
+## [0.8.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.8.1...v0.8.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **skills:** public consumer-facing skills (migrate + best-practices) ([#33](https://github.com/rodrigowbazevedo/zod-nest/issues/33)) ([dc39b20](https://github.com/rodrigowbazevedo/zod-nest/commit/dc39b20fc4a16abfbde3f10b5bff04989417b788)), closes [#32](https://github.com/rodrigowbazevedo/zod-nest/issues/32)
+
 ## [0.8.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.8.0...v0.8.1) (2026-05-17)
 
 
