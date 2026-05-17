@@ -1,3 +1,10 @@
+## [0.1.3](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.2...v0.1.3) (2026-05-17)
+
+
+### Bug Fixes
+
+* **release:** drop redundant build step + enable verbose npm logging ([b35eb75](https://github.com/rodrigowbazevedo/zod-nest/commit/b35eb75ac9dc14066c678f4dc9448d4ca73236c8)), closes [#5](https://github.com/rodrigowbazevedo/zod-nest/issues/5)
+
 ## [0.1.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.1...v0.1.2) (2026-05-17)
 
 
