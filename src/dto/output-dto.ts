@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type { Io, ZodDto } from './dto.types.js';
 
 import { ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
+import { makeZodDtoMarker } from './marker.js';
 import { ZOD_DTO_SYMBOL } from './symbols.js';
 
 /**
@@ -46,16 +47,7 @@ const buildSiblingClass = <TSchema extends z.ZodType>(
     }
 
     static _OPENAPI_METADATA_FACTORY(): Record<string, unknown> {
-      return {
-        [ZOD_NEST_DTO_EXTENSION]: {
-          // Mirror parent's factory shape — see comment in create-zod-dto.ts.
-          type: () => Object,
-          required: false,
-          __zodNestDto: true,
-          dtoId: parent.id,
-          io: 'output',
-        },
-      };
+      return { [ZOD_NEST_DTO_EXTENSION]: makeZodDtoMarker(parent.id, 'output') };
     }
   };
   return SiblingClass as unknown as ZodDto<TSchema>;

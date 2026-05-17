@@ -1,10 +1,10 @@
-import { z } from 'zod';
-
+import type { z } from 'zod';
 import type { ZodNestRegistry } from '../schema/registry.js';
 import type { CreateZodDtoOptions, Io, ZodDto } from './dto.types.js';
 
 import { ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
 import { defaultRegistry } from '../schema/registry.js';
+import { makeZodDtoMarker } from './marker.js';
 import { resolveOutput } from './output-dto.js';
 import { ZOD_DTO_SYMBOL } from './symbols.js';
 
@@ -12,6 +12,7 @@ let anonCounter = 0;
 let warnedOnAnonymous = false;
 
 const resolveId = (
+  registry: ZodNestRegistry,
   schema: z.ZodType,
   providedId: string | undefined,
   className: string,
@@ -19,7 +20,7 @@ const resolveId = (
   if (providedId !== undefined && providedId !== '') {
     return providedId;
   }
-  const meta = z.globalRegistry.get(schema) as { id?: string } | undefined;
+  const meta = registry.zodRegistry.get(schema) as { id?: string } | undefined;
   if (meta && typeof meta.id === 'string' && meta.id !== '') {
     return meta.id;
   }
@@ -52,7 +53,7 @@ export const createZodDto = <TSchema extends z.ZodType>(
     if (cachedId !== undefined) {
       return cachedId;
     }
-    cachedId = resolveId(schema, options?.id, className);
+    cachedId = resolveId(registry, schema, options?.id, className);
     registry.register(schema, cachedId);
     return cachedId;
   };
@@ -79,20 +80,7 @@ export const createZodDto = <TSchema extends z.ZodType>(
     }
 
     static _OPENAPI_METADATA_FACTORY(): Record<string, unknown> {
-      const id = ensureRegistered(this.name);
-      return {
-        [ZOD_NEST_DTO_EXTENSION]: {
-          // `type: () => Object` is a benign type-resolver that lets
-          // @nestjs/swagger satisfy its property-type expectations without
-          // triggering its circular-dependency guard. The real schema is
-          // injected by Phase 2e's doc merger, which strips this property.
-          type: () => Object,
-          required: false,
-          __zodNestDto: true,
-          dtoId: id,
-          io,
-        },
-      };
+      return { [ZOD_NEST_DTO_EXTENSION]: makeZodDtoMarker(ensureRegistered(this.name), io) };
     }
   };
 
