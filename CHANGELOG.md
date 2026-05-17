@@ -1,3 +1,10 @@
+# [0.8.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.7.0...v0.8.0) (2026-05-17)
+
+
+### Features
+
+* **claude:** Phase 4 — CLAUDE.md, skills, hooks; ship 0.8.0 ([#27](https://github.com/rodrigowbazevedo/zod-nest/issues/27)) ([b2d97e7](https://github.com/rodrigowbazevedo/zod-nest/commit/b2d97e7da5064223ab4d9098d426eef8cff01761))
+
 # [0.7.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.6.0...v0.7.0) (2026-05-17)
 
 
