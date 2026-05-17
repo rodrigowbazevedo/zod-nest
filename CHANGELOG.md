@@ -1,3 +1,10 @@
+# [0.5.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.4.0...v0.5.0) (2026-05-17)
+
+
+### Features
+
+* **document:** applyZodNest post-processor (Phase 2e) ([#17](https://github.com/rodrigowbazevedo/zod-nest/issues/17)) ([1d1e428](https://github.com/rodrigowbazevedo/zod-nest/commit/1d1e42897271bc6e9a2c882c1ee70fe3dcc1dca0)), closes [#16](https://github.com/rodrigowbazevedo/zod-nest/issues/16) [#16](https://github.com/rodrigowbazevedo/zod-nest/issues/16)
+
 # [0.4.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.3.0...v0.4.0) (2026-05-17)
 
 
