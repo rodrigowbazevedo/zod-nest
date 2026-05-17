@@ -2,6 +2,8 @@ export {
   COMPONENTS_SCHEMAS_PREFIX,
   createRegistry,
   defaultRegistry,
+  extend,
+  getLineage,
   toOpenApi,
   ZOD_NEST_DTO_EXTENSION,
   ZOD_NEST_ERROR_DUPLICATE_ID,
@@ -10,6 +12,7 @@ export {
   ZodNestUnrepresentableError,
 } from './schema/index.js';
 export type {
+  LineageEntry,
   Override,
   OverrideContext,
   SchemaObject,

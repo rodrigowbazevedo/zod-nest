@@ -1,3 +1,17 @@
+/**
+ * Composition layer — emits OpenAPI `allOf` form for schemas derived via the
+ * `extend` helper.
+ *
+ * **EXPERIMENTAL (v0.2).** The composition surface (`extend`, `getLineage`,
+ * `LineageEntry`) is shipped for early feedback against real-world DTO
+ * compositions. Output shape and helper signatures may change in subsequent
+ * releases as edge cases surface (deeply nested anonymous deltas,
+ * discriminated unions composed with extend, single-schema-mode parent
+ * embedding, subtractive variants `omit` / `pick` / `partial`). Pin a minor
+ * version and validate against your own snapshots before relying on the
+ * output shape downstream.
+ */
+
 import { z } from 'zod';
 
 import type { $ZodType } from 'zod/v4/core';
@@ -5,13 +19,14 @@ import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
 
 /**
- * Lineage record stored for each composition-derived schema. Phase 2a-composition
- * v0.2 only emits this for the `extend` helper; `omit` / `pick` / `partial`
- * defer to v0.3.
+ * Lineage record stored for each composition-derived schema. v0.2 only emits
+ * this for the `extend` helper; `omit` / `pick` / `partial` defer to v0.3.
  *
  * The override hook reads this map to discriminate composition-derived schemas
  * from plain `z.object()`s and replaces their flat JSON Schema body with an
  * `allOf` form that references the parent's `$id`.
+ *
+ * @experimental v0.2 — shape may change as the composition surface stabilizes.
  */
 export interface LineageEntry {
   readonly op: 'extend';
@@ -36,21 +51,6 @@ const propsMap = new WeakMap<
   { properties: readonly string[]; required: readonly string[] }
 >();
 
-/**
- * Wraps `parent.extend(...)` (or any builder that produces a derived
- * `z.ZodObject`) and records the parent → child link in the lineage map.
- * Subsequent `z.toJSONSchema` emission picks this up and rewrites the
- * derived schema's body to `allOf: [{ $ref: '<parent>' }, <delta>]`.
- *
- * Type inference flows through Zod's own `.extend()` machinery — `S` is
- * whatever the `build` callback returns, so `z.infer<typeof result>`
- * resolves to the full extended shape at the call site.
- *
- * @example
- *   const Base  = z.object({ id: z.string() }).meta({ id: 'Base' });
- *   const Child = extend(Base, (s) => s.extend({ role: z.string() }).meta({ id: 'Child' }));
- *   type ChildOut = z.infer<typeof Child>;  // { id: string; role: string }
- */
 /** Zod's wrapper types that make a property optional in JSON Schema's `required` sense. */
 const OPTIONAL_WRAPPER_TYPES: ReadonlySet<string> = new Set(['optional', 'default']);
 
@@ -69,6 +69,26 @@ const computeShapeKeys = (
   return { properties, required };
 };
 
+/**
+ * Wraps `parent.extend(...)` (or any builder that produces a derived
+ * `z.ZodObject`) and records the parent → child link in the lineage map.
+ * Subsequent `z.toJSONSchema` emission picks this up and rewrites the
+ * derived schema's body to `allOf: [{ $ref: '<parent>' }, <delta>]`.
+ *
+ * Type inference flows through Zod's own `.extend()` machinery — `S` is
+ * whatever the `build` callback returns, so `z.infer<typeof result>`
+ * resolves to the full extended shape at the call site.
+ *
+ * @experimental v0.2 — shipped for early feedback. Validate the emitted
+ *   JSON Schema against your own snapshots; details (delta shape,
+ *   anonymous-parent fallback, single-schema-mode parent embedding) may
+ *   change as the surface stabilizes.
+ *
+ * @example
+ *   const Base  = z.object({ id: z.string() }).meta({ id: 'Base' });
+ *   const Child = extend(Base, (s) => s.extend({ role: z.string() }).meta({ id: 'Child' }));
+ *   type ChildOut = z.infer<typeof Child>;  // { id: string; role: string }
+ */
 export const extend = <P extends z.ZodObject, S extends z.ZodObject>(
   parent: P,
   build: (p: P) => S,
@@ -89,6 +109,8 @@ export const extend = <P extends z.ZodObject, S extends z.ZodObject>(
  * Public read-only accessor over the lineage table. Returns `undefined` for
  * schemas that weren't built through the composition helpers. Useful for
  * tooling that wants to walk composition trees outside the OpenAPI output.
+ *
+ * @experimental v0.2 — `LineageEntry` shape may change.
  */
 export const getLineage = (schema: z.ZodType): LineageEntry | undefined => lineageMap.get(schema);
 
