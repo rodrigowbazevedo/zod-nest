@@ -18,16 +18,17 @@ describe('ZodSerializationException', () => {
     expect(err.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
   });
 
-  it('exposes a treeified error body', () => {
+  it('does NOT leak the zod error tree in the response body', () => {
     const zodErr = failingError();
     const err = new ZodSerializationException(zodErr);
-    const body = err.getResponse();
+    const body = err.getResponse() as Record<string, unknown>;
 
-    expect(body).toMatchObject({
+    expect(body).toEqual({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Response validation failed',
-      errors: z.treeifyError(zodErr),
     });
+    expect(body.errors).toBeUndefined();
+    // The zodError is still accessible on the instance for filters / logging.
     expect(err.zodError).toBe(zodErr);
   });
 

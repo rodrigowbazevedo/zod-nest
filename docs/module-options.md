@@ -51,7 +51,7 @@ type CreateSerializationException = (
 ) => unknown;
 ```
 
-Factory for the exception thrown by `ZodSerializerInterceptor` on output validation failure. The default factory builds a `ZodSerializationException` (HTTP 500, body `{ statusCode, message: 'Response validation failed', errors: z.treeifyError(zodError) }`).
+Factory for the exception thrown by `ZodSerializerInterceptor` on output validation failure. The default factory builds a `ZodSerializationException` (HTTP 500, body `{ statusCode, message: 'Response validation failed' }` — the zod error tree is deliberately not in the body; see [`exceptions.md`](exceptions.md#why-the-response-body-has-no-errors-field)).
 
 ```ts
 ZodNestModule.forRoot({
