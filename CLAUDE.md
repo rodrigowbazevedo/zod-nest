@@ -33,7 +33,6 @@ CODE_OF_CONDUCT.md            # Contributor Covenant 2.1 by reference
 NOTICE                        # attribution to nestjs-zod for lifted names
 .github/                      # CI workflows + issue/PR templates
 .claude/                      # optional Claude Code tooling (hooks + skills)
-.maintenance/                 # /check-upstream-updates reports (audit trail)
 ```
 
 `.discovery/` and `.plan/` exist locally but are gitignored — research notes and phase plans that don't ship.
@@ -103,7 +102,7 @@ Optional convenience for contributors using Claude Code. None are required — e
 | `/sync-docs` | Diagnose drift between `src/` changes and user-facing docs on a branch. Surfaces a checklist; never auto-writes. Run before `gh pr create`. |
 | `/api-surface-audit` | Verify every export in `src/index.ts` resolves to a file, has a matching test, and follows naming conventions. Use before cutting a release. |
 | `/schema-fixture` | Add a Zod → OpenAPI fixture to the engine spec suite (`test/schema/engine.*.spec.ts`). |
-| `/check-upstream-updates` | Audit upstream dependencies (`zod`, `@nestjs/swagger`, `@nestjs/common`+`@nestjs/core`, `rxjs`); produce a triage report under `.maintenance/`. |
+| `/check-upstream-updates` | Audit upstream dependencies (`zod`, `@nestjs/swagger`, `@nestjs/common`+`@nestjs/core`, `rxjs`); file one GitHub issue per actionable finding. |
 | `/scan-zod-features` | Surface scanner for Zod's `toJSONSchema` options; usually invoked via `/check-upstream-updates`. |
 | `/scan-nest-features` | Surface scanner for `@nestjs/swagger` + `@nestjs/common` + `@nestjs/core`; usually invoked via `/check-upstream-updates`. |
 
@@ -128,4 +127,4 @@ Top failure modes and how we mitigate them:
 | **`_OPENAPI_METADATA_FACTORY` shape change** — specifically, if it becomes non-static or async | The DTO marker bridge in `src/dto/` breaks; mitigation = explicit assertion test (`test/dto/create-zod-dto.swagger-smoke.spec.ts`) + version-pinned compat-matrix cell. |
 | **Maintainer bandwidth** | `/check-upstream-updates` cadence is manual-only (no scheduled automation). Skill set scoped to library maintenance, not consumer scaffolding — keeps `.claude/skills/` small enough that one person can hold it. |
 
-Reports from `/check-upstream-updates` land in `.maintenance/upstream-<date>.md` and are committed as an audit trail.
+Findings from `/check-upstream-updates` become GitHub issues labelled `upstream-update` — the issue tracker is the audit trail.
