@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest a new capability or improvement.
+title: "[feat] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature. The more concrete the problem statement, the easier it is to evaluate the proposal — "I want to do X but the current API makes it awkward because Y" is much easier to react to than "please add Z".
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to accomplish? What's blocking you with the current surface?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        A rough sketch — API shape, behaviour, examples. Don't worry about polish; the goal is to communicate the idea.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about and why this one is preferred.
+
+  - type: textarea
+    id: scope-fit
+    attributes:
+      label: Fit with project scope
+      description: |
+        `zod-nest` covers Zod v4 → NestJS → OpenAPI 3.1. Features that re-introduce Zod v3, class-validator coexistence, OpenAPI 3.0 emission, or non-HTTP transports are out of scope (see [`docs/why-this-exists.md`](../../docs/why-this-exists.md)). How does this proposal fit?
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Use cases, prior art in other libraries, links to related issues.

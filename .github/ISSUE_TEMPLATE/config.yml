@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read the docs first
+    url: https://github.com/rodrigowbazevedo/zod-nest#readme
+    about: README + docs/ cover most common questions. Try them before opening an issue.

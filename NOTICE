@@ -1,0 +1,25 @@
+zod-nest
+Copyright (c) 2026 Rodrigo Azevedo
+Licensed under the MIT License — see LICENSE for the full text.
+
+This product takes naming and API-shape inspiration from nestjs-zod
+(MIT, Copyright (c) Ben Lorantfy and contributors —
+https://github.com/BenLorantfy/nestjs-zod), specifically:
+
+- The `createZodDto` factory name and its class-with-static-schema shape.
+- The `ZodValidationPipe` name and its role as a global validation pipe.
+- The `ZodValidationException` name and its 400-response envelope.
+- The `ZodSerializerInterceptor` name and its role as a response-validation
+  interceptor.
+- The `ZodSerializationException` name (the response-body shape differs in
+  zod-nest — see docs/exceptions.md for the policy).
+- The `ZodResponse` decorator name (the call shape differs: zod-nest's
+  `ZodResponse` is stackable per status code and does not internally apply
+  `@HttpCode`; see MIGRATION.md for the behavioural differences).
+
+The implementation is a fresh rewrite for Zod v4 and OpenAPI 3.1, but the
+familiar names lower the migration cost for projects coming from nestjs-zod
+and acknowledge the prior art.
+
+No code is lifted verbatim from nestjs-zod. If that changes in a future
+release, the affected file(s) will carry the upstream MIT header.
