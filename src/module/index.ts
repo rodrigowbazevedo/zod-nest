@@ -10,3 +10,4 @@ export type {
   NormalizedZodNestOptions,
   ZodNestModuleOptions,
 } from './options.js';
+export { ZodNestModule } from './zod-nest.module.js';
