@@ -1,3 +1,10 @@
+# [0.6.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.5.0...v0.6.0) (2026-05-17)
+
+
+### Features
+
+* **document:** share HTTP_METHODS, reuse COMPONENTS_SCHEMAS_PREFIX, harden defensive guards ([#18](https://github.com/rodrigowbazevedo/zod-nest/issues/18)) ([13c3a6a](https://github.com/rodrigowbazevedo/zod-nest/commit/13c3a6aa5a561caeb525571d68719b3999e4c0fa))
+
 # [0.5.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.4.0...v0.5.0) (2026-05-17)
 
 
