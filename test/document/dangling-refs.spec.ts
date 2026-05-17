@@ -175,4 +175,69 @@ describe('assertNoDanglingRefs', () => {
     expect(err.message).toContain('#/components/schemas/Unknown');
     expect(err.message).toContain('no DTO with this id was registered');
   });
+
+  it('hints "used as output but body missing" when the id only appears in outputExposedIds', () => {
+    const doc = docOf(
+      {
+        '/x': {
+          get: {
+            responses: {
+              '200': {
+                content: {
+                  'application/json': { schema: { $ref: '#/components/schemas/UsedOutput' } },
+                },
+              },
+            },
+          },
+        },
+      },
+      {},
+    );
+
+    let caught: unknown;
+    try {
+      assertNoDanglingRefs({ doc, collected: collectedWith([], ['UsedOutput']) });
+    } catch (e) {
+      caught = e;
+    }
+
+    const err = caught as ZodNestDocumentError;
+    expect(err.message).toContain('#/components/schemas/UsedOutput');
+    expect(err.message).toContain('used as output but body missing');
+  });
+
+  it('hints "used as input and output" when the id appears in both exposure sets', () => {
+    const doc = docOf(
+      {
+        '/x': {
+          post: {
+            requestBody: {
+              content: {
+                'application/json': { schema: { $ref: '#/components/schemas/UsedBoth' } },
+              },
+            },
+            responses: {
+              '200': {
+                content: {
+                  'application/json': { schema: { $ref: '#/components/schemas/UsedBoth' } },
+                },
+              },
+            },
+          },
+        },
+      },
+      {},
+    );
+
+    let caught: unknown;
+    try {
+      assertNoDanglingRefs({ doc, collected: collectedWith(['UsedBoth'], ['UsedBoth']) });
+    } catch (e) {
+      caught = e;
+    }
+
+    const err = caught as ZodNestDocumentError;
+    expect(err.message).toContain('#/components/schemas/UsedBoth');
+    expect(err.message).toContain('used as input and output but body missing');
+  });
 });
