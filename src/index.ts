@@ -1,6 +1,14 @@
-/**
- * zod-nest — Zod v4-only NestJS + OpenAPI 3.1 integration.
- *
- * Public surface is added incrementally in phases 2a–2e.
- */
-export {};
+export {
+  createRegistry,
+  toOpenApi,
+  ZodNestError,
+  ZodNestUnrepresentableError,
+} from './schema/index.js';
+export type {
+  Override,
+  OverrideContext,
+  SchemaObject,
+  ToOpenApiOptions,
+  ToOpenApiResult,
+  ZodNestRegistry,
+} from './schema/index.js';

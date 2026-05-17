@@ -1,0 +1,71 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`toOpenApi — composite snapshot renders a multi-feature composite as expected: user-refs 1`] = `
+{
+  "Snapshot_Address": {
+    "additionalProperties": false,
+    "properties": {
+      "city": {
+        "type": "string",
+      },
+      "zip": {
+        "type": "string",
+      },
+    },
+    "required": [
+      "city",
+      "zip",
+    ],
+    "title": "Address",
+    "type": "object",
+  },
+}
+`;
+
+exports[`toOpenApi — composite snapshot renders a multi-feature composite as expected: user-schema 1`] = `
+{
+  "additionalProperties": false,
+  "properties": {
+    "address": {
+      "$ref": "#/components/schemas/Snapshot_Address",
+    },
+    "age": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer",
+    },
+    "createdAt": {
+      "format": "date-time",
+      "type": "string",
+    },
+    "id": {
+      "type": "string",
+    },
+    "isActive": {
+      "type": "boolean",
+    },
+    "role": {
+      "enum": [
+        "admin",
+        "user",
+      ],
+      "type": "string",
+    },
+    "tags": {
+      "items": {
+        "type": "string",
+      },
+      "type": "array",
+    },
+  },
+  "required": [
+    "id",
+    "age",
+    "isActive",
+    "role",
+    "address",
+    "createdAt",
+  ],
+  "type": "object",
+}
+`;

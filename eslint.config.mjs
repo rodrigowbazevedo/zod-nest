@@ -52,4 +52,13 @@ export default tseslint.config(
     },
   },
   prettierPlugin,
+  {
+    rules: {
+      // Re-enable after prettier-config (which disables `curly`).
+      // Project convention: always brace `if`/`for`/`while` bodies; never inline.
+      curly: ['error', 'all'],
+      // Project convention: prefer `const foo = (...) => ...` over `function foo(...)`.
+      'func-style': ['error', 'expression', { allowArrowFunctions: true }],
+    },
+  },
 );
