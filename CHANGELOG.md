@@ -1,3 +1,10 @@
+## [0.1.4](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.3...v0.1.4) (2026-05-17)
+
+
+### Bug Fixes
+
+* **release:** upgrade to npm@11 — Node 24.15.0 still ships npm 10.9.8 ([655fed6](https://github.com/rodrigowbazevedo/zod-nest/commit/655fed634d04dabca6159ba4e167d019e435eead))
+
 ## [0.1.3](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.2...v0.1.3) (2026-05-17)
 
 
