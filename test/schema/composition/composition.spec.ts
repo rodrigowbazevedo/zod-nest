@@ -174,3 +174,29 @@ describe('composition emission — interplay with primitiveOverride', () => {
     expect((delta?.properties?.counter as { type?: string })?.type).toBe('integer');
   });
 });
+
+describe('composition emission — all-optional shapes', () => {
+  // Zod omits the `required` array entirely when every property is optional.
+  // The override's `jsonSchema.required ?? []` fallback must handle that
+  // without crashing or emitting a stray `required` on the delta.
+  it('handles a child where every field (parent + delta) is optional', () => {
+    const Base = z.object({ id: z.string().optional() }).meta({ id: 'Comp_AllOpt_Base' });
+    const Child = extend(Base, (s) =>
+      s.extend({ role: z.string().optional() }).meta({ id: 'Comp_AllOpt_Child' }),
+    );
+
+    const body = emit(Child) as {
+      allOf?: ({ $ref?: string } | { properties?: Record<string, unknown>; required?: unknown })[];
+    };
+    expect((body.allOf?.[0] as { $ref?: string }).$ref).toBe(
+      '#/components/schemas/Comp_AllOpt_Base',
+    );
+    const delta = body.allOf?.[1] as {
+      properties?: Record<string, unknown>;
+      required?: unknown;
+    };
+    expect(delta.properties).toMatchObject({ role: { type: 'string' } });
+    // No `required` array on the delta — every key in it is optional.
+    expect(delta.required).toBeUndefined();
+  });
+});
