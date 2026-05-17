@@ -42,9 +42,14 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
+      # No explicit `npm run build` — `prepublishOnly` (lint/typecheck/test/
+      # build) runs as part of `npm publish` inside semantic-release.
 
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Verbose npm logging surfaces the OIDC token exchange + any
+          # trusted-publisher rejection details (otherwise hidden behind an
+          # opaque 404 from `PUT /<package>`).
+          NPM_CONFIG_LOGLEVEL: verbose
         run: npx semantic-release
