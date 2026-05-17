@@ -29,9 +29,11 @@ const URI = (id: string): string => `#/components/schemas/${id}`;
  *
  * Uses `buildToJsonSchemaOptions` so emission semantics (override chain,
  * cycles, unrepresentable detection, metadata) match the single-schema
- * `toOpenApi` path. `reused: 'ref'` + the `uri` callback shape every
- * internal `$ref` directly to `#/components/schemas/<id>` — Phase 2e's
- * doc-level refs need no rewrite at emission time.
+ * `toOpenApi` path. The `uri` callback shapes every registered-schema
+ * `$ref` directly to `#/components/schemas/<id>` — Phase 2e's doc-level
+ * refs need no rewrite at emission time. `reused: 'inline'` keeps Zod
+ * from extracting anonymous reused sub-schemas into a virtual `__shared`
+ * defs table whose refs would dangle against `components.schemas`.
  */
 export const bulkEmit = (opts: BulkEmitOptions): BulkEmitResult => {
   const knownIds = new Set(opts.registry.ids());
@@ -51,7 +53,7 @@ const runPass = (
     io,
     override: opts.override,
     strict: opts.strict,
-    reused: 'ref',
+    reused: 'inline',
     uri: URI,
   });
   // Zod v4's bulk-mode emission always returns `{ schemas: Record<...> }` —

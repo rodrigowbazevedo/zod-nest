@@ -39,7 +39,14 @@ export interface BuildToJsonSchemaOptionsParams {
   io: 'input' | 'output';
   override?: Override;
   strict?: boolean;
-  /** Single-schema mode inlines reused branches; bulk mode prefers shared refs. */
+  /**
+   * Zod's strategy for anonymous reused sub-schemas. Both single-schema and
+   * bulk modes use `'inline'` — `'ref'` extracts anonymous reused branches
+   * into a virtual `__shared/$defs` table whose refs don't resolve against
+   * `components.schemas`, producing dangling refs. Registered schemas
+   * (`metadata.id` present) always go through the `uri` callback regardless,
+   * so DTO-to-DTO `$ref`s are unaffected.
+   */
   reused: 'inline' | 'ref';
   /** Bulk-mode only — shapes internal `$ref`s to `#/components/schemas/<id>`. */
   uri?: (id: string) => string;
