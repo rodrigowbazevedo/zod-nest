@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 
-import { Delete, Get, Patch, Post, Put, RequestMethod } from '@nestjs/common';
-import { METHOD_METADATA } from '@nestjs/common/constants';
+import { Delete, Get, HttpCode, Patch, Post, Put, RequestMethod } from '@nestjs/common';
+import { HTTP_CODE_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
 
 import { defaultStatusFor } from '../../src/response/default-status.js';
 
@@ -20,6 +20,18 @@ class Routes {
 
   @Patch('e')
   patchE(): void {}
+
+  @Post('http-code-on-post')
+  @HttpCode(204)
+  httpCodeOnPost(): void {}
+
+  @Get('http-code-on-get')
+  @HttpCode(202)
+  httpCodeOnGet(): void {}
+
+  @Get('http-code-zero')
+  @HttpCode(0)
+  httpCodeZero(): void {}
 }
 
 describe('defaultStatusFor', () => {
@@ -45,5 +57,22 @@ describe('defaultStatusFor', () => {
     expect(METHOD_METADATA).toBe('method');
     expect(RequestMethod.POST).toBe(1);
     expect(Reflect.getMetadata(METHOD_METADATA, Routes.prototype.postB)).toBe(RequestMethod.POST);
+  });
+
+  it('@HttpCode(204) on a POST handler wins over the POST default of 201', () => {
+    expect(defaultStatusFor(Routes.prototype.httpCodeOnPost)).toBe(204);
+  });
+
+  it('@HttpCode(202) on a GET handler wins over the GET default of 200', () => {
+    expect(defaultStatusFor(Routes.prototype.httpCodeOnGet)).toBe(202);
+  });
+
+  it('@HttpCode(0) on a handler is honored (no truthy-fallback to method default)', () => {
+    expect(defaultStatusFor(Routes.prototype.httpCodeZero)).toBe(0);
+  });
+
+  it('pins the HTTP_CODE_METADATA constant so a Nest rename fails loudly', () => {
+    expect(HTTP_CODE_METADATA).toBe('__httpCode__');
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, Routes.prototype.httpCodeOnPost)).toBe(204);
   });
 });

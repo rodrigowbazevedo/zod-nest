@@ -1,6 +1,14 @@
 import 'reflect-metadata';
 
-import { Controller, Get, HttpStatus, Module, NotFoundException, Post } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Module,
+  NotFoundException,
+  Post,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import request from 'supertest';
 import { z } from 'zod';
@@ -68,6 +76,15 @@ class UsersController {
   create(): { id: string; email: string } {
     // Default status for POST is 201, so this should match.
     return { id: 'u-new', email: 'NEW@B.COM' };
+  }
+
+  @Get('http-coded')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ZodResponse({ type: UserDto })
+  httpCoded(): { id: string; email: string } {
+    // @HttpCode(202) overrides the GET default of 200; the interceptor
+    // must read HTTP_CODE_METADATA in defaultStatusFor to match correctly.
+    return { id: 'u-accepted', email: 'X@Y.COM' };
   }
 }
 
@@ -143,6 +160,12 @@ describe('ZodSerializerInterceptor — end-to-end smoke', () => {
     const res = await request(app.getHttpServer()).post('/users').send({});
     expect(res.status).toBe(HttpStatus.CREATED);
     expect(res.body).toEqual({ id: 'u-new', email: 'new@b.com' });
+  });
+
+  it('@HttpCode(202) GET: interceptor matches via HTTP_CODE_METADATA, validates response', async () => {
+    const res = await request(app.getHttpServer()).get('/users/http-coded');
+    expect(res.status).toBe(HttpStatus.ACCEPTED);
+    expect(res.body).toEqual({ id: 'u-accepted', email: 'x@y.com' });
   });
 
   it('logs `error` severity on strict failure (validationLogs.output enabled)', async () => {
