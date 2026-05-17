@@ -25,10 +25,34 @@ export {
   ZOD_DTO_SYMBOL,
 } from './dto/index.js';
 export type { CreateZodDtoOptions, Io, ZodDto, ZodDtoMarker } from './dto/index.js';
-export { ZodValidationException } from './exceptions/index.js';
+export { ZodSerializationException, ZodValidationException } from './exceptions/index.js';
 export { ZodValidationPipe } from './pipes/index.js';
 export type {
   CreateValidationException,
   ZodValidationPipeArg,
   ZodValidationPipeOptions,
 } from './pipes/index.js';
+export { ZodResponse } from './decorators/index.js';
+export type { ZodResponseOptions, ZodResponseType } from './decorators/index.js';
+export { ZodSerializerInterceptor } from './interceptors/index.js';
+export {
+  defaultStatusFor,
+  resolveEffectiveStatus,
+  ZOD_RESPONSES_METADATA_KEY,
+} from './response/index.js';
+export type {
+  ResponseVariant,
+  ResponseVariantKind,
+  ZodResponseDescription,
+} from './response/index.js';
+export {
+  DEFAULT_MAX_LOGGED_VALUE_BYTES,
+  DEFAULT_REDACT_KEYS,
+  ZOD_NEST_OPTIONS,
+  ZodNestModule,
+} from './module/index.js';
+export type {
+  CreateSerializationException,
+  NormalizedZodNestOptions,
+  ZodNestModuleOptions,
+} from './module/index.js';
