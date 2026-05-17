@@ -26,9 +26,35 @@ interface UnrepresentableHit {
   zodType: string;
 }
 
-export const toOpenApi = (schema: z.ZodType, opts: ToOpenApiOptions): ToOpenApiResult => {
-  const strict = opts.strict ?? true;
-  const merged = combine(builtInOverride, opts.override);
+/**
+ * Parameters for `buildToJsonSchemaOptions` — the shared option-bag builder
+ * used by both `toOpenApi` (single-schema mode) and Phase 2e's `bulkEmit`
+ * (registry-mode). Centralizes the override chain, unrepresentable detection,
+ * metadata wiring, and target/cycles defaults so both paths emit equivalent
+ * JSON Schema for the same input.
+ */
+export interface BuildToJsonSchemaOptionsParams {
+  registry: ZodNestRegistry;
+  io: 'input' | 'output';
+  override?: Override;
+  strict?: boolean;
+  /** Single-schema mode inlines reused branches; bulk mode prefers shared refs. */
+  reused: 'inline' | 'ref';
+  /** Bulk-mode only — shapes internal `$ref`s to `#/components/schemas/<id>`. */
+  uri?: (id: string) => string;
+}
+
+export interface BuiltJsonSchemaOptions {
+  options: NonNullable<Parameters<typeof z.toJSONSchema>[1]>;
+  /** Throws `ZodNestUnrepresentableError` if any strict-unrepresentable hit was collected during emission. */
+  consumeUnrepresentable(): void;
+}
+
+export const buildToJsonSchemaOptions = (
+  params: BuildToJsonSchemaOptionsParams,
+): BuiltJsonSchemaOptions => {
+  const strict = params.strict ?? true;
+  const merged = combine(builtInOverride, params.override);
   const unrepresentableHits: UnrepresentableHit[] = [];
 
   const wrapped: Override = (ctx) => {
@@ -42,20 +68,40 @@ export const toOpenApi = (schema: z.ZodType, opts: ToOpenApiOptions): ToOpenApiR
     });
   };
 
-  const raw = z.toJSONSchema(schema, {
+  const options: NonNullable<Parameters<typeof z.toJSONSchema>[1]> = {
     target: 'draft-2020-12',
-    io: opts.io,
+    io: params.io,
     unrepresentable: 'any',
-    metadata: opts.registry.zodRegistry,
+    metadata: params.registry.zodRegistry,
     override: wrapped,
     cycles: 'ref',
+    reused: params.reused,
+  };
+  if (params.uri !== undefined) {
+    options.uri = params.uri;
+  }
+
+  return {
+    options,
+    consumeUnrepresentable: () => {
+      const firstHit = unrepresentableHits[0];
+      if (firstHit !== undefined) {
+        throw new ZodNestUnrepresentableError(firstHit.path, firstHit.zodType);
+      }
+    },
+  };
+};
+
+export const toOpenApi = (schema: z.ZodType, opts: ToOpenApiOptions): ToOpenApiResult => {
+  const built = buildToJsonSchemaOptions({
+    registry: opts.registry,
+    io: opts.io,
+    override: opts.override,
+    strict: opts.strict,
     reused: 'inline',
   });
-
-  const firstHit = unrepresentableHits[0];
-  if (firstHit !== undefined) {
-    throw new ZodNestUnrepresentableError(firstHit.path, firstHit.zodType);
-  }
+  const raw = z.toJSONSchema(schema, built.options);
+  built.consumeUnrepresentable();
 
   const result = postProcess(raw);
 

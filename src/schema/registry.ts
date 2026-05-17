@@ -5,6 +5,13 @@ export interface ZodNestRegistry {
   register(schema: z.ZodType, id: string): void;
   hasCollision(id: string): boolean;
   getCollisions(): ReadonlyMap<string, ReadonlySet<z.ZodType>>;
+  /**
+   * Snapshot of every id registered through this `ZodNestRegistry`. Phase 2e's
+   * bulk-mode emitter uses it to filter `z.toJSONSchema(registry.zodRegistry,
+   * ...)` output to zod-nest-known ids only (the underlying Zod registry is
+   * `z.globalRegistry`, which can hold third-party entries).
+   */
+  ids(): readonly string[];
 }
 
 export const createRegistry = (): ZodNestRegistry => {
@@ -35,6 +42,7 @@ export const createRegistry = (): ZodNestRegistry => {
       }
       return out;
     },
+    ids: () => [...seen.keys()],
   };
 };
 
