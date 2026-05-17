@@ -1,12 +1,13 @@
 import type { SchemaObject } from './openapi.types.js';
 
+import { COMPONENTS_SCHEMAS_PREFIX } from './constants.js';
+
 export interface PostProcessResult {
   schema: SchemaObject;
   refs: Map<string, SchemaObject>;
 }
 
 const DEFS_PREFIX = '#/$defs/';
-const COMPONENTS_PREFIX = '#/components/schemas/';
 
 const rewriteRefs = (node: unknown, selfRef: string | undefined): void => {
   if (Array.isArray(node)) {
@@ -21,7 +22,7 @@ const rewriteRefs = (node: unknown, selfRef: string | undefined): void => {
   const obj = node as Record<string, unknown>;
   const ref = obj.$ref;
   if (typeof ref === 'string' && ref.startsWith(DEFS_PREFIX)) {
-    obj.$ref = COMPONENTS_PREFIX + ref.slice(DEFS_PREFIX.length);
+    obj.$ref = COMPONENTS_SCHEMAS_PREFIX + ref.slice(DEFS_PREFIX.length);
   } else if (ref === '#' && selfRef !== undefined) {
     // Zod emits '#' for cycle refs back to the document root. When we lift a
     // named schema into its own components.schemas entry, '#' should resolve
@@ -52,7 +53,7 @@ export const postProcess = (raw: SchemaObject): PostProcessResult => {
   rewriteRefs(root, undefined);
 
   for (const [id, body] of refs) {
-    rewriteRefs(body, `${COMPONENTS_PREFIX}${id}`);
+    rewriteRefs(body, `${COMPONENTS_SCHEMAS_PREFIX}${id}`);
   }
 
   return { schema: root, refs };

@@ -7,14 +7,17 @@ export class ZodNestError extends Error {
 
 export class ZodNestUnrepresentableError extends ZodNestError {
   readonly path: ReadonlyArray<string | number>;
+  readonly zodType: string;
 
-  constructor(path: ReadonlyArray<string | number>) {
+  constructor(path: ReadonlyArray<string | number>, zodType: string) {
     super(
-      `Unrepresentable schema at ${formatPath(path)}: no override produced a JSON Schema body. ` +
-        `Set strict: false to emit \`{}\` instead, or supply an \`override\` that handles this Zod type.`,
+      `Unrepresentable Zod schema \`${zodType}\` at ${formatPath(path)}: no override produced ` +
+        `a JSON Schema body. Set strict: false to emit \`{}\` instead, or supply an \`override\` ` +
+        `that handles this Zod type.`,
     );
     this.name = 'ZodNestUnrepresentableError';
     this.path = path;
+    this.zodType = zodType;
   }
 }
 

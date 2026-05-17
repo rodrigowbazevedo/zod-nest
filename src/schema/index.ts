@@ -1,3 +1,8 @@
+export {
+  COMPONENTS_SCHEMAS_PREFIX,
+  ZOD_NEST_ERROR_DUPLICATE_ID,
+  ZOD_NEST_ERROR_EXTENSION,
+} from './constants.js';
 export { toOpenApi } from './engine.js';
 export type { ToOpenApiOptions, ToOpenApiResult } from './engine.js';
 export { createRegistry } from './registry.js';
