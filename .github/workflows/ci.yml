@@ -1,9 +1,10 @@
 name: CI
 
+# Only runs on pull requests. Push-to-main is handled by release.yml, which
+# runs the same lint / typecheck / test / build steps as part of the release
+# pipeline. Two workflows fighting over the same checks on main was wasteful.
 on:
   pull_request:
-  push:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}

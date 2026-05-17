@@ -29,9 +29,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           # Node 24.15.0 still ships npm 10.9.8, which lacks trusted-publisher
-          # OIDC support. We upgrade to npm@11 explicitly in the step below.
-          # Consumers can still use this package on >=22 (engines); only the
-          # publish runner needs the newer npm.
+          # OIDC support. We upgrade to npm@11 explicitly via the @semantic-
+          # release/exec publish step. Consumers can still use this package
+          # on >=22 (engines); only the publish runner needs the newer npm.
           node-version: '24'
           # `registry-url` is mandatory for npm OIDC trusted publishing — it
           # writes a `.npmrc` that pins the registry, which is what triggers
@@ -42,8 +42,18 @@ jobs:
 
       - run: npm ci
 
-      # No explicit `npm run build` — `prepublishOnly` (lint/typecheck/test/
-      # build) runs as part of `npm publish` inside semantic-release.
+      # Run the full pipeline explicitly so each step is visible in the
+      # release job's logs (and a failure points at the right step instead
+      # of being hidden inside `npm publish`'s `prepublishOnly` chain).
+      # CI runs the same steps on PRs; this is the source of truth at
+      # release time.
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - run: npm run build
 
       - name: Release
         env:
