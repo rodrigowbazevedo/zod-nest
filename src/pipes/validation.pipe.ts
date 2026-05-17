@@ -2,19 +2,14 @@ import { Injectable, Optional } from '@nestjs/common';
 
 import type { ArgumentMetadata, PipeTransform } from '@nestjs/common';
 import type { z } from 'zod';
-import type { ZodDto } from '../dto/dto.types.js';
 import type {
   CreateValidationException,
   ZodValidationPipeArg,
   ZodValidationPipeOptions,
 } from './types.js';
 
-import { ZOD_DTO_SYMBOL } from '../dto/symbols.js';
+import { isZodDto } from '../dto/predicates.js';
 import { ZodValidationException } from '../exceptions/validation.exception.js';
-
-const isZodDtoClass = (value: unknown): value is ZodDto =>
-  typeof value === 'function' &&
-  (value as unknown as Record<symbol, unknown>)[ZOD_DTO_SYMBOL] === true;
 
 const isZodSchema = (value: unknown): value is z.ZodType =>
   value !== null && typeof value === 'object' && '_zod' in value;
@@ -53,7 +48,7 @@ export class ZodValidationPipe implements PipeTransform {
       return this.explicitSchema;
     }
     const metatype: unknown = metadata.metatype;
-    if (!isZodDtoClass(metatype)) {
+    if (!isZodDto(metatype)) {
       return undefined;
     }
     return metatype.schema;
@@ -66,7 +61,7 @@ export class ZodValidationPipe implements PipeTransform {
     if (arg === undefined) {
       return { schema: undefined, factory: defaultExceptionFactory };
     }
-    if (isZodDtoClass(arg)) {
+    if (isZodDto(arg)) {
       return { schema: arg.schema, factory: defaultExceptionFactory };
     }
     if (isZodSchema(arg)) {
@@ -76,7 +71,7 @@ export class ZodValidationPipe implements PipeTransform {
       return { schema: undefined, factory: defaultExceptionFactory };
     }
     const optionSchema = arg.schema;
-    const resolvedSchema = isZodDtoClass(optionSchema) ? optionSchema.schema : optionSchema;
+    const resolvedSchema = isZodDto(optionSchema) ? optionSchema.schema : optionSchema;
     return {
       schema: resolvedSchema,
       factory: arg.createValidationException ?? defaultExceptionFactory,

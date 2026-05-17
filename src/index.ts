@@ -17,7 +17,13 @@ export type {
   ToOpenApiResult,
   ZodNestRegistry,
 } from './schema/index.js';
-export { createZodDto, isZodDtoMarker, makeZodDtoMarker, ZOD_DTO_SYMBOL } from './dto/index.js';
+export {
+  createZodDto,
+  isZodDto,
+  isZodDtoMarker,
+  makeZodDtoMarker,
+  ZOD_DTO_SYMBOL,
+} from './dto/index.js';
 export type { CreateZodDtoOptions, Io, ZodDto, ZodDtoMarker } from './dto/index.js';
 export { ZodValidationException } from './exceptions/index.js';
 export { ZodValidationPipe } from './pipes/index.js';

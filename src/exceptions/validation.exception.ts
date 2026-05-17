@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, HttpStatus } from '@nestjs/common';
 import { z } from 'zod';
 
 import type { ArgumentMetadata } from '@nestjs/common';
@@ -24,7 +24,7 @@ export class ZodValidationException extends BadRequestException {
 
   constructor(zodError: z.ZodError, argMetadata?: ArgumentMetadata) {
     super({
-      statusCode: 400,
+      statusCode: HttpStatus.BAD_REQUEST,
       message: 'Validation failed',
       errors: z.treeifyError(zodError),
     });
