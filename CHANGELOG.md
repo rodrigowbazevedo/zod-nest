@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.2.0...v0.3.0) (2026-05-17)
+
+
+### Features
+
+* **pipe:** ZodValidationPipe + ZodValidationException (Phase 2c) ([#13](https://github.com/rodrigowbazevedo/zod-nest/issues/13)) ([add7cd0](https://github.com/rodrigowbazevedo/zod-nest/commit/add7cd074562eeeeab9936c562a3f5dc3f6b9f05)), closes [#12](https://github.com/rodrigowbazevedo/zod-nest/issues/12)
+
 # [0.2.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.1.5...v0.2.0) (2026-05-17)
 
 
