@@ -9,6 +9,7 @@ import { z } from 'zod';
 import type { $ZodType } from 'zod/v4/core';
 import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
+import type { ZodNestRegistry } from './registry.js';
 
 import { DEFS_PREFIX } from './constants.js';
 
@@ -93,6 +94,8 @@ export const DEFAULT_BUILD_REF = (id: string): string => `${DEFS_PREFIX}${id}`;
 export interface CreateCompositionOverrideOptions {
   /** Shape the `$ref` string for a parent id. Defaults to `#/$defs/<id>`. */
   buildRef: (id: string) => string;
+  /** Registry to resolve parent ids against. Use the same instance the engine emits with. */
+  registry: ZodNestRegistry;
 }
 
 /**
@@ -105,7 +108,7 @@ export interface CreateCompositionOverrideOptions {
  * object reference reach the caller.
  */
 export const createCompositionOverride = (opts: CreateCompositionOverrideOptions): Override => {
-  const { buildRef } = opts;
+  const { buildRef, registry } = opts;
   return (ctx) => {
     const { jsonSchema, zodSchema } = ctx;
     const entry = lineageMap.get(zodSchema);
@@ -120,7 +123,7 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
       return;
     }
 
-    const parentId = z.globalRegistry.get(entry.parent)?.id;
+    const parentId = registry.zodRegistry.get(entry.parent)?.id;
     if (parentId === undefined) {
       // Anonymous parent — fall back to Zod's flat emission.
       return;

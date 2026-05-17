@@ -30,29 +30,6 @@ export const primitiveOverride: Override = ({ zodSchema, jsonSchema }) => {
   }
 };
 
-const STRICT_REQUIRES_OVERRIDE: ReadonlySet<string> = new Set([
-  'bigint',
-  'date',
-  'symbol',
-  'undefined',
-  'void',
-  'map',
-  'set',
-  'transform',
-  'nan',
-  'custom',
-]);
-
-export const isStrictlyUnrepresentable = (
-  jsonSchema: SchemaObject,
-  zodSchema: $ZodTypes,
-): boolean => {
-  if (!STRICT_REQUIRES_OVERRIDE.has(zodSchema._zod.def.type)) {
-    return false;
-  }
-  return Object.keys(jsonSchema).length === 0;
-};
-
 export const combine = (...overrides: ReadonlyArray<Override | undefined>): Override => {
   const list: Override[] = [];
   for (const candidate of overrides) {
@@ -60,9 +37,6 @@ export const combine = (...overrides: ReadonlyArray<Override | undefined>): Over
       continue;
     }
     list.push(candidate);
-  }
-  if (list.length === 0) {
-    return () => undefined;
   }
   return (ctx) => {
     for (const o of list) {
