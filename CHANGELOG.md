@@ -1,3 +1,10 @@
+# [0.11.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.10.1...v0.11.0) (2026-05-18)
+
+
+### Features
+
+* **ci:** compatibility matrix for zod + [@nestjs](https://github.com/nestjs) peer-dep ranges ([#40](https://github.com/rodrigowbazevedo/zod-nest/issues/40)) ([88bfafb](https://github.com/rodrigowbazevedo/zod-nest/commit/88bfafb6aed7233f1318c1419d77d66f4997752f)), closes [#34](https://github.com/rodrigowbazevedo/zod-nest/issues/34)
+
 ## [0.10.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.10.0...v0.10.1) (2026-05-18)
 
 
