@@ -103,17 +103,13 @@ const singleOrArray = <T extends z.ZodType>(item: T) => {
   const arrFrag: SchemaObject = { type: 'array', items: itemFrag };
 
   const pipe = item.transform((v) => [v]);
-  // .transform(...) returns a pipe whose `def.out` is the inner transform —
-  // register on both so the inner transform doesn't trip strict mode.
   overrideJSONSchema(pipe, { input: itemFrag, output: arrFrag });
-  overrideJSONSchema(pipe._zod.def.out as unknown as z.ZodType, {
-    input: itemFrag,
-    output: arrFrag,
-  });
 
   return z.union([z.array(item), pipe]);
 };
 ```
+
+A single registration on the outer pipe is enough — the engine suppresses the inner transform's strict-mode hit when the outer pipe covers the relevant io side, so you do not have to reach into `_zod.def.out` to silence it.
 
 Input emission: `{ anyOf: [arrFrag, itemFrag] }` (item or array).
 Output emission: `{ anyOf: [arrFrag, arrFrag] }` (always array).

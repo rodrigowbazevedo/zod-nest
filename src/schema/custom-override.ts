@@ -18,7 +18,7 @@ import type { Override } from './override.js';
  */
 export type OverrideJSONSchemaArg = SchemaObject | { input?: SchemaObject; output?: SchemaObject };
 
-interface StoredFragments {
+export interface StoredFragments {
   input?: SchemaObject;
   output?: SchemaObject;
 }
@@ -72,6 +72,16 @@ export const overrideJSONSchema = (schema: z.ZodType, arg: OverrideJSONSchemaArg
   }
   customOverrideMap.set(schema, { input: arg, output: arg });
 };
+
+/**
+ * Read-only lookup into the registration store. Used by the engine to detect
+ * when a pipe-typed schema covers its inner descent target with a relevant-io
+ * fragment — see `buildToJsonSchemaOptions` in `engine.ts`. Returning a
+ * possibly-`undefined` `StoredFragments` keeps the engine ignorant of the
+ * underlying WeakMap.
+ */
+export const peekRegistration = (schema: $ZodType): StoredFragments | undefined =>
+  customOverrideMap.get(schema);
 
 /**
  * Internal override factory consulted by the engine. Closes over the current
