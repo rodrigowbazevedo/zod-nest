@@ -7,7 +7,7 @@ import type { ZodNestRegistry } from './registry.js';
 
 import { createCompositionOverride, DEFAULT_BUILD_REF } from './composition.js';
 import { ZOD_NEST_ERROR_DUPLICATE_ID, ZOD_NEST_ERROR_EXTENSION } from './constants.js';
-import { customOverride } from './custom-override.js';
+import { createCustomOverride } from './custom-override.js';
 import { ZodNestUnrepresentableError } from './errors.js';
 import { combine, primitiveOverride } from './override.js';
 import { postProcess } from './post-process.js';
@@ -102,8 +102,10 @@ export const buildToJsonSchemaOptions = (
   // Chain order matches precedence (left → right, last-write-wins mutation
   // semantics). Caller's `params.override` runs last so per-call overrides
   // remain the ultimate escape hatch; `customOverride` consults the
-  // `overrideJSONSchema(...)` registration map and clobbers the built-in
+  // `overrideJSONSchema(...)` registration map (parameterized by `io` so it
+  // can pick divergent input/output fragments) and clobbers the built-in
   // primitive/composition mappings for the registered schema instance.
+  const customOverride = createCustomOverride(params.io);
   const merged = combine(primitiveOverride, compositionOverride, customOverride, params.override);
   const unrepresentableHits: UnrepresentableHit[] = [];
 

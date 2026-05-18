@@ -72,6 +72,52 @@ Every emission of `FileSchema` — direct or nested — now writes the registere
 
 **Memory.** The registration map is a `WeakMap` keyed by schema identity — when your schema instance goes out of scope, the registration is collected with it.
 
+### Diverging input vs output fragments
+
+Some schemas describe **different shapes** on the request side vs the response side — typical for coercion helpers, where the input is permissive (accepts many shapes) but the output is normalized. A single fragment can't express that. The wrapper form lets you register both sides separately:
+
+```ts
+overrideJSONSchema(coercedSchema, {
+  input:  { type: 'string', description: 'permissive — request side' },
+  output: { type: 'string', description: 'normalized — response side' },
+});
+```
+
+The engine picks `input` during request-body emission and `output` during response-body / serializer emission. Omit a side to leave Zod's default emission untouched for that direction:
+
+```ts
+overrideJSONSchema(s, { output: { type: 'string' } });
+// Input side still emits whatever Zod would emit by default.
+```
+
+The discriminator between the single-fragment form and the wrapper form is the presence of an `input` or `output` key. Neither is a JSON Schema / OpenAPI 3.1 keyword, so the two forms never collide in practice.
+
+**Real-world pattern: `singleOrArray` coercion.** A helper that accepts `T | T[]` on input but always normalizes to `T[]` on output:
+
+```ts
+import { z } from 'zod';
+import { overrideJSONSchema, type SchemaObject } from 'zod-nest';
+
+const singleOrArray = <T extends z.ZodType>(item: T) => {
+  const itemFrag: SchemaObject = { type: 'string' };  // example: T = string
+  const arrFrag: SchemaObject = { type: 'array', items: itemFrag };
+
+  const pipe = item.transform((v) => [v]);
+  // .transform(...) returns a pipe whose `def.out` is the inner transform —
+  // register on both so the inner transform doesn't trip strict mode.
+  overrideJSONSchema(pipe, { input: itemFrag, output: arrFrag });
+  overrideJSONSchema(pipe._zod.def.out as unknown as z.ZodType, {
+    input: itemFrag,
+    output: arrFrag,
+  });
+
+  return z.union([z.array(item), pipe]);
+};
+```
+
+Input emission: `{ anyOf: [arrFrag, itemFrag] }` (item or array).
+Output emission: `{ anyOf: [arrFrag, arrFrag] }` (always array).
+
 ## Opaque blobs
 
 When a field carries a value your API doesn't introspect (a passthrough JWT, a base64-encoded payload, an upstream-controlled shape), emit it as an opaque JSON Schema object so consumers know it exists but don't try to validate its shape:
