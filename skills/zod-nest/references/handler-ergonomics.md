@@ -54,15 +54,18 @@ it. Set `status` explicitly only on off-happy-path variants.
 
 Canonical: <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/responses.md>.
 
-## 3. Redundant `@ApiOkResponse({ type })`
+## 3. Redundant `@Api*Response({ type })` next to `@ZodResponse({ type })`
 
-**Detection** — `@ApiOkResponse({ type: Dto })` appears next to
-`@ZodResponse({ type: Dto })` (same Dto) on the same handler.
+**Detection** — any of `@ApiResponse` / `@ApiOkResponse` / `@ApiCreatedResponse`
+/ `@ApiNoContentResponse` / etc. appears next to a `@ZodResponse({ type: Dto })`
+for the same DTO and (resolved) status on the same handler.
 
-**Severity** — 🟡. The `@ApiOkResponse` is dead weight — `@ZodResponse`
-already declares the doc entry and validates.
+**Severity** — 🟡. Since `zod-nest@1.4.0`, `@ZodResponse` is a composite
+decorator: it applies `@ApiResponse(...)` internally, so the doc entry is
+already written. The manual `@Api*Response` is dead weight and risks drifting
+out of sync with the validated DTO.
 
-**Proposed edit** — remove the `@ApiOkResponse`:
+**Proposed edit** — remove the redundant `@Api*Response`:
 
 ```diff
   @Get(':id')
@@ -70,6 +73,13 @@ already declares the doc entry and validates.
   @ZodResponse({ type: UserDto })
   getUser(): Promise<UserDto> { /* ... */ }
 ```
+
+**Binary-download exception.** If the manual call carries info `@ZodResponse`
+alone can't express — historically `@ApiOkResponse({ content: { 'application/octet-stream': ... } })`
+for binary downloads — propose the canonical replacement instead of a plain
+deletion: `overrideJSONSchema(BlobSchema, { type: 'string', format: 'binary' })`
++ `@ZodResponse({ type: BlobDto })`. See
+<https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md>.
 
 Canonical: <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/responses.md>.
 

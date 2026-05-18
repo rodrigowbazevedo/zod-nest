@@ -122,9 +122,46 @@ foo() {}
 
 This matches what consumers already write in `@ApiResponse({ status: 'default' })` to name the canonical-success card explicitly, and avoids the surprise of an unrelated 503 silently validating against the `'default'` DTO. If a true unclaimed-status fallback is needed, it's an additive change for later.
 
-### Caveat — OpenAPI emission
+### OpenAPI emission
 
-The OpenAPI document `responses.<status>` cards are still written by hand via `@ApiResponse` (`applyZodNest` does not synthesise response cards). Wildcards are a **runtime validation** feature; pair them with explicit `@ApiResponse({ status: '2XX', ... })` calls when you want the OpenAPI spec to reflect the same range.
+`@ZodResponse` is a **composite decorator**: in addition to registering the runtime variant, it applies `@ApiResponse(...)` (or the array/tuple equivalent) so the OpenAPI document carries the response shape automatically. No need to write `@ApiResponse({ type })` alongside `@ZodResponse({ type })` — the response card is emitted for you.
+
+| Variant kind | What the doc gets |
+|---|---|
+| `@ZodResponse({ type: Dto })` | `responses.<status>.content['application/json'].schema = { $ref: '#/components/schemas/<Dto>' }` |
+| `@ZodResponse({ type: [Dto] })` | `{ type: 'array', items: { $ref: '...' } }` |
+| `@ZodResponse({ type: [A, B] })` | `{ type: 'array', prefixItems: [{ $ref: A }, { $ref: B }], items: false }` (OpenAPI 3.1 tuple) |
+| Wildcard `status: '2XX'` | emitted as `responses.2XX` per OpenAPI 3.1 |
+
+Tuple variants also apply `@ApiExtraModels(...slotDtos)` so each tuple-slot DTO is registered in `components.schemas`.
+
+### Decorator ordering & the microtask trick
+
+TypeScript decorators apply **bottom-up**, so `@ZodResponse` — usually written above `@Get` / `@Post` / `@HttpCode` — runs its factory body *first*, before sibling decorators have written their metadata. That metadata (`HTTP_CODE_METADATA`, `METHOD_METADATA`) is what `resolveEffectiveStatus` reads to determine the response status when `@ZodResponse({ status })` is omitted.
+
+`@ZodResponse` handles this with two paths:
+
+- **Explicit `status` (numeric or `'NXX'` wildcard)** — `@ApiResponse(...)` is applied **synchronously**. There's nothing to wait for; the status is already known.
+- **Implicit `status` (omitted or `'default'`)** — `@ApiResponse(...)` is deferred via `queueMicrotask` so the sibling decorators have already settled their metadata by the time the microtask runs. `@nestjs/swagger`'s `SwaggerExplorer` reads response metadata at `SwaggerModule.createDocument(...)` time (app-bootstrap, well after all microtasks have flushed), so the deferred application lands in time.
+
+**When does this matter to you?** Almost never. Two edge cases:
+
+1. **Custom wrappers** — if you build a decorator factory that wraps `@ZodResponse` (status-implicit form) and itself defers work past microtasks, the ordering can race. Workaround: pass `status` explicitly in the wrapper, which switches to the synchronous path.
+2. **Unit-testing decorators in isolation** — if you call `Reflect.getMetadata('swagger/apiResponse', handler)` synchronously after class definition, the metadata won't be there yet for implicit-status calls. `await new Promise((r) => setImmediate(r))` once before asserting; the microtask flushes during NestJS' own `app.init()` in integration tests.
+
+```ts
+// ✅ implicit status — defers application by one microtask
+@Post()                                  // sets METHOD_METADATA later
+@HttpCode(204)                           // sets HTTP_CODE_METADATA later
+@ZodResponse({ type: AcceptedDto })      // runs first; resolves status via microtask → 204
+foo() {}
+
+// ✅ explicit status — applied synchronously
+@Post()
+@HttpCode(204)
+@ZodResponse({ status: 204, type: AcceptedDto })
+bar() {}
+```
 
 ## `passthroughOnError`
 

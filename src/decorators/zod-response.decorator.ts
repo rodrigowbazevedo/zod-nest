@@ -9,7 +9,9 @@ import type {
 } from '../response/metadata.js';
 
 import { isZodDto } from '../dto/predicates.js';
+import { resolveEffectiveStatus } from '../response/default-status.js';
 import { appendResponseVariant } from '../response/metadata.js';
+import { applySwaggerResponseDecorator } from './zod-response.swagger-bridge.js';
 
 /**
  * Accepted shapes for `@ZodResponse({ type })`:
@@ -109,18 +111,32 @@ const normaliseStatus = (
 };
 
 /**
- * Method-only decorator. Declares a typed response variant for the handler.
- * Stack multiple decorations to declare per-status types; lookup at runtime
- * is by `ZodSerializerInterceptor`'s two-pass matcher (exact numeric, then
- * `'NXX'` wildcard).
+ * Method-only decorator. Declares a typed response variant for the handler
+ * AND applies the equivalent `@ApiResponse(...)` from `@nestjs/swagger` so
+ * the OpenAPI document carries the response shape — no need for consumers
+ * to hand-write `@ApiResponse` alongside `@ZodResponse`.
  *
- * The wrapped Zod schema (array / tuple) is built once at decoration time
- * and stored on the variant record — no per-request schema construction.
+ * Stack multiple decorations to declare per-status types; runtime lookup
+ * is by `ZodSerializerInterceptor`'s two-pass matcher (exact numeric, then
+ * `'NXX'` wildcard). The wrapped Zod schema (array / tuple) is built once
+ * at decoration time — no per-request schema construction.
+ *
+ * **Decorator-ordering note (implicit `status` only).** TypeScript decorators
+ * apply bottom-up, so `@ZodResponse` (typically written above `@Get` /
+ * `@HttpCode`) executes its factory body *first* — before sibling
+ * decorators have written their `HTTP_CODE_METADATA` / `METHOD_METADATA`.
+ * When `opts.status` is explicit, the `@ApiResponse(...)` call is applied
+ * synchronously — there's nothing to wait for. When `opts.status` is
+ * implicit (resolves to `@HttpCode` or the HTTP-method default), the
+ * `@ApiResponse(...)` call is deferred via `queueMicrotask` so the sibling
+ * metadata has settled by the time we read it. See `docs/responses.md →
+ * "Decorator ordering & the microtask trick"`.
  */
 export const ZodResponse = (opts: ZodResponseOptions): MethodDecorator => {
   const built = buildKind(opts.type);
   const status = normaliseStatus(opts.status);
-  return (_target, _propertyKey, descriptor) => {
+  const statusExplicit = status !== undefined;
+  return (target, propertyKey, descriptor) => {
     const handler = descriptor.value;
     if (typeof handler !== 'function') {
       throw new TypeError('[zod-nest] @ZodResponse can only be applied to methods.');
@@ -134,5 +150,20 @@ export const ZodResponse = (opts: ZodResponseOptions): MethodDecorator => {
       passthroughOnError: opts.passthroughOnError ?? false,
     };
     appendResponseVariant(handler, variant);
+
+    // `TypedPropertyDescriptor<unknown>` matches what the swagger bridge
+    // expects; `MethodDecorator`'s descriptor parameter is `TypedPropertyDescriptor<T>`
+    // for the inferred return type, structurally compatible at runtime.
+    const swaggerDescriptor = descriptor as TypedPropertyDescriptor<unknown>;
+    if (statusExplicit) {
+      applySwaggerResponseDecorator(variant, status, target, propertyKey, swaggerDescriptor);
+      return;
+    }
+    // Implicit status — defer so `@HttpCode` / `METHOD_METADATA` from
+    // sibling decorators are readable by `resolveEffectiveStatus`.
+    queueMicrotask(() => {
+      const effective = resolveEffectiveStatus(variant, handler);
+      applySwaggerResponseDecorator(variant, effective, target, propertyKey, swaggerDescriptor);
+    });
   };
 };

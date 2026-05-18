@@ -36,6 +36,8 @@ interface ApplyZodNestOptions {
 
 **Why `app` is required.** `@nestjs/swagger` is anemic on response shapes — it materializes `requestBody` and `parameters` `$ref`s back to `components.schemas`, but response types live on controller-method metadata that the raw doc doesn't surface. `applyZodNest` uses `DiscoveryService` to walk the controller graph and pick up `@ZodResponse` output-side DTO usage.
 
+**Response cards are written by `@ZodResponse` itself.** The decorator is a composite — it applies the equivalent `@ApiResponse(...)` so `@nestjs/swagger`'s native pipeline writes `paths.<route>.<method>.responses.<status>.content[...]`. `applyZodNest` only does the marker→schema replacement pass on the placeholders that emerge from that. See [`responses.md → "OpenAPI emission"`](responses.md#openapi-emission) and [`responses.md → "Decorator ordering & the microtask trick"`](responses.md#decorator-ordering--the-microtask-trick) for the runtime details.
+
 ## The post-processing pipeline
 
 `applyZodNest` runs these passes in order, mutating the doc as it goes:

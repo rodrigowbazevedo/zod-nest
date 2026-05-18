@@ -38,7 +38,7 @@ Peer dependencies (`@nestjs/common`, `@nestjs/core`, `@nestjs/swagger`, `rxjs`, 
 |---|---|---|
 | Zod version | v3 + v4 | v4 only |
 | Doc entry point | `cleanupOpenApiDoc(SwaggerModule.createDocument(...))` | `applyZodNest(rawDoc, { app })` (mutates + returns) |
-| Single-status response | `@ZodResponse({ type: Dto })` (composite of `@ZodSerializerDto` + `@ApiResponse` + `@HttpCode`) | `@ZodResponse({ type: Dto })` (no internal `@HttpCode`) |
+| Single-status response | `@ZodResponse({ type: Dto })` (composite of `@ZodSerializerDto` + `@ApiResponse` + `@HttpCode`) | `@ZodResponse({ type: Dto })` (composite of variant registration + `@ApiResponse`; **no internal `@HttpCode`** — caller controls status via `@HttpCode(n)`) |
 | Older single-status pattern | `@ZodSerializerDto(Dto) + @ApiOkResponse({ type: Dto })` | `@ZodResponse({ type: Dto })` |
 | Multi-status responses | not stackable (`@ZodResponse` validates type-consistency at decoration time) | stack `@ZodResponse` calls; status inferred for the default variant |
 | Internal `@HttpCode` | `@ZodResponse({ status })` calls `@HttpCode(status)` internally | not applied — caller controls actual status via `@HttpCode(n)` |
@@ -336,6 +336,9 @@ Intentional. The output entry is only emitted when input and output JSON Schemas
 
 **"My 500 responses no longer include the `errors` field."**
 Intentional (and a security improvement) — see [Serialization exception body changes](#serialization-exception-body-changes) above. Move client-side diagnostics to log-based observability or a custom factory.
+
+**"After migration, my response shapes are gone from the OpenAPI doc — `responses.<status>` is empty even though `@ZodResponse({ type })` is on the handler."**
+Fixed since `zod-nest@1.4.0`. `@ZodResponse` is now a composite decorator: it applies the equivalent `@ApiResponse(...)` automatically, so the doc carries the response shape without a manual `@ApiResponse` next to it. If you're on an earlier `zod-nest` version, either upgrade or pair every `@ZodResponse({ type })` with `@ApiResponse({ status, type })`. See [`docs/responses.md → "OpenAPI emission"`](docs/responses.md#openapi-emission). For binary downloads where you previously hand-wrote `@ApiOkResponse({ content: { 'application/octet-stream' } })`: register the binary fragment via `overrideJSONSchema(BlobSchema, { type: 'string', format: 'binary' })` once, then use `@ZodResponse({ type: BlobDto })` — see [`docs/recipes/binary-downloads.md`](docs/recipes/binary-downloads.md).
 
 **"I get `ZodNestDocumentError: DANGLING_REF` at boot."**
 `applyZodNest` validates the final `$ref` graph. A dangling ref means a DTO is referenced from the doc but the registry doesn't know about it — typically a missing `createZodDto` call, a typo'd `.meta({ id })`, or two `ZodNestRegistry` instances being used in the same app. The error message lists every offending ref with a hint from the collected-usage table.
