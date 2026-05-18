@@ -1,3 +1,10 @@
+# [0.9.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.8.2...v0.9.0) (2026-05-18)
+
+
+### Features
+
+* **ci:** PR validation hardening — coverage, types, OpenAPI gates ([#36](https://github.com/rodrigowbazevedo/zod-nest/issues/36)) ([9adcb68](https://github.com/rodrigowbazevedo/zod-nest/commit/9adcb6877b115df02cecb9c491c00d20a53317c7)), closes [#34](https://github.com/rodrigowbazevedo/zod-nest/issues/34) [package.json#files](https://github.com/package.json/issues/files) [#25](https://github.com/rodrigowbazevedo/zod-nest/issues/25) [#27](https://github.com/rodrigowbazevedo/zod-nest/issues/27) [#28](https://github.com/rodrigowbazevedo/zod-nest/issues/28)
+
 ## [0.8.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.8.1...v0.8.2) (2026-05-17)
 
 

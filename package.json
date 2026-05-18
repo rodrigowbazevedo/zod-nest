@@ -1,6 +1,6 @@
 {
   "name": "zod-nest",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "Modern Zod v4-only NestJS + OpenAPI 3.1 integration. Successor to nestjs-zod.",
   "license": "MIT",
   "author": "Rodrigo Azevedo",
