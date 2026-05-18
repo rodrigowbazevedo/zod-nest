@@ -1,3 +1,4 @@
+import { expectTypeOf } from 'expect-type';
 import { z } from 'zod';
 
 import type { ZodDto } from '../../src';
@@ -18,6 +19,11 @@ describe('createZodDto — TypeScript inference (compile-only)', () => {
 
     // @ts-expect-error - `age` is a number, not a string
     const wrong: Instance = { id: 'a', age: 'one' };
+
+    // expect-type assertion — clearer failure than the type-annotated style
+    // above when the inferred type drifts (e.g. createZodDto starts returning
+    // `unknown` or losing the schema generic).
+    expectTypeOf<Instance>().toEqualTypeOf<z.output<typeof schema>>();
 
     void Types_User_Dto;
     void sample;
