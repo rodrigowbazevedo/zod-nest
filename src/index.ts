@@ -16,6 +16,7 @@ export type {
   LineageEntry,
   Override,
   OverrideContext,
+  OverrideJSONSchemaArg,
   SchemaObject,
   ToOpenApiOptions,
   ToOpenApiResult,

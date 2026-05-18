@@ -145,7 +145,7 @@ try {
 
 **Mitigation** — three options, most-targeted first:
 
-1. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema *instance* (most often `z.instanceof(File)` / `z.custom<T>()`). The engine writes the fragment verbatim everywhere that instance is emitted. See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
+1. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema *instance* (most often `z.instanceof(File)` / `z.custom<T>()`). The engine writes the fragment verbatim everywhere that instance is emitted. Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes (coercion helpers). See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
 
    ```ts
    import { z } from 'zod';

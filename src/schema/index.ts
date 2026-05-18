@@ -7,6 +7,7 @@ export {
 export { extend, getLineage } from './composition.js';
 export type { LineageEntry } from './composition.js';
 export { overrideJSONSchema } from './custom-override.js';
+export type { OverrideJSONSchemaArg } from './custom-override.js';
 export { toOpenApi } from './engine.js';
 export type { ToOpenApiOptions, ToOpenApiResult } from './engine.js';
 export { createRegistry, defaultRegistry } from './registry.js';
