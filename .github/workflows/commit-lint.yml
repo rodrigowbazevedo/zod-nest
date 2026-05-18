@@ -1,0 +1,36 @@
+name: Commit Lint
+
+# Lints the PR title against Conventional Commits + the local
+# `commitlint.config.js` (which adds a 70-char header-max-length cap). The
+# PR title is what becomes the squash-merge commit message, which is what
+# semantic-release reads to compute the next version bump — getting it
+# wrong here cascades into a wrong release.
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+    branches: [main]
+
+concurrency:
+  group: commit-lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commitlint:
+    name: Lint PR title
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: echo "$PR_TITLE" | npx commitlint
