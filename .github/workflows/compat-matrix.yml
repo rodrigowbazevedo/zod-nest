@@ -1,0 +1,139 @@
+name: Compatibility Matrix
+
+# Validates that the declared peer-dep ranges (zod, @nestjs/common,
+# @nestjs/core, @nestjs/swagger) actually hold by running the full test
+# suite against each cell of .github/compat-matrix.json.
+#
+# Triggers:
+#   - push to main: catches regressions on every merge.
+#   - schedule (Mondays, 12:00 UTC): catches breakage from upstream
+#     releases that happened between merges.
+#   - workflow_dispatch: manual trigger when investigating peer-dep
+#     churn.
+#
+# No PR trigger. The existing ci.yml gate runs on PRs; the matrix is
+# scoped to main + scheduled cadence so PRs stay fast.
+#
+# Failure handling: when a cell fails on a `push` or `schedule` run,
+# the job opens (or comments on) a GitHub issue labelled
+# `compat-matrix-failure` so the regression can't be silently lost in
+# the Actions UI. Manual `workflow_dispatch` runs do NOT auto-file
+# issues — manual runs are usually investigative.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: compat-matrix-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  generate-matrix:
+    name: Expand cells
+    runs-on: ubuntu-latest
+    outputs:
+      cells: ${{ steps.gen.outputs.cells }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: gen
+        # Expose the `cells` array as a JSON-encoded workflow output so the
+        # downstream `test-cell` job's matrix can consume it via fromJson.
+        run: |
+          CELLS=$(jq -c '.cells' .github/compat-matrix.json)
+          echo "cells=$CELLS" >> "$GITHUB_OUTPUT"
+
+  test-cell:
+    name: ${{ matrix.cell.name }}
+    needs: generate-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cell: ${{ fromJson(needs.generate-matrix.outputs.cells) }}
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply compat overrides + run test suite
+        env:
+          COMPAT_CELL: ${{ toJson(matrix.cell) }}
+        run: node scripts/run-compat.mjs
+
+      # On scheduled or push-to-main failures, open (or update) an issue
+      # so the regression is tracked outside the Actions UI. Skip on
+      # workflow_dispatch — manual runs are usually investigative and
+      # shouldn't spawn auto-issues.
+      - name: Report cell failure (open or comment issue)
+        if: failure() && (github.event_name == 'schedule' || github.event_name == 'push')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CELL_NAME: ${{ matrix.cell.name }}
+          CELL_JSON: ${{ toJson(matrix.cell) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          # Ensure the label exists (idempotent — fails silently if already created).
+          gh label create compat-matrix-failure \
+            --color "d73a4a" \
+            --description "Cell in the compatibility matrix is failing" \
+            2>/dev/null || true
+
+          # Look for an open issue with the canonical title shape.
+          TITLE="compat-matrix failure: ${CELL_NAME}"
+          EXISTING=$(gh issue list \
+            --label compat-matrix-failure \
+            --state open \
+            --search "in:title \"${TITLE}\"" \
+            --json number \
+            --jq '.[0].number // empty')
+
+          BODY=$(cat <<EOF
+          The \`${CELL_NAME}\` cell of the compatibility matrix failed.
+
+          **Trigger:** \`${EVENT_NAME}\`
+          **Run:** ${RUN_URL}
+
+          **Versions tested:**
+          \`\`\`json
+          ${CELL_JSON}
+          \`\`\`
+
+          **Reproduce locally:**
+          \`\`\`bash
+          COMPAT_CELL='${CELL_JSON}' node scripts/run-compat.mjs
+          \`\`\`
+
+          Investigate the failing peer-dep version, then either:
+          - Update \`.github/compat-matrix.json\` to drop the unsupported version (and \`peerDependencies\` in \`package.json\` to match), or
+          - Fix the underlying compat issue in \`src/\` and close this issue.
+          EOF
+          )
+
+          if [ -n "$EXISTING" ]; then
+            echo "Commenting on existing issue #${EXISTING}"
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            echo "Opening new issue for cell ${CELL_NAME}"
+            gh issue create \
+              --title "$TITLE" \
+              --label compat-matrix-failure \
+              --body "$BODY"
+          fi
