@@ -52,7 +52,9 @@ Peer dependencies (`@nestjs/common`, `@nestjs/core`, `@nestjs/swagger`, `rxjs`, 
 | Logger override | none | `logger: LoggerService` |
 | Log redaction | n/a | `redactKeys: readonly string[]` (replaces default list, no merge) |
 | Log truncation | n/a | `maxLoggedValueBytes: number` (default 4096) |
-| Doc-build errors | silent / dangling refs at runtime | `ZodNestDocumentError` (`AMBIGUOUS_RENAME` / `DANGLING_REF`) — fails fast |
+| Doc-build errors | silent / dangling refs at runtime | `ZodNestDocumentError` (`AMBIGUOUS_RENAME` / `DANGLING_REF` / `UNEXPANDABLE_PARAM_DTO`) — fails fast |
+| `@Query()` / `@Param()` / `@Headers()` DTO expansion | exploded by `cleanupOpenApiDoc` based on `PREFIX` placeholder | exploded by `applyZodNest`'s `expandParamMarkers` pass — symmetric output, one parameter per top-level field |
+| OpenAPI version on emitted doc | derived from `DocumentBuilder.setOpenAPIVersion(...)` (defaults to `'3.0.0'`) | forced to `'3.1.0'` by `applyZodNest` regardless of `DocumentBuilder` config |
 | Composition (experimental) | not a feature | `extend()` + `getLineage()` — `@experimental` |
 | Internal extension keys in spec | ~10 `x-nestjs_zod-*` keys remain | 0 (stripped at exit) |
 | `$ref` paths | post-process rewrite | emitted correctly by Zod's `uri` callback |
@@ -337,6 +339,15 @@ Intentional (and a security improvement) — see [Serialization exception body c
 
 **"I get `ZodNestDocumentError: DANGLING_REF` at boot."**
 `applyZodNest` validates the final `$ref` graph. A dangling ref means a DTO is referenced from the doc but the registry doesn't know about it — typically a missing `createZodDto` call, a typo'd `.meta({ id })`, or two `ZodNestRegistry` instances being used in the same app. The error message lists every offending ref with a hint from the collected-usage table.
+
+**"After migration, my `@Query()` DTOs emit a single bogus `x-zod-nest-dto` parameter instead of one parameter per field."**
+You're seeing the unprocessed marker from `@nestjs/swagger`'s `_OPENAPI_METADATA_FACTORY` explosion. `applyZodNest` has to run on the doc to split it into per-field parameters — confirm Step 4 wired `applyZodNest(rawDoc, { app })` between `SwaggerModule.createDocument(...)` and `SwaggerModule.setup(...)`. The expansion is symmetric with `nestjs-zod`'s `cleanupOpenApiDoc` (same field-per-parameter output) and covers `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` uniformly. See [`docs/recipes/query-param-dtos.md`](docs/recipes/query-param-dtos.md).
+
+**"I get `ZodNestDocumentError: UNEXPANDABLE_PARAM_DTO` at boot."**
+A `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` argument is bound to a `createZodDto` whose underlying schema isn't an object — typically `createZodDto(z.array(...))` or `createZodDto(z.union(...))`. The expansion has no top-level `properties` record to walk, so it bails out. Use `@Body()` for non-object DTOs, or restructure the schema as an object whose fields become the parameters. See [`docs/swagger-integration.md → UNEXPANDABLE_PARAM_DTO`](docs/swagger-integration.md#unexpandable_param_dto).
+
+**"My emitted doc says `openapi: '3.0.0'` even though zod-nest claims 3.1-only output."**
+Fixed in `applyZodNest` — it now writes `openapi: '3.1.0'` as its final step, regardless of `DocumentBuilder.setOpenAPIVersion(...)`. If you're still seeing `3.0.0`, double-check that the doc you're inspecting is the post-`applyZodNest` document (not the raw output from `SwaggerModule.createDocument`).
 
 **"I get `ZodNestUnrepresentableError` for my `z.instanceof(File)` / `z.custom<T>()` field."**
 JSON Schema can't represent `z.custom` / `z.instanceof` shapes — Zod emits `{}` and the engine throws in strict mode. Register a JSON Schema fragment once with `overrideJSONSchema(MyFileSchema, { type: 'string', format: 'binary' })` and the engine writes that fragment everywhere the same instance is used — no per-call `override` callback, no `@ApiBody({...})` workaround. For coercion shapes where the request and response sides need different fragments, pass `{ input, output }` instead of a raw fragment (additive overload, non-breaking). See [`docs/recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema`](docs/recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).

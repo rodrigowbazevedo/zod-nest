@@ -163,7 +163,7 @@ try {
 
 ```ts
 class ZodNestDocumentError extends ZodNestError {
-  readonly code: 'AMBIGUOUS_RENAME' | 'DANGLING_REF';
+  readonly code: 'AMBIGUOUS_RENAME' | 'DANGLING_REF' | 'UNEXPANDABLE_PARAM_DTO';
   readonly details: Readonly<Record<string, unknown>>;
   constructor(code: ZodNestDocumentErrorCode, message: string, details?: Record<string, unknown>);
 }
@@ -199,6 +199,35 @@ A `$ref` in the doc points at a `components.schemas` key that no longer exists a
 - *Unknown* → likely a `.meta({ id })` typo or an entirely unregistered DTO.
 
 Fix: register the DTO via `createZodDto` to the correct registry, or correct the `.meta({ id })` typo.
+
+### `code: 'UNEXPANDABLE_PARAM_DTO'`
+
+A `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` argument resolved to a `createZodDto` whose underlying schema is not an object — there is no top-level `properties` record to iterate, so the marker parameter can't be expanded into individual parameters.
+
+```ts
+const Tags = z.array(z.string());           // array — has no `properties`
+class TagsDto extends createZodDto(Tags) {}
+
+@Controller()
+class TagsController {
+  @Get()
+  list(@Query() tags: TagsDto): unknown { /* … */ }
+}
+
+applyZodNest(raw, { app });
+// → ZodNestDocumentError({
+//     code: 'UNEXPANDABLE_PARAM_DTO',
+//     details: { dtoId: 'TagsDto', in: 'query', io: 'input' },
+//   })
+```
+
+Fix — pick one:
+
+- Use `@Body()` instead. Non-object DTOs are perfectly valid request bodies.
+- Restructure the schema as an object whose fields become the parameters: `z.object({ tags: z.array(z.string()) })` becomes `@Query() x: TagsQueryDto` with a single `tags` parameter (typed as a comma-separated array via OpenAPI's `style: 'form', explode: true` convention).
+- For one-off primitive parameters, drop the DTO entirely and inline the type: `@Query('q') q: string` is a no-op for `ZodValidationPipe` (validation only kicks in when the metatype is a zod-nest DTO class).
+
+See [`docs/recipes/query-param-dtos.md`](recipes/query-param-dtos.md) for the per-decorator expansion contract.
 
 ## Catching multiple exception types
 

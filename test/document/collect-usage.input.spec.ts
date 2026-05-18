@@ -73,6 +73,36 @@ describe('collectUsage — input side + class→dtoId map', () => {
     expect([...inputExposedIds]).toEqual(['User']);
   });
 
+  it('detects input-side ids from `__zodNestDto: true` marker parameters (query / path / header DTOs)', () => {
+    // Mirror of the placeholder @nestjs/swagger emits for `@Query() x: QueryDto`,
+    // `@Param() y: PathDto`, etc. — a single parameter named `x-zod-nest-dto`
+    // carrying the marker fields. `expandParamMarkers` later splits this; this
+    // pre-pass test just verifies collect-usage adds the dtoId to `inputExposedIds`
+    // so `bulkEmit` materialises the schema for that expansion.
+    const doc = makeDoc({
+      paths: {
+        '/templates': {
+          get: {
+            parameters: [
+              {
+                name: 'x-zod-nest-dto',
+                in: 'query',
+                required: false,
+                __zodNestDto: true,
+                dtoId: 'TemplatesPaginationParams',
+                io: 'input',
+                schema: { $ref: '#/components/schemas/Object' },
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const { inputExposedIds } = collectUsage(doc, stubApp);
+    expect([...inputExposedIds]).toEqual(['TemplatesPaginationParams']);
+  });
+
   it('detects input-side ids from parameters[*].schema.$ref', () => {
     const doc = makeDoc({
       paths: {

@@ -7,10 +7,13 @@ import { defaultRegistry } from '../schema/registry.js';
 import { bulkEmit } from './bulk-emit.js';
 import { collectUsage } from './collect-usage.js';
 import { assertNoDanglingRefs } from './dangling-refs.js';
+import { expandParamMarkers } from './expand-param-markers.js';
 import { extendExposureViaRefs } from './expose-closure.js';
 import { mergeSchemas } from './merge-schemas.js';
 import { rewriteRefs } from './rewrite-refs.js';
 import { stripMarkers } from './strip-markers.js';
+
+const OPENAPI_VERSION = '3.1.0';
 
 export interface ApplyZodNestOptions {
   /**
@@ -43,10 +46,18 @@ export interface ApplyZodNestOptions {
  * - Every `components.schemas[<DtoClassName>]` placeholder with an
  *   `x-zod-nest-dto` marker is replaced by the Zod-derived JSON Schema body,
  *   keyed by the marker's `dtoId` (renaming as needed).
+ * - Every `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` marker
+ *   parameter is expanded into one parameter per top-level property of the
+ *   DTO's schema (`expandParamMarkers`). The synthetic `components.schemas.Object`
+ *   that `@nestjs/swagger` materialises for the marker placeholder is pruned
+ *   when it has no remaining referrers.
  * - The I/O suffix truth table is applied — equal input/output bodies collapse
  *   to one `components.schemas[id]`; divergent bodies split as
  *   `id` (input) + `idOutput` (output), with response-side refs rewritten.
  * - Every `$ref` whose target is missing throws `ZodNestDocumentError(DANGLING_REF)`.
+ * - `doc.openapi` is set to `'3.1.0'` — zod-nest emits OpenAPI 3.1 only; this
+ *   guarantees the version string matches the emitted body regardless of the
+ *   `DocumentBuilder` configuration on the caller side.
  *
  * Composable with other doc-transform passes — apply other mutations before
  * or after this function. The `app` argument is required because the
@@ -70,9 +81,11 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions): Ope
     collected: extended,
     collisions: registry.getCollisions(),
   });
+  expandParamMarkers({ doc, inputSchemas, outputSchemas });
   rewriteRefs({ doc, renames, divergentOutputIds });
   stripMarkers(doc);
   assertNoDanglingRefs({ doc, collected: extended });
+  doc.openapi = OPENAPI_VERSION;
 
   return doc;
 };
