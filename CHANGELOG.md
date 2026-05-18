@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.0.0...v1.1.0) (2026-05-18)
+
+
+### Features
+
+* **schema:** I/O divergence support in overrideJSONSchema ([#49](https://github.com/rodrigowbazevedo/zod-nest/issues/49)) ([aa77b64](https://github.com/rodrigowbazevedo/zod-nest/commit/aa77b64d78040b0c832810b686ee44fc191410d1))
+
 # [1.0.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.13.0...v1.0.0) (2026-05-18)
 
 
