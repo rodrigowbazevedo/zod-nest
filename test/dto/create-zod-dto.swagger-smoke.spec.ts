@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { Body, Controller, Module, Post } from '@nestjs/common';
+import { Body, Controller, Get, Module, Post, Query } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ApiBody, ApiResponse, DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { z } from 'zod';
@@ -14,6 +14,10 @@ const UserSchema = z.object({
 
 class SmokeUserDto extends createZodDto(UserSchema, { id: 'SmokeUserDto' }) {}
 
+class SmokeQueryDto extends createZodDto(z.object({ limit: z.number(), q: z.string() }), {
+  id: 'SmokeQueryDto',
+}) {}
+
 @Controller('smoke-users')
 class SmokeUsersController {
   @Post()
@@ -21,6 +25,11 @@ class SmokeUsersController {
   @ApiResponse({ status: 201, type: SmokeUserDto })
   create(@Body() body: SmokeUserDto): SmokeUserDto {
     return body;
+  }
+
+  @Get()
+  list(@Query() q: SmokeQueryDto): SmokeUserDto[] {
+    return [q as never];
   }
 }
 
@@ -45,6 +54,32 @@ describe('createZodDto — @nestjs/swagger smoke', () => {
     // (see comment in create-zod-dto.ts) that `applyZodNest` strips.
     expect(marker?.__zodNestDto).toBe(true);
     expect(marker?.dtoId).toBe('SmokeUserDto');
+    expect(marker?.io).toBe('input');
+
+    await app.close();
+  });
+
+  it('lifts the x-zod-nest-dto placeholder onto the @Query() operation parameter (pre-applyZodNest)', async () => {
+    const app = await NestFactory.create(SmokeAppModule, { logger: false });
+    const config = new DocumentBuilder().setTitle('smoke').setVersion('0.0.0').build();
+    const doc = SwaggerModule.createDocument(app, config);
+
+    const op = (doc.paths as Record<string, Record<string, Record<string, unknown>>> | undefined)?.[
+      '/smoke-users'
+    ]?.get;
+    const parameters = op?.parameters as Array<Record<string, unknown>> | undefined;
+    expect(parameters).toBeDefined();
+    // @nestjs/swagger explodes the DTO's _OPENAPI_METADATA_FACTORY entries
+    // into one parameter per property; since the marker is the only property,
+    // the result is a single `x-zod-nest-dto` parameter carrying the dtoId.
+    // `expandParamMarkers` (inside `applyZodNest`) is what splits this into
+    // the real per-field params; this assertion just locks in the upstream
+    // shape we depend on.
+    expect(parameters).toHaveLength(1);
+    const [marker] = parameters!;
+    expect(marker?.name).toBe('x-zod-nest-dto');
+    expect(marker?.__zodNestDto).toBe(true);
+    expect(marker?.dtoId).toBe('SmokeQueryDto');
     expect(marker?.io).toBe('input');
 
     await app.close();

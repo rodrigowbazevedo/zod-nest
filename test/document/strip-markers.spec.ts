@@ -103,4 +103,74 @@ describe('stripMarkers', () => {
     };
     expect(ok.properties).toBeUndefined();
   });
+
+  it('removes leftover marker parameters from operation.parameters[]', () => {
+    const doc = {
+      openapi: '3.1.0',
+      info: { title: 't', version: 'v' },
+      paths: {
+        '/x': {
+          get: {
+            parameters: [
+              { name: 'id', in: 'path', required: true, schema: { type: 'number' } },
+              {
+                name: 'x-zod-nest-dto',
+                in: 'query',
+                __zodNestDto: true,
+                dtoId: 'StaleMarker',
+                io: 'input',
+              },
+            ],
+          },
+        },
+      },
+      components: { schemas: {} },
+    } as unknown as OpenAPIObject;
+
+    stripMarkers(doc);
+
+    const paths = doc.paths as unknown as Record<string, Record<string, Record<string, unknown>>>;
+    const params = paths['/x']?.get?.parameters as Array<Record<string, unknown>>;
+    expect(params).toEqual([
+      { name: 'id', in: 'path', required: true, schema: { type: 'number' } },
+    ]);
+  });
+
+  it('handles missing / null / malformed paths and parameters defensively', () => {
+    const doc = {
+      openapi: '3.1.0',
+      info: { title: 't', version: 'v' },
+      paths: {
+        '/null-pathitem': null,
+        '/null-op': { post: null },
+        '/non-array-params': { get: { parameters: 'not-an-array' } },
+        '/null-param': {
+          get: {
+            parameters: [
+              null,
+              'string-not-object',
+              { name: 'real', in: 'query', schema: { type: 'string' } },
+            ],
+          },
+        },
+      },
+      components: { schemas: {} },
+    } as unknown as OpenAPIObject;
+
+    expect(() => stripMarkers(doc)).not.toThrow();
+    // Real parameter survives; the null / non-object entries are kept verbatim
+    // (the filter only drops marker entries).
+    const paths = doc.paths as unknown as Record<string, Record<string, Record<string, unknown>>>;
+    const params = paths['/null-param']?.get?.parameters as unknown[];
+    expect(params).toHaveLength(3);
+  });
+
+  it('is a no-op when doc.paths is missing entirely', () => {
+    const doc = {
+      openapi: '3.1.0',
+      info: { title: 't', version: 'v' },
+      components: { schemas: {} },
+    } as unknown as OpenAPIObject;
+    expect(() => stripMarkers(doc)).not.toThrow();
+  });
 });

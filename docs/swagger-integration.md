@@ -1,6 +1,6 @@
 # Swagger integration (`applyZodNest`)
 
-`applyZodNest(rawDoc, options)` is the single post-processor that runs after `SwaggerModule.createDocument(...)`. It walks the doc, replaces every `x-zod-nest-dto` marker with the real Zod-derived JSON Schema, applies the I/O suffix truth table, strips the markers, validates the ref graph, and returns the same (mutated) document for compositional convenience.
+`applyZodNest(rawDoc, options)` is the single post-processor that runs after `SwaggerModule.createDocument(...)`. It walks the doc, replaces every `x-zod-nest-dto` marker with the real Zod-derived JSON Schema, expands every `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` DTO marker into individual parameter entries, applies the I/O suffix truth table, strips the markers, validates the ref graph, sets `openapi: '3.1.0'`, and returns the same (mutated) document for compositional convenience.
 
 ```ts
 import { applyZodNest } from 'zod-nest';
@@ -14,7 +14,7 @@ const doc = applyZodNest(raw, { app });
 SwaggerModule.setup('docs', app, doc);
 ```
 
-One call replaces the entire `cleanupOpenApiDoc` ritual that earlier libraries needed. No 3.0 fallback — the output is always OpenAPI 3.1.
+One call replaces the entire `cleanupOpenApiDoc` ritual that earlier libraries needed. No 3.0 fallback — `applyZodNest` writes `openapi: '3.1.0'` on the doc as its final step, regardless of how `DocumentBuilder` was configured.
 
 ## Options
 
@@ -43,9 +43,11 @@ interface ApplyZodNestOptions {
 1. **Collect usage.** Walk the input-side `$ref`s in the doc (reliable — `@nestjs/swagger` materializes them) and the output-side `@ZodResponse` metadata on every controller method. Produces `{ inputExposedIds, outputExposedIds }`. The exposure sets are then closed over `$ref`s so that nested `.meta({ id })` schemas reachable from an exposed body are emitted too.
 2. **Bulk emit.** Run `z.toJSONSchema` against the registry once per side (`input`, `output`), producing two maps `Record<dtoId, SchemaObject>`. Filtered to the ids `zod-nest` itself registered — including ids discovered transitively from `.meta({ id })` on descendants of explicitly-registered DTOs (`createZodDto` calls `register()`, which walks the Zod composition tree and adopts every named descendant). Third-party entries in `z.globalRegistry` that aren't reachable through a registered DTO are left alone.
 3. **Merge schemas.** For each id, apply the I/O suffix truth table. Equal bodies collapse to `components.schemas[id]`. Divergent bodies split as `id` (input) + `<id>Output` (output). Class-name → dtoId rename pass runs alongside.
-4. **Rewrite refs.** Two sub-passes: (a) class-name → dtoId rename for every `$ref` in the doc; (b) response-side `$ref` rewrite to `<id>Output` for every id in `divergentOutputIds`. Scoped to `paths.*.{op}.responses.*` so request-side refs are untouched.
-5. **Strip markers.** Remove every `x-zod-nest-dto` placeholder from `components.schemas[*].properties`. Empty `properties` blocks are dropped. The `x-zod-nest-error` extension (engine collision policy) is preserved so the broken contract stays visible in Swagger UI.
-6. **Assert no dangling refs.** Walk every `$ref` and confirm the target exists in `components.schemas`. Throws `ZodNestDocumentError({ code: 'DANGLING_REF' })` on the first miss, listing every offending ref with a per-ref hint inferred from collected usage.
+4. **Expand parameter markers.** Walk `paths.*.<op>.parameters[]` for `__zodNestDto: true` placeholders — the byproduct of `@nestjs/swagger` exploding a `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` DTO via `_OPENAPI_METADATA_FACTORY`. Each marker becomes one parameter per top-level property of the DTO's schema, with `description` mirrored onto both the parameter object and its schema. Optional fields bound to `in: 'path'` are coerced to `required: true` with a `console.warn`, since OpenAPI 3.1 forbids optional path parameters. Non-object DTOs (arrays, unions, primitives) throw `ZodNestDocumentError({ code: 'UNEXPANDABLE_PARAM_DTO' })`. The synthetic `components.schemas.Object` placeholder that `@nestjs/swagger` materialises from the marker's `type: () => Object` is pruned once its only referrer (the marker parameter) is gone. See [`recipes/query-param-dtos.md`](recipes/query-param-dtos.md) for the consumer-facing pattern.
+5. **Rewrite refs.** Two sub-passes: (a) class-name → dtoId rename for every `$ref` in the doc; (b) response-side `$ref` rewrite to `<id>Output` for every id in `divergentOutputIds`. Scoped to `paths.*.{op}.responses.*` so request-side refs are untouched.
+6. **Strip markers.** Remove every `x-zod-nest-dto` placeholder from `components.schemas[*].properties`, plus any leftover marker parameter from `paths.*.<op>.parameters[]` (defensive — `expandParamMarkers` removes them in the normal path). Empty `properties` blocks are dropped. The `x-zod-nest-error` extension (engine collision policy) is preserved so the broken contract stays visible in Swagger UI.
+7. **Assert no dangling refs.** Walk every `$ref` and confirm the target exists in `components.schemas`. Throws `ZodNestDocumentError({ code: 'DANGLING_REF' })` on the first miss, listing every offending ref with a per-ref hint inferred from collected usage.
+8. **Force OpenAPI 3.1.** Set `doc.openapi = '3.1.0'` so the version string matches the emitted body even when `DocumentBuilder.setOpenAPIVersion('3.1.0')` was not called on the caller side.
 
 The function is **composable** — apply your own doc-transform passes before or after `applyZodNest`. Just ensure that any pre-pass that touches `$ref`s knows what's coming.
 
@@ -67,7 +69,7 @@ See [`dto.md → Schema metadata for Swagger UI`](dto.md#schema-metadata-for-swa
 
 ```ts
 class ZodNestDocumentError extends ZodNestError {
-  readonly code: 'AMBIGUOUS_RENAME' | 'DANGLING_REF';
+  readonly code: 'AMBIGUOUS_RENAME' | 'DANGLING_REF' | 'UNEXPANDABLE_PARAM_DTO';
   readonly details: Readonly<Record<string, unknown>>;
 }
 ```
@@ -77,6 +79,16 @@ class ZodNestDocumentError extends ZodNestError {
 Two distinct DTO classes target the same registry id with differing bodies. The rename pass can't write `components.schemas[id]` unambiguously — which body wins?
 
 Typical cause: copy-pasted `createZodDto(otherSchema, { id: 'User' })` somewhere, or two `.meta({ id: 'User' })` calls on different schemas. Fix by giving each schema a unique id.
+
+### `UNEXPANDABLE_PARAM_DTO`
+
+A `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` handler argument resolved to a `createZodDto` whose underlying schema is not an object — e.g. `createZodDto(z.array(z.string()))` or `createZodDto(z.union([...]))`. The marker parameter has no top-level `properties` record to iterate, so the expansion step fails fast at doc-build time.
+
+The error `details` carry `{ dtoId, in, io }` so the offending decorator is easy to locate. Mitigation — pick one:
+
+- Use `@Body()` instead: non-object DTOs are perfectly valid request bodies.
+- Restructure the schema as an object whose fields become the parameters (the more common fix when the original DTO is a tuple or discriminated union).
+- For one-off primitive parameters, drop the DTO entirely and inline the type: `@Query('q') q: string` is a no-op for `ZodValidationPipe` (see [`validation-pipe.md`](validation-pipe.md)).
 
 ### `DANGLING_REF`
 

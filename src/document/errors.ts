@@ -1,6 +1,9 @@
 import { ZodNestError } from '../schema/errors.js';
 
-export type ZodNestDocumentErrorCode = 'AMBIGUOUS_RENAME' | 'DANGLING_REF';
+export type ZodNestDocumentErrorCode =
+  | 'AMBIGUOUS_RENAME'
+  | 'DANGLING_REF'
+  | 'UNEXPANDABLE_PARAM_DTO';
 
 /**
  * Thrown by `applyZodNest` when the doc cannot be processed cleanly. Surfaces
@@ -14,6 +17,11 @@ export type ZodNestDocumentErrorCode = 'AMBIGUOUS_RENAME' | 'DANGLING_REF';
  * that no longer exists after `applyZodNest`. Usually means a marker was
  * stripped but its rename target wasn't populated, or a user-supplied pre-pass
  * left a stale ref.
+ *
+ * `UNEXPANDABLE_PARAM_DTO`: a `@Query()` / `@Param()` / `@Headers()` /
+ * `@Cookie()` handler argument resolved to a `createZodDto` whose schema is
+ * not an object — the marker parameter can't be expanded into individual
+ * parameters because there's no top-level `properties` record to iterate.
  */
 export class ZodNestDocumentError extends ZodNestError {
   readonly code: ZodNestDocumentErrorCode;

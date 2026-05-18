@@ -101,7 +101,7 @@ const collectRefsFromOperation = (
   if (isPlainRecord(operation.requestBody)) {
     collectRefsFromContent(operation.requestBody.content, classToDtoId, ids);
   }
-  // parameters[*].schema.$ref
+  // parameters[*].schema.$ref AND parameters[*] marker placeholders
   const parameters = operation.parameters;
   if (Array.isArray(parameters)) {
     for (const param of parameters) {
@@ -109,8 +109,20 @@ const collectRefsFromOperation = (
         continue;
       }
       collectRefFromSchema(param.schema, classToDtoId, ids);
+      collectIdFromMarkerParam(param, ids);
     }
   }
+};
+
+const collectIdFromMarkerParam = (param: Record<string, unknown>, ids: Set<string>): void => {
+  if (param.__zodNestDto !== true) {
+    return;
+  }
+  const dtoId = param.dtoId;
+  if (typeof dtoId !== 'string' || dtoId === '') {
+    return;
+  }
+  ids.add(dtoId);
 };
 
 const collectRefsFromContent = (

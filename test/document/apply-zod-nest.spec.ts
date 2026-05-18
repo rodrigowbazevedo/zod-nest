@@ -1,6 +1,16 @@
 import 'reflect-metadata';
 
-import { Body, Controller, Get, HttpStatus, Post, Type } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Type,
+} from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
@@ -39,6 +49,20 @@ const refAt = (root: unknown, ...path: (string | number)[]): string | undefined 
     cur = (cur as Record<string | number, unknown>)[seg];
   }
   return typeof cur === 'string' ? cur : undefined;
+};
+
+const paramsAt = (
+  doc: OpenAPIObject,
+  path: string,
+  method: string,
+): Array<Record<string, unknown>> => {
+  const paths = doc.paths as Record<string, Record<string, Record<string, unknown>>> | undefined;
+  const op = paths?.[path]?.[method];
+  const parameters = op?.parameters;
+  if (!Array.isArray(parameters)) {
+    throw new Error(`No parameters[] at ${method.toUpperCase()} ${path}`);
+  }
+  return parameters as Array<Record<string, unknown>>;
 };
 
 // ─── Happy path ────────────────────────────────────────────────────────────
@@ -555,6 +579,170 @@ describe('applyZodNest — nested .meta({ id }) schemas are registered transitiv
       `${ROOT}NestedFileType`,
     );
 
+    await app.close();
+  });
+});
+
+// ─── Parameter-marker expansion (@Query / @Param / @Headers) ───────────────
+
+describe('applyZodNest — @Query() / @Param() / @Headers() DTO marker expansion', () => {
+  class ListQueryDto extends createZodDto(
+    z.object({
+      limit: z.number().describe('The number of items to return'),
+      cursor: z.string().optional(),
+      sort: z.enum(['asc', 'desc']).optional(),
+    }),
+    { id: 'ListQueryDto' },
+  ) {}
+  class PathParamsDto extends createZodDto(z.object({ templateId: z.number() }), {
+    id: 'PathParamsDto',
+  }) {}
+  class HeadersDto extends createZodDto(z.object({ 'x-trace-id': z.string() }), {
+    id: 'HeadersDto',
+  }) {}
+  class ListBodyDto extends createZodDto(z.object({ name: z.string() }), {
+    id: 'ListBodyDto',
+  }) {}
+
+  @Controller('items')
+  class ParamMixController {
+    @Get()
+    list(@Query() q: ListQueryDto): ListBodyDto[] {
+      return [q as never];
+    }
+
+    @Get(':templateId')
+    one(@Param() params: PathParamsDto, @Headers() _headers: HeadersDto): ListBodyDto {
+      return params as never;
+    }
+
+    @Post()
+    create(@Body() body: ListBodyDto): ListBodyDto {
+      return body;
+    }
+  }
+
+  let app: INestApplication;
+  let doc: OpenAPIObject;
+
+  beforeAll(async () => {
+    const boot = await bootstrap([ParamMixController]);
+    app = boot.app;
+    doc = applyZodNest(boot.raw, { app });
+  });
+
+  afterAll(() => app.close());
+
+  it('forces `openapi: "3.1.0"` on the emitted document', () => {
+    expect(doc.openapi).toBe('3.1.0');
+  });
+
+  it('expands @Query() DTO into one parameter per top-level field', () => {
+    const params = paramsAt(doc, '/items', 'get');
+    const names = params.map((p) => p.name);
+    expect(names).toEqual(expect.arrayContaining(['limit', 'cursor', 'sort']));
+    // No leftover marker placeholder.
+    expect(names).not.toContain('x-zod-nest-dto');
+    // `.describe()` duplicates onto the parameter object.
+    const limit = params.find((p) => p.name === 'limit');
+    expect(limit?.description).toBe('The number of items to return');
+    expect((limit?.schema as Record<string, unknown>).description).toBe(
+      'The number of items to return',
+    );
+  });
+
+  it('expands @Param() DTO into individual path parameters with `required: true`', () => {
+    const params = paramsAt(doc, '/items/{templateId}', 'get');
+    const templateId = params.find((p) => p.name === 'templateId');
+    expect(templateId).toBeDefined();
+    expect(templateId?.in).toBe('path');
+    expect(templateId?.required).toBe(true);
+  });
+
+  it('expands @Headers() DTO with `in: "header"`', () => {
+    const params = paramsAt(doc, '/items/{templateId}', 'get');
+    const trace = params.find((p) => p.name === 'x-trace-id');
+    expect(trace).toBeDefined();
+    expect(trace?.in).toBe('header');
+    expect(trace?.required).toBe(true);
+  });
+
+  it('leaves @Body() DTOs untouched (requestBody $ref intact)', () => {
+    const ref = refAt(
+      doc.paths,
+      '/items',
+      'post',
+      'requestBody',
+      'content',
+      'application/json',
+      'schema',
+      '$ref',
+    );
+    expect(ref).toBe(`${ROOT}ListBodyDto`);
+  });
+
+  it('prunes the synthetic `Object` schema once its only referrer is gone', () => {
+    expect(schemasOf(doc).Object).toBeUndefined();
+  });
+});
+
+// ─── Path-param required coercion (warn + force) ───────────────────────────
+
+describe('applyZodNest — optional field in @Param() DTO is coerced to required', () => {
+  class OptionalPathDto extends createZodDto(z.object({ id: z.string().optional() }), {
+    id: 'OptionalPathDto',
+  }) {}
+
+  @Controller('opt-path')
+  class OptPathController {
+    @Get(':id')
+    one(@Param() params: OptionalPathDto): unknown {
+      return params;
+    }
+  }
+
+  it('coerces `required: true` and emits a console.warn naming the field', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const { app, raw } = await bootstrap([OptPathController]);
+    const doc = applyZodNest(raw, { app });
+
+    const params = paramsAt(doc, '/opt-path/{id}', 'get');
+    const id = params.find((p) => p.name === 'id');
+    expect(id?.required).toBe(true);
+    expect(warn).toHaveBeenCalled();
+    const [firstCall] = warn.mock.calls;
+    expect(firstCall?.[0]).toContain('Path parameter `id` on DTO `OptionalPathDto`');
+
+    warn.mockRestore();
+    await app.close();
+  });
+});
+
+// ─── UNEXPANDABLE_PARAM_DTO guard (non-object schema bound to @Query()) ────
+
+describe('applyZodNest — UNEXPANDABLE_PARAM_DTO guard for non-object query DTOs', () => {
+  // Array shape — has no top-level `properties`; the marker cannot be split.
+  class ArrayQueryDto extends createZodDto(z.array(z.string()), { id: 'ArrayQueryDto' }) {}
+
+  @Controller('arr-query')
+  class ArrQueryController {
+    @Get()
+    list(@Query() q: ArrayQueryDto): unknown {
+      return q;
+    }
+  }
+
+  it('throws ZodNestDocumentError(UNEXPANDABLE_PARAM_DTO) at applyZodNest time', async () => {
+    const { app, raw } = await bootstrap([ArrQueryController]);
+    let caught: unknown;
+    try {
+      applyZodNest(raw, { app });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(ZodNestDocumentError);
+    expect((caught as ZodNestDocumentError).code).toBe('UNEXPANDABLE_PARAM_DTO');
+    expect((caught as ZodNestDocumentError).details.dtoId).toBe('ArrayQueryDto');
     await app.close();
   });
 });

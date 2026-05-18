@@ -73,6 +73,68 @@ describe('collectUsage — input side + class→dtoId map', () => {
     expect([...inputExposedIds]).toEqual(['User']);
   });
 
+  it('detects input-side ids from `__zodNestDto: true` marker parameters (query / path / header DTOs)', () => {
+    // Mirror of the placeholder @nestjs/swagger emits for `@Query() x: QueryDto`,
+    // `@Param() y: PathDto`, etc. — a single parameter named `x-zod-nest-dto`
+    // carrying the marker fields. `expandParamMarkers` later splits this; this
+    // pre-pass test just verifies collect-usage adds the dtoId to `inputExposedIds`
+    // so `bulkEmit` materialises the schema for that expansion.
+    const doc = makeDoc({
+      paths: {
+        '/templates': {
+          get: {
+            parameters: [
+              {
+                name: 'x-zod-nest-dto',
+                in: 'query',
+                required: false,
+                __zodNestDto: true,
+                dtoId: 'TemplatesPaginationParams',
+                io: 'input',
+                schema: { $ref: '#/components/schemas/Object' },
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const { inputExposedIds } = collectUsage(doc, stubApp);
+    expect([...inputExposedIds]).toEqual(['TemplatesPaginationParams']);
+  });
+
+  it('ignores marker parameters whose `dtoId` is missing / empty / non-string', () => {
+    const doc = makeDoc({
+      paths: {
+        '/x': {
+          get: {
+            parameters: [
+              // valid — dtoId is a non-empty string
+              {
+                name: 'x-zod-nest-dto',
+                in: 'query',
+                __zodNestDto: true,
+                dtoId: 'RealDto',
+                io: 'input',
+              },
+              // invalid — empty dtoId
+              { name: 'x-zod-nest-dto', in: 'query', __zodNestDto: true, dtoId: '', io: 'input' },
+              // invalid — non-string dtoId
+              { name: 'x-zod-nest-dto', in: 'query', __zodNestDto: true, dtoId: 42, io: 'input' },
+              // invalid — missing dtoId
+              { name: 'x-zod-nest-dto', in: 'query', __zodNestDto: true, io: 'input' },
+              // invalid — __zodNestDto is not true
+              { name: 'x-zod-nest-dto', in: 'query', __zodNestDto: false, dtoId: 'Skipped' },
+            ],
+          },
+        },
+      },
+    });
+
+    const { inputExposedIds } = collectUsage(doc, stubApp);
+    expect([...inputExposedIds]).toEqual(['RealDto']);
+  });
+
   it('detects input-side ids from parameters[*].schema.$ref', () => {
     const doc = makeDoc({
       paths: {
