@@ -56,7 +56,8 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepare": "husky",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "pack:smoke": "node scripts/pack-smoke.mjs"
   },
   "peerDependencies": {
     "@nestjs/common": ">=10",

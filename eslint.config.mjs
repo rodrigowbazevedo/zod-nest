@@ -51,6 +51,13 @@ export default tseslint.config(
       'jest/valid-expect': 'error',
     },
   },
+  {
+    // CLI utility scripts intentionally write to stdout/stderr.
+    files: ['scripts/**/*.{js,mjs,ts}'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
   prettierPlugin,
   {
     rules: {
