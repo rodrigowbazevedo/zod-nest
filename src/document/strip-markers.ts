@@ -1,7 +1,8 @@
 import type { OpenAPIObject } from '@nestjs/swagger';
 
+import { isZodDtoMarker } from '../dto/marker.js';
 import { ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
-import { HTTP_METHODS } from './http-methods.js';
+import { forEachOperation } from './http-methods.js';
 
 /**
  * Removes `x-zod-nest-dto` placeholder entries from every
@@ -57,35 +58,13 @@ const dropJsonSchemaMetadata = (schema: unknown): void => {
 };
 
 const stripMarkerParameters = (doc: OpenAPIObject): void => {
-  const paths = doc.paths;
-  if (paths === null || typeof paths !== 'object') {
-    return;
-  }
-  for (const pathItem of Object.values(paths)) {
-    if (pathItem === null || typeof pathItem !== 'object') {
-      continue;
+  forEachOperation(doc, (op) => {
+    const parameters = op.parameters;
+    if (!Array.isArray(parameters)) {
+      return;
     }
-    const pathRecord = pathItem as Record<string, unknown>;
-    for (const method of HTTP_METHODS) {
-      const op = pathRecord[method];
-      if (op === null || typeof op !== 'object') {
-        continue;
-      }
-      const opRecord = op as Record<string, unknown>;
-      const parameters = opRecord.parameters;
-      if (!Array.isArray(parameters)) {
-        continue;
-      }
-      opRecord.parameters = parameters.filter((param) => !isMarkerParam(param));
-    }
-  }
-};
-
-const isMarkerParam = (value: unknown): boolean => {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  return (value as { __zodNestDto?: unknown }).__zodNestDto === true;
+    op.parameters = parameters.filter((param) => !isZodDtoMarker(param));
+  });
 };
 
 const stripMarkerFromSchema = (schema: unknown): void => {
