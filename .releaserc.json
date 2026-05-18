@@ -2,7 +2,14 @@
   "branches": ["main"],
   "plugins": [
     "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "writerOpts": {
+          "footerPartial": "{{#if noteGroups}}\n\n---\n\n### Migrating\n\nThis release contains breaking changes. See [MIGRATION.md](https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md) for the upgrade path.\n{{/if}}\n"
+        }
+      }
+    ],
     [
       "@semantic-release/changelog",
       {
