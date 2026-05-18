@@ -1,0 +1,56 @@
+# Narrow scope: dev-tooling-only npm bumps + GitHub Actions versions.
+#
+# Peer-dep bumps (zod, @nestjs/*, rxjs) are handled manually by the
+# maintainer via the `/check-upstream-updates` Claude skill — the matrix
+# floors in `peerDependencies` are too load-bearing to let an automated PR
+# move them. So those names are listed in `ignore:` even though they appear
+# as devDependencies for type-checking + testing.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    allow:
+      - dependency-type: development
+    ignore:
+      # Peer-deps — handled manually via /check-upstream-updates
+      - dependency-name: '@nestjs/common'
+      - dependency-name: '@nestjs/core'
+      - dependency-name: '@nestjs/swagger'
+      - dependency-name: '@nestjs/platform-express'
+      - dependency-name: '@nestjs/testing'
+      - dependency-name: rxjs
+      - dependency-name: zod
+    groups:
+      dev-tooling:
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      gh-actions:
+        patterns: ['*']

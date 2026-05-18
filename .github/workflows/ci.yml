@@ -38,6 +38,12 @@ jobs:
 
       - run: npm run build
 
+      # pack-smoke verifies the published tarball installs cleanly and every
+      # documented public export resolves in both CJS and ESM — catches
+      # publish-time-only regressions that the in-repo suite can't see
+      # (missing files, broken `exports` map, ESM-resolution issues).
+      - run: npm run pack:smoke
+
       - name: Upload coverage to Codecov
         if: matrix.node == '24'
         uses: codecov/codecov-action@v6

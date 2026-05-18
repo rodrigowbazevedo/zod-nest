@@ -1,5 +1,5 @@
 import { RequestMethod } from '@nestjs/common';
-import { HTTP_CODE_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
+import { HTTP_CODE_METADATA, METHOD_METADATA } from '@nestjs/common/constants.js';
 
 import type { ResponseVariant } from './metadata.js';
 
