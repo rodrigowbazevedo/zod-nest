@@ -331,6 +331,52 @@ describe('expandParamMarkers', () => {
     ).not.toThrow();
   });
 
+  it('is a no-op when `doc.paths` is missing entirely', () => {
+    const docWithoutPaths = {
+      openapi: '3.0.0',
+      info: { title: 't', version: 'v' },
+      components: { schemas: {} },
+    } as unknown as OpenAPIObject;
+
+    expect(() =>
+      expandParamMarkers({
+        doc: docWithoutPaths,
+        inputSchemas: new Map(),
+        outputSchemas: new Map(),
+      }),
+    ).not.toThrow();
+  });
+
+  it('skips properties whose schema is not a plain record (defensive)', () => {
+    const doc = docOf({
+      paths: { '/x': { get: { parameters: [markerParam('query', 'WeirdDto')] } } },
+    });
+    const inputSchemas = new Map<string, unknown>([
+      [
+        'WeirdDto',
+        {
+          type: 'object',
+          properties: {
+            ok: { type: 'string' },
+            broken: null,
+            arrayProp: [],
+            stringProp: 'not-a-schema',
+          },
+          required: [],
+        },
+      ],
+    ]);
+
+    expandParamMarkers({ doc, inputSchemas, outputSchemas: new Map() });
+
+    // Only `ok` survives; the malformed property values are silently dropped
+    // so the doc-build doesn't crash on weird Zod / override output.
+    const params = paramsOf(doc, '/x', 'get');
+    expect(params).toEqual([
+      { name: 'ok', in: 'query', required: false, schema: { type: 'string' } },
+    ]);
+  });
+
   it('skips marker params that are missing required fields (defensive)', () => {
     const docMissing = docOf({
       paths: {

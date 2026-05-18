@@ -103,6 +103,38 @@ describe('collectUsage — input side + class→dtoId map', () => {
     expect([...inputExposedIds]).toEqual(['TemplatesPaginationParams']);
   });
 
+  it('ignores marker parameters whose `dtoId` is missing / empty / non-string', () => {
+    const doc = makeDoc({
+      paths: {
+        '/x': {
+          get: {
+            parameters: [
+              // valid — dtoId is a non-empty string
+              {
+                name: 'x-zod-nest-dto',
+                in: 'query',
+                __zodNestDto: true,
+                dtoId: 'RealDto',
+                io: 'input',
+              },
+              // invalid — empty dtoId
+              { name: 'x-zod-nest-dto', in: 'query', __zodNestDto: true, dtoId: '', io: 'input' },
+              // invalid — non-string dtoId
+              { name: 'x-zod-nest-dto', in: 'query', __zodNestDto: true, dtoId: 42, io: 'input' },
+              // invalid — missing dtoId
+              { name: 'x-zod-nest-dto', in: 'query', __zodNestDto: true, io: 'input' },
+              // invalid — __zodNestDto is not true
+              { name: 'x-zod-nest-dto', in: 'query', __zodNestDto: false, dtoId: 'Skipped' },
+            ],
+          },
+        },
+      },
+    });
+
+    const { inputExposedIds } = collectUsage(doc, stubApp);
+    expect([...inputExposedIds]).toEqual(['RealDto']);
+  });
+
   it('detects input-side ids from parameters[*].schema.$ref', () => {
     const doc = makeDoc({
       paths: {

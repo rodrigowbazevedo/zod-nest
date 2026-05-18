@@ -175,13 +175,9 @@ const buildParameter = (
   return entry;
 };
 
-const capitalize = (value: string): string => {
-  if (value.length === 0) {
-    return value;
-  }
-  const head = value.charAt(0);
-  return head.toUpperCase() + value.slice(1);
-};
+// `paramIn` is validated as a non-empty string by `readMarker` before reaching
+// here, so the first character is always present.
+const capitalize = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1);
 
 const pruneOrphanObjectSchema = (doc: OpenAPIObject): void => {
   const schemas = doc.components?.schemas as Record<string, unknown> | undefined;
