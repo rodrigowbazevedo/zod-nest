@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.2.0...v1.3.0) (2026-05-18)
+
+
+### Features
+
+* **document:** expand @Query/@Param/@Headers DTOs in applyZodNest ([#54](https://github.com/rodrigowbazevedo/zod-nest/issues/54)) ([360cb1a](https://github.com/rodrigowbazevedo/zod-nest/commit/360cb1a3bb506a50dc882a6f7cab8f1b78441c04)), closes [#53](https://github.com/rodrigowbazevedo/zod-nest/issues/53)
+
 # [1.2.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.1.1...v1.2.0) (2026-05-18)
 
 
