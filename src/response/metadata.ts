@@ -12,6 +12,13 @@ export const ZOD_RESPONSES_METADATA_KEY = Symbol.for('zod-nest.responses');
 export type ResponseVariantKind = 'single' | 'array' | 'tuple';
 
 /**
+ * OpenAPI 3.1 range keys accepted by `@ZodResponse({ status })`. Matched
+ * by `ZodSerializerInterceptor` after exact numeric matches fail —
+ * `'2XX'` covers 200–299, `'4XX'` covers 400–499, and so on.
+ */
+export type ResponseStatusWildcard = '1XX' | '2XX' | '3XX' | '4XX' | '5XX';
+
+/**
  * Description payload accepted by `@ZodResponse(...)` and passed through to
  * `applyZodNest`'s `@ApiResponse(...)` emitter. String form is shorthand for
  * `{ description }`; the object form lets users declare OpenAPI response
@@ -30,14 +37,20 @@ export type ZodResponseDescription =
  * `validationSchema` so `applyZodNest` can emit `@ApiResponse({ type })`
  * without unwrapping the runtime-only `z.array(...)` / `z.tuple([...])` wrapper.
  *
- * `status` is `undefined` when the user didn't pass one explicitly — the
- * effective status is resolved lazily by `resolveEffectiveStatus(variant,
- * handler)` because `@ZodResponse` runs *before* NestJS' route decorators
- * (`@Get`, `@Post`, ...) under TypeScript's bottom-up application order,
- * so `METHOD_METADATA` is not yet set when the decorator evaluates.
+ * `status` is `undefined` when the user didn't pass one explicitly OR when
+ * the user wrote `'default'` (the decorator collapses both to `undefined` —
+ * they mean the same thing: "resolve to the method's default status at
+ * request time"). The effective status is resolved lazily by
+ * `resolveEffectiveStatus(variant, handler)` because `@ZodResponse` runs
+ * *before* NestJS' route decorators (`@Get`, `@Post`, ...) under
+ * TypeScript's bottom-up application order, so `METHOD_METADATA` is not
+ * yet set when the decorator evaluates.
+ *
+ * A wildcard string (`'2XX'` / `'4XX'` / ...) is kept verbatim — the
+ * matcher in `ZodSerializerInterceptor` handles range comparison.
  */
 export interface ResponseVariant {
-  status: number | undefined;
+  status: number | ResponseStatusWildcard | undefined;
   kind: ResponseVariantKind;
   dto: ZodDto | readonly ZodDto[];
   validationSchema: z.ZodType;

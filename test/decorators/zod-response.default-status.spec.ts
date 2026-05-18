@@ -51,7 +51,7 @@ class Routes {
   explicitBeatsHttpCode(): void {}
 }
 
-const statusOf = (handler: object): number | undefined => {
+const statusOf = (handler: object): number | string | undefined => {
   const variant = getResponseVariants(handler)?.[0];
   if (variant === undefined) {
     return undefined;

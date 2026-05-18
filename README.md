@@ -39,7 +39,7 @@ For the long-form motivation, see [`docs/why-this-exists.md`](docs/why-this-exis
 A short list of behavioural differences you'll hit on day one. Full migration table is in [`MIGRATION.md`](MIGRATION.md).
 
 - **Multi-status `@ZodResponse`** — stack the decorator per status code. In `nestjs-zod`, multi-status required mixing `@ZodSerializerDto` with hand-rolled `@ApiResponse({ status: ... })` calls.
-- **No internal `@HttpCode`** — `@ZodResponse` does **not** call `@HttpCode` under the hood. Status resolution precedence: `@ZodResponse({ status })` → `@HttpCode(...)` on the handler → method default (`POST → 201`, others → `200`). The caller controls `201` vs `200` vs `204` via standard NestJS decorators.
+- **No internal `@HttpCode`** — `@ZodResponse` does **not** call `@HttpCode` under the hood. Status resolution precedence: `@ZodResponse({ status })` → `@HttpCode(...)` on the handler → method default (`POST → 201`, others → `200`). The caller controls `201` vs `200` vs `204` via standard NestJS decorators. `status` accepts numeric codes plus the OpenAPI 3.1 range keys (`'1XX'`…`'5XX'`) and `'default'` (sugar for the resolved method default).
 - **I/O suffix only when needed** — `<Id>Output` is only emitted when the input and output JSON Schemas actually differ. `nestjs-zod` always emitted `_Output`.
 - **OpenAPI 3.1 only** — no `3.0` fallback. `$ref`s emit to the final location; `cleanupOpenApiDoc` is unnecessary.
 - **Validation-failure logging out of the box** — `nestjs-zod` has none.
@@ -52,7 +52,6 @@ A short list of behavioural differences you'll hit on day one. Full migration ta
 
 - **Zod v3 support** — Zod v4 only. Migrate first.
 - **`class-validator` / `class-transformer` coexistence** — `zod-nest` is Zod-native. Mixing class-validator decorators on a `createZodDto` result is not supported.
-- **Status wildcards** in `@ZodResponse` (`'2XX'`, `'default'`) — deferred to v1.
 - **Hybrid DTO projects** — mixing `createZodDto` DTOs with plain `@ApiProperty` classes in the same controller is not tested.
 - **Non-HTTP contexts** — WebSocket gateways, GraphQL resolvers, microservice handlers are out of scope.
 
@@ -423,7 +422,7 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 - `ZodValidationPipe`, `ZodValidationException`, `ZodValidationPipeOptions`, `CreateValidationException`
 
 **Response** — [`docs/responses.md`](docs/responses.md)
-- `@ZodResponse({ status?, type, description?, passthroughOnError? })`, `ZodSerializerInterceptor`, `ZodSerializationException`, `defaultStatusFor`, `resolveEffectiveStatus`, `ResponseVariant`, `ZOD_RESPONSES_METADATA_KEY`
+- `@ZodResponse({ status?, type, description?, passthroughOnError? })`, `ZodSerializerInterceptor`, `ZodSerializationException`, `defaultStatusFor`, `resolveEffectiveStatus`, `ResponseStatusInput`, `ResponseStatusWildcard`, `ResponseVariant`, `ZOD_RESPONSES_METADATA_KEY`
 
 **Document** — [`docs/swagger-integration.md`](docs/swagger-integration.md)
 - `applyZodNest(rawDoc, options)`, `ApplyZodNestOptions`, `ZodNestDocumentError`
@@ -470,7 +469,6 @@ If you're coming from `nestjs-zod`, the headline changes are:
 - Replace `@ApiOkResponse({ type: Dto }) + @ZodSerializerDto(Dto)` pairs with `@ZodResponse({ type: Dto })`.
 - Drop `class-validator` / `class-transformer` if they were installed only for `nestjs-zod` interop.
 - Check any `MyDto.isZodDto` reflection — the discriminator is now `Symbol.for('zod-nest.dto') in MyDto`.
-- Status wildcards (`'2XX'`, `'default'`) aren't supported in v0 — use explicit statuses.
 
 Full guide with side-by-side diffs and a 19-row breaking-changes table in [`MIGRATION.md`](MIGRATION.md).
 

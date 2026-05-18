@@ -36,7 +36,11 @@ export type {
   ZodValidationPipeOptions,
 } from './pipes/index.js';
 export { ZodResponse } from './decorators/index.js';
-export type { ZodResponseOptions, ZodResponseType } from './decorators/index.js';
+export type {
+  ResponseStatusInput,
+  ZodResponseOptions,
+  ZodResponseType,
+} from './decorators/index.js';
 export { ZodSerializerInterceptor } from './interceptors/index.js';
 export {
   defaultStatusFor,
@@ -44,6 +48,7 @@ export {
   ZOD_RESPONSES_METADATA_KEY,
 } from './response/index.js';
 export type {
+  ResponseStatusWildcard,
   ResponseVariant,
   ResponseVariantKind,
   ZodResponseDescription,
