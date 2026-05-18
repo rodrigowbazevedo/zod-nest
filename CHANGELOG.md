@@ -1,3 +1,10 @@
+# [0.13.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.12.0...v0.13.0) (2026-05-18)
+
+
+### Features
+
+* **schema:** overrideJSONSchema(schema, fragment) for unrepresentable types ([#45](https://github.com/rodrigowbazevedo/zod-nest/issues/45)) ([d4c48c2](https://github.com/rodrigowbazevedo/zod-nest/commit/d4c48c26f9fbda936c6846d07aae4e79a119b7f0)), closes [#31](https://github.com/rodrigowbazevedo/zod-nest/issues/31)
+
 # [0.12.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.11.0...v0.12.0) (2026-05-18)
 
 
