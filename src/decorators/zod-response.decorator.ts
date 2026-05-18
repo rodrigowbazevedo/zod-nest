@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import type { ZodDto } from '../dto/dto.types.js';
 import type {
+  ResponseStatusWildcard,
   ResponseVariant,
   ResponseVariantKind,
   ZodResponseDescription,
@@ -24,8 +25,23 @@ import { appendResponseVariant } from '../response/metadata.js';
  */
 export type ZodResponseType = ZodDto | readonly [ZodDto, ...ZodDto[]];
 
+/**
+ * Accepted shapes for `@ZodResponse({ status })`:
+ * - `number` — exact match against `response.statusCode` (most common case).
+ * - `'1XX'` / `'2XX'` / `'3XX'` / `'4XX'` / `'5XX'` — OpenAPI 3.1 range key;
+ *   `'2XX'` matches 200–299, etc. Considered only after no exact numeric
+ *   variant matches the observed status.
+ * - `'default'` — sugar for the handler's method default status. Collapsed
+ *   to `undefined` when the variant is built, so `resolveEffectiveStatus`
+ *   walks the same `@HttpCode → method-default` chain as an omitted `status`.
+ *   This deliberately does NOT implement a catch-all-fallback semantic; it
+ *   names the canonical-success card explicitly, matching what consumers
+ *   already write in `@ApiResponse({ status: 'default' })`.
+ */
+export type ResponseStatusInput = number | ResponseStatusWildcard | 'default';
+
 export interface ZodResponseOptions {
-  status?: number;
+  status?: ResponseStatusInput;
   type: ZodResponseType;
   description?: ZodResponseDescription;
   passthroughOnError?: boolean;
@@ -78,22 +94,39 @@ const buildKind = (type: ZodResponseType): BuiltKind => {
 };
 
 /**
+ * Normalise the user-facing `status` input into the variant-internal shape:
+ * `'default'` collapses to `undefined` so the matcher treats it the same as
+ * an omitted status (resolve to `defaultStatusFor(handler)` at request time).
+ * Numbers and `'NXX'` wildcards pass through untouched.
+ */
+const normaliseStatus = (
+  status: ResponseStatusInput | undefined,
+): number | ResponseStatusWildcard | undefined => {
+  if (status === 'default') {
+    return undefined;
+  }
+  return status;
+};
+
+/**
  * Method-only decorator. Declares a typed response variant for the handler.
  * Stack multiple decorations to declare per-status types; lookup at runtime
- * is by `response.statusCode === variant.status`.
+ * is by `ZodSerializerInterceptor`'s two-pass matcher (exact numeric, then
+ * `'NXX'` wildcard).
  *
  * The wrapped Zod schema (array / tuple) is built once at decoration time
  * and stored on the variant record — no per-request schema construction.
  */
 export const ZodResponse = (opts: ZodResponseOptions): MethodDecorator => {
   const built = buildKind(opts.type);
+  const status = normaliseStatus(opts.status);
   return (_target, _propertyKey, descriptor) => {
     const handler = descriptor.value;
     if (typeof handler !== 'function') {
       throw new TypeError('[zod-nest] @ZodResponse can only be applied to methods.');
     }
     const variant: ResponseVariant = {
-      status: opts.status,
+      status,
       kind: built.kind,
       dto: built.dto,
       validationSchema: built.validationSchema,

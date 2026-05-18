@@ -8,7 +8,7 @@ import type { Observable } from 'rxjs';
 import type { ZodDto } from '../dto/dto.types.js';
 import type { LogValidationFailure } from '../logging/validation-logger.js';
 import type { CreateSerializationException, NormalizedZodNestOptions } from '../module/options.js';
-import type { ResponseVariant } from '../response/metadata.js';
+import type { ResponseStatusWildcard, ResponseVariant } from '../response/metadata.js';
 
 import { ZodSerializationException } from '../exceptions/serialization.exception.js';
 import { noopLogValidationFailure } from '../logging/validation-logger.js';
@@ -29,6 +29,38 @@ const formatDtoLabel = (variant: ResponseVariant): string => {
 
 const formatHandlerLabel = (context: ExecutionContext): string =>
   `${context.getClass().name}.${context.getHandler().name}`;
+
+// '1XX' → 1, '2XX' → 2, etc. `charCodeAt(0) - 48` is the leading digit;
+// `Math.floor(status / 100)` is the response's hundreds bucket.
+const matchesWildcard = (wildcard: ResponseStatusWildcard, status: number): boolean =>
+  wildcard.charCodeAt(0) - 48 === Math.floor(status / 100);
+
+/**
+ * Two-pass variant selection: exact numeric match wins outright, then the
+ * `'NXX'` wildcard variants get a chance. Source order breaks ties within
+ * each pass — first match wins, mirroring author intent (decorators apply
+ * bottom-up but `appendResponseVariant` prepends, so the runtime array is
+ * already in source order).
+ */
+const selectVariant = (
+  variants: readonly ResponseVariant[],
+  status: number,
+  handler: object,
+): ResponseVariant | undefined => {
+  for (const variant of variants) {
+    const effective = resolveEffectiveStatus(variant, handler);
+    if (typeof effective === 'number' && effective === status) {
+      return variant;
+    }
+  }
+  for (const variant of variants) {
+    const effective = resolveEffectiveStatus(variant, handler);
+    if (typeof effective === 'string' && matchesWildcard(effective, status)) {
+      return variant;
+    }
+  }
+  return undefined;
+};
 
 @Injectable()
 export class ZodSerializerInterceptor implements NestInterceptor {
@@ -72,7 +104,7 @@ export class ZodSerializerInterceptor implements NestInterceptor {
     if (status === undefined) {
       return value;
     }
-    const variant = variants.find((v) => resolveEffectiveStatus(v, handler) === status);
+    const variant = selectVariant(variants, status, handler);
     if (variant === undefined) {
       return value;
     }

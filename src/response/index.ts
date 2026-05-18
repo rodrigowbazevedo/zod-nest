@@ -4,4 +4,9 @@ export {
   getResponseVariants,
   ZOD_RESPONSES_METADATA_KEY,
 } from './metadata.js';
-export type { ResponseVariant, ResponseVariantKind, ZodResponseDescription } from './metadata.js';
+export type {
+  ResponseStatusWildcard,
+  ResponseVariant,
+  ResponseVariantKind,
+  ZodResponseDescription,
+} from './metadata.js';

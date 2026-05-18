@@ -25,6 +25,16 @@ class Controller {
   @Get('pair')
   @ZodResponse({ type: [UserDto, ErrorDto] })
   pair(): void {}
+
+  @Get('wildcard')
+  @ZodResponse({ status: '2XX', type: UserDto })
+  @ZodResponse({ status: '4XX', type: ErrorDto })
+  @ZodResponse({ status: '5XX', type: FatalDto })
+  wildcard(): void {}
+
+  @Get('default-sugar')
+  @ZodResponse({ status: 'default', type: UserDto })
+  defaultSugar(): void {}
 }
 
 describe('@ZodResponse — stacking', () => {
@@ -60,5 +70,18 @@ describe('@ZodResponse — stacking', () => {
     for (const variant of variants) {
       expect(variant.passthroughOnError).toBe(false);
     }
+  });
+
+  it('stores NXX wildcard statuses verbatim on the variant', () => {
+    const variants = getResponseVariants(Controller.prototype.wildcard) ?? [];
+    expect(variants.map((v) => v.status)).toEqual(['2XX', '4XX', '5XX']);
+    expect(variants.map((v) => v.kind)).toEqual(['single', 'single', 'single']);
+    expect(variants.map((v) => v.dto)).toEqual([UserDto, ErrorDto, FatalDto]);
+  });
+
+  it("collapses status: 'default' to undefined on the variant", () => {
+    const [variant] = getResponseVariants(Controller.prototype.defaultSugar) ?? [];
+    expect(variant?.status).toBeUndefined();
+    expect(variant?.dto).toBe(UserDto);
   });
 });

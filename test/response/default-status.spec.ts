@@ -2,8 +2,12 @@ import 'reflect-metadata';
 
 import { Delete, Get, HttpCode, Patch, Post, Put, RequestMethod } from '@nestjs/common';
 import { HTTP_CODE_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
+import { z } from 'zod';
 
-import { defaultStatusFor } from '../../src/response/default-status.js';
+import { createZodDto } from '../../src';
+import { ZodResponse } from '../../src/decorators/zod-response.decorator.js';
+import { defaultStatusFor, resolveEffectiveStatus } from '../../src/response/default-status.js';
+import { getResponseVariants } from '../../src/response/metadata.js';
 
 class Routes {
   @Get('a')
@@ -74,5 +78,68 @@ describe('defaultStatusFor', () => {
   it('pins the HTTP_CODE_METADATA constant so a Nest rename fails loudly', () => {
     expect(HTTP_CODE_METADATA).toBe('__httpCode__');
     expect(Reflect.getMetadata(HTTP_CODE_METADATA, Routes.prototype.httpCodeOnPost)).toBe(204);
+  });
+});
+
+class WildcardDto extends createZodDto(z.object({ ok: z.boolean() }), {
+  id: 'DefaultStatus_Wildcard',
+}) {}
+
+class WildcardRoutes {
+  @Get('a')
+  @ZodResponse({ status: '2XX', type: WildcardDto })
+  wildcard2xx(): void {}
+
+  @Get('b')
+  @ZodResponse({ status: '5XX', type: WildcardDto })
+  wildcard5xx(): void {}
+
+  @Get('c')
+  @ZodResponse({ status: 'default', type: WildcardDto })
+  defaultOnGet(): void {}
+
+  @Post('d')
+  @ZodResponse({ status: 'default', type: WildcardDto })
+  defaultOnPost(): void {}
+
+  @Post('e')
+  @HttpCode(204)
+  @ZodResponse({ status: 'default', type: WildcardDto })
+  defaultOnPostWithHttpCode(): void {}
+}
+
+describe('resolveEffectiveStatus — wildcards and default', () => {
+  it("returns '2XX' verbatim when the variant declared a wildcard", () => {
+    const [variant] = getResponseVariants(WildcardRoutes.prototype.wildcard2xx) ?? [];
+    expect(variant?.status).toBe('2XX');
+    expect(resolveEffectiveStatus(variant!, WildcardRoutes.prototype.wildcard2xx)).toBe('2XX');
+  });
+
+  it("returns '5XX' verbatim for a 5XX wildcard variant", () => {
+    const [variant] = getResponseVariants(WildcardRoutes.prototype.wildcard5xx) ?? [];
+    expect(resolveEffectiveStatus(variant!, WildcardRoutes.prototype.wildcard5xx)).toBe('5XX');
+  });
+
+  it("collapses 'default' to undefined on the variant (sugar for method default)", () => {
+    const [getVariant] = getResponseVariants(WildcardRoutes.prototype.defaultOnGet) ?? [];
+    const [postVariant] = getResponseVariants(WildcardRoutes.prototype.defaultOnPost) ?? [];
+    expect(getVariant?.status).toBeUndefined();
+    expect(postVariant?.status).toBeUndefined();
+  });
+
+  it("'default' on a GET resolves to 200 via defaultStatusFor", () => {
+    const [variant] = getResponseVariants(WildcardRoutes.prototype.defaultOnGet) ?? [];
+    expect(resolveEffectiveStatus(variant!, WildcardRoutes.prototype.defaultOnGet)).toBe(200);
+  });
+
+  it("'default' on a POST resolves to 201 via defaultStatusFor", () => {
+    const [variant] = getResponseVariants(WildcardRoutes.prototype.defaultOnPost) ?? [];
+    expect(resolveEffectiveStatus(variant!, WildcardRoutes.prototype.defaultOnPost)).toBe(201);
+  });
+
+  it("'default' honours @HttpCode override (POST + @HttpCode(204) → 204)", () => {
+    const handler = WildcardRoutes.prototype.defaultOnPostWithHttpCode;
+    const [variant] = getResponseVariants(handler) ?? [];
+    expect(resolveEffectiveStatus(variant!, handler)).toBe(204);
   });
 });

@@ -81,6 +81,51 @@ This is why `@ZodResponse` works for arbitrary statuses without conflicting with
 
 Resolution is **deferred to request time** because `@ZodResponse` runs before NestJS' route + `@HttpCode` decorators (TypeScript decorators apply bottom-up), so the method metadata isn't set yet at decoration time. The variant record stores `status: undefined` and `resolveEffectiveStatus(variant, handler)` is called per request.
 
+## Status wildcards
+
+`@ZodResponse({ status })` accepts the OpenAPI 3.1 range keys and the `'default'` sentinel in addition to numeric codes:
+
+| `status` value | Meaning |
+|---|---|
+| `200`, `201`, `404`, … | Exact numeric match against `response.statusCode`. |
+| `'1XX'` / `'2XX'` / `'3XX'` / `'4XX'` / `'5XX'` | Matches any status in that hundreds bucket (`'2XX'` → 200–299). |
+| `'default'` | Sugar for the handler's resolved default status. Collapsed to `undefined` on the variant; resolves at request time via the same `@HttpCode → method-default` chain as an omitted `status`. |
+
+`ZodSerializerInterceptor` selects a variant in **two passes**:
+
+1. **Exact numeric** — first variant where `resolveEffectiveStatus(variant, handler)` is a number equal to `response.statusCode`.
+2. **`NXX` wildcard** — first variant whose wildcard covers the observed bucket.
+
+Source order breaks ties within each pass.
+
+```ts
+class Controller {
+  @Get(':id')
+  @ZodResponse({ status: 204,       type: NoContentDto }) // exact wins for 204
+  @ZodResponse({ status: '2XX',     type: GenericOkDto }) // catches 200, 201, 202, 299
+  @ZodResponse({ status: '4XX',     type: ErrorDto     })
+  @ZodResponse({ status: '5XX',     type: FatalDto     })
+  getUser(): void {}
+}
+```
+
+### Why `'default'` is not a catch-all
+
+`'default'` deliberately does **not** implement "fallback for any unclaimed status." It is sugar for "the method's resolved default status" — identical in semantics to omitting `status`. Concretely:
+
+```ts
+@Post()
+@HttpCode(204)
+@ZodResponse({ status: 'default', type: AcceptedDto }) // → variant.status undefined; effective status 204
+foo() {}
+```
+
+This matches what consumers already write in `@ApiResponse({ status: 'default' })` to name the canonical-success card explicitly, and avoids the surprise of an unrelated 503 silently validating against the `'default'` DTO. If a true unclaimed-status fallback is needed, it's an additive change for later.
+
+### Caveat — OpenAPI emission
+
+The OpenAPI document `responses.<status>` cards are still written by hand via `@ApiResponse` (`applyZodNest` does not synthesise response cards). Wildcards are a **runtime validation** feature; pair them with explicit `@ApiResponse({ status: '2XX', ... })` calls when you want the OpenAPI spec to reflect the same range.
+
 ## `passthroughOnError`
 
 Variants are strict by default — validation failure throws `ZodSerializationException` (HTTP 500). Set `passthroughOnError: true` to switch to soft mode:

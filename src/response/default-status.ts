@@ -1,7 +1,7 @@
 import { RequestMethod } from '@nestjs/common';
 import { HTTP_CODE_METADATA, METHOD_METADATA } from '@nestjs/common/constants.js';
 
-import type { ResponseVariant } from './metadata.js';
+import type { ResponseStatusWildcard, ResponseVariant } from './metadata.js';
 
 const POST_DEFAULT_STATUS = 201;
 const GENERIC_DEFAULT_STATUS = 200;
@@ -31,17 +31,22 @@ export const defaultStatusFor = (handler: object): number => {
 };
 
 /**
- * Resolve the effective status code for a variant. Precedence chain:
+ * Resolve the effective status for a variant. Precedence chain:
  *
- * 1. Explicit `@ZodResponse({ status })` on the decorator call — `variant.status`.
- * 2. `@HttpCode(n)` on the handler — read via `defaultStatusFor()` at runtime.
- * 3. HTTP method default (POST → 201, others → 200) — also via `defaultStatusFor()`.
+ * 1. Explicit numeric `@ZodResponse({ status })` — returned verbatim.
+ * 2. Wildcard `@ZodResponse({ status: 'NXX' })` — returned verbatim; the
+ *    interceptor matcher handles range comparison against `response.statusCode`.
+ * 3. Omitted status (or `'default'` collapsed at decoration time) —
+ *    `@HttpCode(n)` then HTTP-method default via `defaultStatusFor()`.
  *
  * Resolution is deferred to request time because `@ZodResponse` runs before
  * NestJS' route + `@HttpCode` decorators — none of their metadata is set
  * when the decorator evaluates.
  */
-export const resolveEffectiveStatus = (variant: ResponseVariant, handler: object): number => {
+export const resolveEffectiveStatus = (
+  variant: ResponseVariant,
+  handler: object,
+): number | ResponseStatusWildcard => {
   if (variant.status !== undefined) {
     return variant.status;
   }
