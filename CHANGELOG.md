@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.3.1...v1.4.0) (2026-05-18)
+
+
+### Features
+
+* **decorators:** @ZodResponse auto-applies @ApiResponse for OpenAPI emission ([#58](https://github.com/rodrigowbazevedo/zod-nest/issues/58)) ([4cfd8ec](https://github.com/rodrigowbazevedo/zod-nest/commit/4cfd8ec96c5fb626d65a9c5d51a2961cfd459387)), closes [#56](https://github.com/rodrigowbazevedo/zod-nest/issues/56)
+
 ## [1.3.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.3.0...v1.3.1) (2026-05-18)
 
 
