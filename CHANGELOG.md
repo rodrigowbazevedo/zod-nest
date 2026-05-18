@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.3.0...v1.3.1) (2026-05-18)
+
+
+### Bug Fixes
+
+* **document:** strip $schema/$id from emitted component schemas ([#57](https://github.com/rodrigowbazevedo/zod-nest/issues/57)) ([1f98026](https://github.com/rodrigowbazevedo/zod-nest/commit/1f980261f3f0d90cf634a281b46641555366de9c)), closes [#54](https://github.com/rodrigowbazevedo/zod-nest/issues/54) [#55](https://github.com/rodrigowbazevedo/zod-nest/issues/55)
+
 # [1.3.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.2.0...v1.3.0) (2026-05-18)
 
 
