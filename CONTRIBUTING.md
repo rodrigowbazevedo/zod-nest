@@ -51,7 +51,7 @@ If you happen to use [Claude Code](https://claude.com/claude-code), the repo shi
   - `/sync-docs` — surface docs that need updating against the branch's `src/` diff.
   - `/api-surface-audit` — verify every public export has a test + follows naming conventions. Use before cutting a release.
   - `/schema-fixture` — add a parameterized Zod → OpenAPI test case to the engine spec suite.
-  - `/check-upstream-updates` — audit `zod`, `@nestjs/swagger`, `@nestjs/common`/`core`, `rxjs` and file GitHub issues on actionable findings.
+  - `/check-upstream-updates` — audit `zod`, `@nestjs/swagger`, `@nestjs/common`/`core`, `rxjs`, `reflect-metadata` and file GitHub issues on actionable findings.
   - `/scan-zod-features`, `/scan-nest-features` — source-aware scanners that the upstream-updates orchestrator delegates to.
 
 ## Test layout

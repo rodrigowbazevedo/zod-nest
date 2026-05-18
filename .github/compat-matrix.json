@@ -1,33 +1,59 @@
 {
-  "$comment": "Source of truth for the compatibility matrix. Edit this file to extend or shrink supported peer-dep ranges; the workflow at .github/workflows/compat-matrix.yml expands these cells into a strategy matrix and fails if any cell's test suite breaks.",
+  "$comment": "Source of truth for the compatibility matrix. Edit this file to extend or shrink supported peer-dep ranges; the workflow at .github/workflows/compat-matrix.yml expands these cells into a strategy matrix and fails if any cell's test suite breaks. Each cell pins every peer the consumer can independently vary (zod / nest-common / nest-core / nest-swagger / rxjs / reflect-metadata) so the floor cell actually exercises the floor, not just the floors we remembered to list.",
   "cells": [
     {
       "name": "floor",
       "zod": "4.4.0",
-      "@nestjs/common": "10.0.0",
-      "@nestjs/core": "10.0.0",
-      "@nestjs/swagger": "8.0.0"
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "7.1.0",
+      "reflect-metadata": "0.2.0"
     },
     {
       "name": "zod-latest",
       "zod": "latest",
-      "@nestjs/common": "10.0.0",
-      "@nestjs/core": "10.0.0",
-      "@nestjs/swagger": "8.0.0"
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "7.1.0",
+      "reflect-metadata": "0.2.0"
     },
     {
       "name": "nest-latest",
       "zod": "4.4.0",
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
-      "@nestjs/swagger": "latest"
+      "@nestjs/swagger": "latest",
+      "rxjs": "7.1.0",
+      "reflect-metadata": "0.2.0"
+    },
+    {
+      "name": "rxjs-latest",
+      "zod": "4.4.0",
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "latest",
+      "reflect-metadata": "0.2.0"
+    },
+    {
+      "name": "reflect-metadata-latest",
+      "zod": "4.4.0",
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "7.1.0",
+      "reflect-metadata": "latest"
     },
     {
       "name": "all-latest",
       "zod": "latest",
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
-      "@nestjs/swagger": "latest"
+      "@nestjs/swagger": "latest",
+      "rxjs": "latest",
+      "reflect-metadata": "latest"
     }
   ]
 }
