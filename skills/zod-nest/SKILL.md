@@ -95,9 +95,17 @@ for the full rule catalog. The diagnostics:
 2. **Multi-status candidate** — handler has multiple `@ApiResponse` (or
    `@ApiOkResponse` / `@ApiNotFoundResponse` / etc.) calls but only one
    `@ZodResponse`. Suggest stacking `@ZodResponse` per status.
-3. **Redundant `@ApiOkResponse({ type })`** — `@ApiOkResponse({ type: Dto })`
-   sits next to `@ZodResponse({ type: Dto })` referencing the same DTO.
-   Drop the redundant `@ApiOkResponse`.
+3. **Redundant `@ApiResponse({ type })` next to `@ZodResponse({ type })`** —
+   since `zod-nest@1.4.0`, `@ZodResponse` is a composite decorator that
+   applies `@ApiResponse(...)` internally. Any `@ApiResponse` /
+   `@ApiOkResponse` / `@ApiCreatedResponse` (etc.) sitting alongside a
+   `@ZodResponse` for the same status and same DTO is now redundant — drop
+   the manual `@Api*Response` call. Exception: if the manual call carries
+   additional info `@ZodResponse` can't express (e.g. `content:
+   'application/octet-stream'` for binary downloads pre-migration), surface
+   the [binary downloads recipe](https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md)
+   as the canonical replacement (`overrideJSONSchema(BlobSchema, { ... })`
+   + `@ZodResponse({ type: BlobDto })`).
 
 ### Step 4 — emit the checklist
 

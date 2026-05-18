@@ -61,6 +61,8 @@ class UploadDto extends createZodDto(
 
 Every emission of `FileSchema` — direct or nested — now writes the registered fragment verbatim. No `override` callback on `applyZodNest`, no `@ApiBody({...})` workaround.
 
+For the symmetric case on the response side (binary downloads / streaming exports), see [`binary-downloads.md`](binary-downloads.md) — same `overrideJSONSchema` pattern, paired with `@ZodResponse` instead of `@Body`.
+
 **Precedence.** Per-call `override` (passed to `applyZodNest` / `toOpenApi`) still wins over a registration — registrations sit between `compositionOverride` and the caller's `override` in the chain. The intuitive ladder:
 
 1. `primitiveOverride` (built-in `bigint` / `date` mappings)

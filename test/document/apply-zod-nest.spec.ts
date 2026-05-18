@@ -361,6 +361,125 @@ describe('applyZodNest — multi-status @ZodResponse stack', () => {
   });
 });
 
+// ─── Response card emission from @ZodResponse (composite half) ─────────────
+//
+// `@ZodResponse` is a composite decorator: it appends a runtime variant AND
+// applies `@ApiResponse(...)` so the OpenAPI doc carries the response shape
+// without the consumer hand-writing `@ApiResponse`. These cases run the full
+// pipeline and assert `paths.<route>.<method>.responses.<status>.content` is
+// populated end-to-end.
+
+describe('applyZodNest — @ZodResponse emits responses.<status>.content', () => {
+  class EmitItemDto extends createZodDto(z.object({ id: z.string() }), {
+    id: 'EmitItem',
+  }) {}
+  class EmitErrorDto extends createZodDto(z.object({ code: z.number() }), {
+    id: 'EmitError',
+  }) {}
+
+  @Controller('emit')
+  class EmitController {
+    @Get('single')
+    @ZodResponse({ status: HttpStatus.OK, type: EmitItemDto })
+    single(): EmitItemDto {
+      return new EmitItemDto();
+    }
+
+    @Get('array')
+    @ZodResponse({ status: HttpStatus.OK, type: [EmitItemDto] })
+    list(): EmitItemDto[] {
+      return [];
+    }
+
+    @Get('tuple')
+    @ZodResponse({ status: HttpStatus.OK, type: [EmitItemDto, EmitErrorDto] })
+    pair(): unknown {
+      return [];
+    }
+
+    @Get('implicit')
+    @ZodResponse({ type: EmitItemDto })
+    implicit(): EmitItemDto {
+      return new EmitItemDto();
+    }
+
+    @Post('implicit-post')
+    @ZodResponse({ type: EmitItemDto })
+    implicitPost(): EmitItemDto {
+      return new EmitItemDto();
+    }
+
+    @Get('stacked')
+    @ZodResponse({ status: HttpStatus.OK, type: EmitItemDto })
+    @ZodResponse({ status: HttpStatus.NOT_FOUND, type: EmitErrorDto })
+    stacked(): EmitItemDto {
+      return new EmitItemDto();
+    }
+  }
+
+  let app: INestApplication;
+  let doc: OpenAPIObject;
+
+  beforeAll(async () => {
+    const boot = await bootstrap([EmitController]);
+    app = boot.app;
+    doc = applyZodNest(boot.raw, { app });
+  });
+
+  afterAll(() => app.close());
+
+  const responseSchemaAt = (
+    path: string,
+    method: string,
+    status: string,
+  ): Record<string, unknown> | undefined => {
+    const ops = (doc.paths as Record<string, Record<string, Record<string, unknown>>>)[path]?.[
+      method
+    ];
+    const responses = ops?.responses as Record<string, Record<string, unknown>> | undefined;
+    const r = responses?.[status];
+    const content = r?.content as Record<string, Record<string, unknown>> | undefined;
+    return content?.['application/json']?.schema as Record<string, unknown> | undefined;
+  };
+
+  it('emits responses.200.content[application/json].schema as a $ref to the DTO id (single)', () => {
+    const schema = responseSchemaAt('/emit/single', 'get', '200');
+    expect(schema?.$ref).toBe(`${ROOT}EmitItem`);
+  });
+
+  it('emits a `type: array, items: $ref` schema for array kind', () => {
+    const schema = responseSchemaAt('/emit/array', 'get', '200');
+    expect(schema?.type).toBe('array');
+    const items = schema?.items as Record<string, unknown> | undefined;
+    expect(items?.$ref).toBe(`${ROOT}EmitItem`);
+  });
+
+  it('emits a `type: array, prefixItems: [...]` schema for tuple kind', () => {
+    const schema = responseSchemaAt('/emit/tuple', 'get', '200');
+    expect(schema?.type).toBe('array');
+    expect(schema?.items).toBe(false);
+    const prefixItems = schema?.prefixItems as Array<{ $ref: string }> | undefined;
+    expect(prefixItems).toHaveLength(2);
+    expect(prefixItems?.[0]?.$ref).toBe(`${ROOT}EmitItem`);
+    expect(prefixItems?.[1]?.$ref).toBe(`${ROOT}EmitError`);
+  });
+
+  it('resolves implicit status from the HTTP method default (GET → 200)', () => {
+    const schema = responseSchemaAt('/emit/implicit', 'get', '200');
+    expect(schema?.$ref).toBe(`${ROOT}EmitItem`);
+  });
+
+  it('resolves implicit status from the HTTP method default (POST → 201)', () => {
+    const schema = responseSchemaAt('/emit/implicit-post', 'post', '201');
+    expect(schema?.$ref).toBe(`${ROOT}EmitItem`);
+  });
+
+  it('emits one response card per stacked @ZodResponse', () => {
+    expect(responseSchemaAt('/emit/stacked', 'get', '200')?.$ref).toBe(`${ROOT}EmitItem`);
+    expect(responseSchemaAt('/emit/stacked', 'get', '404')?.$ref).toBe(`${ROOT}EmitError`);
+  });
+});
+
 // ─── No zod-nest DTOs at all ──────────────────────────────────────────────
 
 describe('applyZodNest — controller with no zod-nest DTOs is a clean pass-through', () => {
