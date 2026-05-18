@@ -173,4 +173,55 @@ describe('stripMarkers', () => {
     } as unknown as OpenAPIObject;
     expect(() => stripMarkers(doc)).not.toThrow();
   });
+
+  it('drops `$schema` and `$id` from every components.schemas[K] body', () => {
+    const doc = docOf({
+      SortDirection: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        $id: '#/components/schemas/SortDirection',
+        type: 'string',
+        enum: ['asc', 'desc'],
+        title: 'SortDirection',
+      },
+      Plain: { type: 'object', properties: { x: { type: 'string' } } },
+    });
+
+    stripMarkers(doc);
+
+    const schemas = doc.components?.schemas as Record<string, Record<string, unknown>>;
+    const sortDirection = schemas.SortDirection!;
+    expect(sortDirection).not.toHaveProperty('$schema');
+    expect(sortDirection).not.toHaveProperty('$id');
+    // Other fields are preserved.
+    expect(sortDirection.type).toBe('string');
+    expect(sortDirection.title).toBe('SortDirection');
+    // Schemas without the metadata are untouched.
+    expect(schemas.Plain).toEqual({ type: 'object', properties: { x: { type: 'string' } } });
+  });
+
+  it('does not chase `$id` / `$schema` inside nested properties (root-level only)', () => {
+    const doc = docOf({
+      Outer: {
+        $id: '#/components/schemas/Outer',
+        type: 'object',
+        properties: {
+          inner: {
+            // Nested $id / $schema must survive — those are part of a
+            // referenced sub-schema's payload, not the root component identity.
+            $id: 'nested-id',
+            $schema: 'nested-dialect',
+            type: 'string',
+          },
+        },
+      },
+    });
+
+    stripMarkers(doc);
+
+    const outer = (doc.components?.schemas as Record<string, Record<string, unknown>>).Outer!;
+    expect(outer).not.toHaveProperty('$id');
+    const inner = (outer.properties as Record<string, Record<string, unknown>>).inner!;
+    expect(inner.$id).toBe('nested-id');
+    expect(inner.$schema).toBe('nested-dialect');
+  });
 });

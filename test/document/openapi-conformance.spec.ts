@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { Body, Controller, Get, Post, Type } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Type } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
@@ -134,6 +134,62 @@ describe('OpenAPI 3.1 conformance', () => {
     const { app, doc } = await bootstrap([AdminsController]);
     try {
       await expect(validate(doc)).resolves.toBeDefined();
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Reproduces the cvs-kalo / bff-zod-4 case that motivated issue #55:
+  // a `@Query() ZodDto` whose schema referenced a separately-named enum
+  // emitted `$id: "#/components/schemas/SortDirection"` into the SortDirection
+  // body. Swagger UI's strict resolver re-anchored ref lookups against the
+  // leaf schema and reported "Could not resolve reference" for every named
+  // component. `SwaggerParser.validate` is more permissive but the doc
+  // shouldn't carry those internal fields in the first place.
+  it('strips `$id` / `$schema` from named components referenced by a @Query() DTO property', async () => {
+    const SortDirection = z
+      .enum(['asc', 'desc'])
+      .describe('The direction to sort by')
+      .meta({ id: 'SortDirection', title: 'SortDirection' });
+    const QuerySchema = z
+      .object({
+        sort: SortDirection.optional(),
+        limit: z.number().describe('Page size').optional(),
+      })
+      .meta({ id: 'ListQueryDto' });
+    class ListQueryDto extends createZodDto(QuerySchema) {}
+
+    @Controller('items')
+    class ItemsController {
+      @Get()
+      list(@Query() _q: ListQueryDto): unknown {
+        return [];
+      }
+    }
+
+    const { app, doc } = await bootstrap([ItemsController]);
+    try {
+      // SwaggerParser validates the 3.1 doc end-to-end.
+      await expect(validate(doc)).resolves.toBeDefined();
+
+      // The named-component body has no JSON Schema dialect metadata.
+      const sortDirection = (doc.components?.schemas as Record<string, Record<string, unknown>>)
+        .SortDirection!;
+      expect(sortDirection).not.toHaveProperty('$id');
+      expect(sortDirection).not.toHaveProperty('$schema');
+      // The substantive fields survive.
+      expect(sortDirection.type).toBe('string');
+      expect(sortDirection.enum).toEqual(['asc', 'desc']);
+
+      // The expanded @Query() parameters keep `description` on the schema —
+      // no parameter-level duplication.
+      const params = (
+        doc.paths as unknown as Record<string, Record<string, Record<string, unknown>>>
+      )['/items']?.get?.parameters as Array<Record<string, unknown>>;
+      const limit = params.find((p) => p.name === 'limit');
+      expect(limit).toBeDefined();
+      expect(limit).not.toHaveProperty('description');
+      expect((limit?.schema as Record<string, unknown>).description).toBe('Page size');
     } finally {
       await app.close();
     }

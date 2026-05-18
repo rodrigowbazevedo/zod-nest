@@ -2,7 +2,7 @@ import type { OpenAPIObject } from '@nestjs/swagger';
 
 import { COMPONENTS_SCHEMAS_PREFIX } from '../schema/constants.js';
 import { ZodNestDocumentError } from './errors.js';
-import { HTTP_METHODS } from './http-methods.js';
+import { forEachOperation } from './http-methods.js';
 import { walkRefs } from './walk-refs.js';
 
 export interface ExpandParamMarkersParams {
@@ -47,46 +47,47 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
  */
 export const expandParamMarkers = (params: ExpandParamMarkersParams): void => {
   const { doc, inputSchemas, outputSchemas } = params;
-  const paths = doc.paths;
-  if (!isPlainRecord(paths)) {
-    return;
-  }
-  for (const pathItem of Object.values(paths)) {
-    if (!isPlainRecord(pathItem)) {
-      continue;
+  let expandedAny = false;
+  forEachOperation(doc, (op) => {
+    const parameters = op.parameters;
+    if (!Array.isArray(parameters)) {
+      return;
     }
-    for (const method of HTTP_METHODS) {
-      const op = pathItem[method];
-      if (!isPlainRecord(op)) {
-        continue;
-      }
-      const parameters = op.parameters;
-      if (!Array.isArray(parameters)) {
-        continue;
-      }
-      op.parameters = expandParameterList(parameters, inputSchemas, outputSchemas);
+    const next = expandParameterList(parameters, inputSchemas, outputSchemas);
+    if (next !== parameters) {
+      op.parameters = next;
+      expandedAny = true;
     }
+  });
+  // The synthetic `components.schemas.Object` only appears when at least one
+  // marker parameter was processed by @nestjs/swagger — skip the full-doc
+  // ref walk on the common no-marker path.
+  if (expandedAny) {
+    pruneOrphanObjectSchema(doc);
   }
-  pruneOrphanObjectSchema(doc);
 };
 
 const expandParameterList = (
   parameters: readonly unknown[],
   inputSchemas: ReadonlyMap<string, unknown>,
   outputSchemas: ReadonlyMap<string, unknown>,
-): unknown[] => {
-  const result: unknown[] = [];
-  for (const param of parameters) {
+): readonly unknown[] => {
+  let result: unknown[] | undefined;
+  for (let i = 0; i < parameters.length; i++) {
+    const param = parameters[i];
     const marker = readMarker(param);
     if (marker === undefined) {
-      result.push(param);
+      result?.push(param);
       continue;
+    }
+    if (result === undefined) {
+      result = parameters.slice(0, i);
     }
     const map = marker.io === 'output' ? outputSchemas : inputSchemas;
     const body = map.get(marker.dtoId);
     result.push(...expandOne(marker, body));
   }
-  return result;
+  return result ?? parameters;
 };
 
 const readMarker = (value: unknown): MarkerParam | undefined => {
@@ -161,22 +162,14 @@ const buildParameter = (
     );
     effectiveRequired = true;
   }
-  const entry: Record<string, unknown> = {
+  return {
     name,
     in: marker.in,
     required: effectiveRequired,
     schema,
   };
-  if (typeof schema.description === 'string') {
-    // Duplicate the description onto the parameter object as well as leaving
-    // it on the schema — maximum Swagger-UI compatibility, see plan answer 3.
-    entry.description = schema.description;
-  }
-  return entry;
 };
 
-// `paramIn` is validated as a non-empty string by `readMarker` before reaching
-// here, so the first character is always present.
 const capitalize = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1);
 
 const pruneOrphanObjectSchema = (doc: OpenAPIObject): void => {

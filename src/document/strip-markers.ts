@@ -1,13 +1,16 @@
 import type { OpenAPIObject } from '@nestjs/swagger';
 
+import { isZodDtoMarker } from '../dto/marker.js';
 import { ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
-import { HTTP_METHODS } from './http-methods.js';
+import { forEachOperation } from './http-methods.js';
 
 /**
  * Removes `x-zod-nest-dto` placeholder entries from every
- * `components.schemas[K].properties` block, plus any stray marker parameter
- * that `expandParamMarkers` left behind. Used as the final cleanup pass
- * after `mergeSchemas` + `expandParamMarkers` + `rewriteRefs`.
+ * `components.schemas[K].properties` block, drops the JSON Schema 2020-12
+ * metadata (`$schema`, `$id`) that Zod's bulk emission leaks onto every
+ * component body, and removes any stray marker parameter that
+ * `expandParamMarkers` left behind. Used as the final cleanup pass after
+ * `mergeSchemas` + `expandParamMarkers` + `rewriteRefs`.
  *
  * In practice the schema marker has already been overwritten or its key
  * dropped by `mergeSchemas` whenever the DTO is exposed. The straggler case
@@ -20,6 +23,15 @@ import { HTTP_METHODS } from './http-methods.js';
  * This pass catches anything that somehow slipped through (e.g. a future
  * caller that bypasses `applyZodNest`'s pipeline).
  *
+ * The `$schema` / `$id` strip exists because Zod v4's bulk `toJSONSchema`
+ * writes `$schema: "https://json-schema.org/draft/2020-12/schema"` and a
+ * relative-URI-fragment `$id` (`#/components/schemas/<Id>`) onto every
+ * emitted body. Swagger UI's strict ref resolver chokes on the `$id`
+ * fragment — it re-anchors lookups against the leaf schema and then fails
+ * to find `components` at the new root. The fields are redundant inside
+ * OpenAPI anyway: the schema's identity comes from its `components.schemas`
+ * key. We delete both.
+ *
  * When the marker is the only property, the empty `properties` block is
  * dropped too. The `x-zod-nest-error` extension (engine collision policy)
  * is intentionally preserved so the broken contract stays visible in
@@ -30,41 +42,29 @@ export const stripMarkers = (doc: OpenAPIObject): void => {
   if (schemas !== undefined) {
     for (const schema of Object.values(schemas)) {
       stripMarkerFromSchema(schema);
+      dropJsonSchemaMetadata(schema);
     }
   }
   stripMarkerParameters(doc);
 };
 
-const stripMarkerParameters = (doc: OpenAPIObject): void => {
-  const paths = doc.paths;
-  if (paths === null || typeof paths !== 'object') {
+const dropJsonSchemaMetadata = (schema: unknown): void => {
+  if (schema === null || typeof schema !== 'object') {
     return;
   }
-  for (const pathItem of Object.values(paths)) {
-    if (pathItem === null || typeof pathItem !== 'object') {
-      continue;
-    }
-    const pathRecord = pathItem as Record<string, unknown>;
-    for (const method of HTTP_METHODS) {
-      const op = pathRecord[method];
-      if (op === null || typeof op !== 'object') {
-        continue;
-      }
-      const opRecord = op as Record<string, unknown>;
-      const parameters = opRecord.parameters;
-      if (!Array.isArray(parameters)) {
-        continue;
-      }
-      opRecord.parameters = parameters.filter((param) => !isMarkerParam(param));
-    }
-  }
+  const body = schema as { $schema?: unknown; $id?: unknown };
+  delete body.$schema;
+  delete body.$id;
 };
 
-const isMarkerParam = (value: unknown): boolean => {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  return (value as { __zodNestDto?: unknown }).__zodNestDto === true;
+const stripMarkerParameters = (doc: OpenAPIObject): void => {
+  forEachOperation(doc, (op) => {
+    const parameters = op.parameters;
+    if (!Array.isArray(parameters)) {
+      return;
+    }
+    op.parameters = parameters.filter((param) => !isZodDtoMarker(param));
+  });
 };
 
 const stripMarkerFromSchema = (schema: unknown): void => {
