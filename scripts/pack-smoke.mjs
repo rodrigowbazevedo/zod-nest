@@ -1,19 +1,24 @@
 #!/usr/bin/env node
 /**
  * pack-smoke — verifies the package is installable + every documented
- * public export resolves from both the CJS and ESM entries.
+ * public export resolves from both the CJS and ESM entries + the bundled DI
+ * metadata is intact so consumers can bootstrap a real NestJS container
+ * (regression guard for #35).
  *
  * Catches publish-time-only regressions that the in-repo test suite can't
  * see: missing files in `package.json#files`, broken `exports` map,
- * misnamed entry, removed-but-still-referenced exports.
+ * misnamed entry, removed-but-still-referenced exports, missing
+ * `design:paramtypes` metadata on `@Injectable()` classes.
  *
  * Workflow:
  *   1. `npm pack --json` → tarball in repo root.
  *   2. Copy tarball into a fresh tempdir sandbox.
  *   3. `npm init -y` + install peer-deps + the tarball.
- *   4. CJS smoke: `node -e "require('zod-nest')"` + assert exports.
- *   5. ESM smoke: `node --input-type=module ...` + assert exports.
- *   6. Cleanup.
+ *   4. Metadata grep: installed `dist/index.js` must carry `design:paramtypes`.
+ *   5. CJS smoke: assert exports + bootstrap `ZodNestModule.forRoot()` and
+ *      resolve `ZodSerializerInterceptor` via `NestFactory.createApplicationContext`.
+ *   6. ESM smoke: same.
+ *   7. Cleanup.
  *
  * Failure exits non-zero; CI fails the job.
  */
@@ -107,15 +112,58 @@ try {
     stdio: 'inherit',
   });
 
+  log('metadata grep: installed dist/index.js carries design:paramtypes (#35)');
+  // The published bundle must contain `design:paramtypes` emissions so NestJS
+  // DI can resolve type-keyed constructor params. tsup's default esbuild
+  // transform skips this; SWC restores it. Asserting on the *installed*
+  // dist (not the repo's) makes sure `package.json#files` + `exports` ship
+  // the right artifact.
+  const installedCjs = readFileSync(
+    join(sandbox, 'node_modules', 'zod-nest', 'dist', 'index.js'),
+    'utf-8',
+  );
+  const installedEsm = readFileSync(
+    join(sandbox, 'node_modules', 'zod-nest', 'dist', 'index.mjs'),
+    'utf-8',
+  );
+  for (const [label, source] of [
+    ['CJS', installedCjs],
+    ['ESM', installedEsm],
+  ]) {
+    if (!/design:paramtypes/.test(source)) {
+      throw new Error(
+        `Installed ${label} bundle is missing design:paramtypes metadata — ` +
+          'NestJS DI will fail to resolve type-keyed constructor params (#35).',
+      );
+    }
+  }
+
   const exportsJSON = JSON.stringify(EXPECTED_EXPORTS);
 
   // Scripts written to files (not `node -e` strings) so newlines survive
   // intact — `node -e` passes its arg through shell interpolation and
   // mangles escape sequences.
+  //
+  // Each smoke also bootstraps a Nest application context with
+  // `ZodNestModule.forRoot()` and resolves `ZodSerializerInterceptor`.
+  // `createApplicationContext` exercises the DI container without needing
+  // an HTTP platform adapter, which is sufficient to reproduce the #35
+  // failure mode (the original error fires while Nest builds providers).
 
   log('CJS smoke');
+  // Note: \`@Module(...)\` mutates the target class via reflect-metadata and
+  // returns void, so the class reference must be retained separately — do
+  // not assign the decorator-application's return value.
+  //
+  // Successful \`createApplicationContext\` is the assertion: Nest instantiates
+  // \`APP_INTERCEPTOR\` providers eagerly during container init, so the #35
+  // failure mode ("Nest can't resolve dependencies of ZodSerializerInterceptor")
+  // would throw here. No need to resolve the interceptor afterwards — it's
+  // wired via \`APP_INTERCEPTOR\` (a multi-token), not as a direct provider.
   const cjsScript = `require('reflect-metadata');
 const m = require('zod-nest');
+const { NestFactory } = require('@nestjs/core');
+const { Module } = require('@nestjs/common');
 const expected = ${exportsJSON};
 const missing = expected.filter((n) => m[n] === undefined);
 if (missing.length) {
@@ -123,6 +171,20 @@ if (missing.length) {
   process.exit(1);
 }
 console.log('CJS:', expected.length, 'exports present');
+
+class RootModule {}
+Module({ imports: [m.ZodNestModule.forRoot()] })(RootModule);
+
+NestFactory.createApplicationContext(RootModule, { logger: false })
+  .then((ctx) => {
+    console.log('CJS: ZodNestModule.forRoot() DI bootstrap OK');
+    return ctx.close();
+  })
+  .catch((err) => {
+    console.error('CJS DI bootstrap failed:', err && err.message ? err.message : err);
+    if (err && err.stack) console.error(err.stack);
+    process.exit(1);
+  });
 `;
   writeFileSync(join(sandbox, 'cjs-smoke.cjs'), cjsScript);
   execSync('node cjs-smoke.cjs', { cwd: sandbox, stdio: 'inherit' });
@@ -130,6 +192,8 @@ console.log('CJS:', expected.length, 'exports present');
   log('ESM smoke');
   const esmScript = `import 'reflect-metadata';
 import * as m from 'zod-nest';
+import { NestFactory } from '@nestjs/core';
+import { Module } from '@nestjs/common';
 const expected = ${exportsJSON};
 const missing = expected.filter((n) => m[n] === undefined);
 if (missing.length) {
@@ -137,11 +201,18 @@ if (missing.length) {
   process.exit(1);
 }
 console.log('ESM:', expected.length, 'exports present');
+
+class RootModule {}
+Module({ imports: [m.ZodNestModule.forRoot()] })(RootModule);
+
+const ctx = await NestFactory.createApplicationContext(RootModule, { logger: false });
+console.log('ESM: ZodNestModule.forRoot() DI bootstrap OK');
+await ctx.close();
 `;
   writeFileSync(join(sandbox, 'esm-smoke.mjs'), esmScript);
   execSync('node esm-smoke.mjs', { cwd: sandbox, stdio: 'inherit' });
 
-  log('✅ all exports present in both CJS and ESM');
+  log('✅ exports + DI bootstrap green in both CJS and ESM');
 } finally {
   rmSync(sandbox, { recursive: true, force: true });
   if (tarballPathInRoot) {
