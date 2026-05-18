@@ -39,6 +39,16 @@
         "default": "./dist/index.js"
       }
     },
+    "./helpers": {
+      "import": {
+        "types": "./dist/helpers/index.d.mts",
+        "default": "./dist/helpers/index.mjs"
+      },
+      "require": {
+        "types": "./dist/helpers/index.d.ts",
+        "default": "./dist/helpers/index.js"
+      }
+    },
     "./package.json": "./package.json"
   },
   "files": [

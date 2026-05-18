@@ -143,21 +143,34 @@ try {
 }
 ```
 
-**Mitigation** — three options, most-targeted first:
+**Mitigation** — four options, most-targeted first:
 
-1. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema *instance* (most often `z.instanceof(File)` / `z.custom<T>()`). The engine writes the fragment verbatim everywhere that instance is emitted. Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes (coercion helpers). See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
+1. **Drop in a shipped preset** from `zod-nest/helpers` — `FileSchema` / `BlobSchema` / `BufferSchema` cover the common `z.instanceof(File | Blob | Buffer)` cases without any registration of your own.
+
+   ```ts
+   import { z } from 'zod';
+   import { createZodDto } from 'zod-nest';
+   import { FileSchema } from 'zod-nest/helpers';
+
+   class UploadDto extends createZodDto(
+     z.object({ file: FileSchema }),
+   ) {}
+   ```
+
+2. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema *instance*. Pair with the `zod-nest/helpers` fragment catalog (`binaryFragment`, `uuidFragment`, `opaqueFragment`, …) or the `binary()` / `opaque()` sugar functions so you don't have to hand-write the magic objects. Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes (coercion helpers). See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
 
    ```ts
    import { z } from 'zod';
    import { overrideJSONSchema } from 'zod-nest';
+   import { binary, uuidFragment } from 'zod-nest/helpers';
 
-   const FileSchema = z.instanceof(File);
-   overrideJSONSchema(FileSchema, { type: 'string', format: 'binary' });
+   const PdfUpload = overrideJSONSchema(z.instanceof(File), binary({ contentMediaType: 'application/pdf' }));
+   const UserId = overrideJSONSchema(z.custom<string>(), uuidFragment);
    ```
 
-2. **`override` callback** — pass a per-call `override` to `applyZodNest` / `toOpenApi` that mutates `ctx.jsonSchema` for matching types. Useful when the mapping should apply to *every* schema of a given Zod type (e.g. all `z.bigint()` → custom string format). See [`swagger-integration.md`](swagger-integration.md#override-callback) for the pattern.
+3. **`override` callback** — pass a per-call `override` to `applyZodNest` / `toOpenApi` that mutates `ctx.jsonSchema` for matching types. Useful when the mapping should apply to *every* schema of a given Zod type. See [`swagger-integration.md`](swagger-integration.md#override-callback) for the pattern.
 
-3. **`strict: false`** — globally relax the check; unrepresentable constructs emit `{}`. Reach for this only when you're knowingly trading schema fidelity for a clean boot.
+4. **`strict: false`** — globally relax the check; unrepresentable constructs emit `{}`. Reach for this only when you're knowingly trading schema fidelity for a clean boot.
 
 ## `ZodNestDocumentError`
 
