@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.1.0...v1.1.1) (2026-05-18)
+
+
+### Bug Fixes
+
+* **schema:** suppress strict-mode hit on pipe-wrapped transforms ([#51](https://github.com/rodrigowbazevedo/zod-nest/issues/51)) ([b6d4c65](https://github.com/rodrigowbazevedo/zod-nest/commit/b6d4c65edb42aff943be610f009c3cf00e200bcf)), closes [#49](https://github.com/rodrigowbazevedo/zod-nest/issues/49) [#50](https://github.com/rodrigowbazevedo/zod-nest/issues/50)
+
 # [1.1.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.0.0...v1.1.0) (2026-05-18)
 
 
