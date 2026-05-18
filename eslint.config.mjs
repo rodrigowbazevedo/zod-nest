@@ -7,7 +7,16 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', 'reports/**', 'node_modules/**', '**/*.config.*'],
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'reports/**',
+      'node_modules/**',
+      '**/*.config.*',
+      // Claude Code session state: agent worktrees, transcripts, settings —
+      // not project source, must not affect lint regardless of what's inside.
+      '.claude/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
