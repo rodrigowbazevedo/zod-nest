@@ -643,9 +643,10 @@ describe('applyZodNest — @Query() / @Param() / @Headers() DTO marker expansion
     expect(names).toEqual(expect.arrayContaining(['limit', 'cursor', 'sort']));
     // No leftover marker placeholder.
     expect(names).not.toContain('x-zod-nest-dto');
-    // `.describe()` duplicates onto the parameter object.
+    // `.describe()` stays on the parameter schema (where Zod emits it);
+    // applyZodNest no longer copies it to the parameter object itself.
     const limit = params.find((p) => p.name === 'limit');
-    expect(limit?.description).toBe('The number of items to return');
+    expect(limit).not.toHaveProperty('description');
     expect((limit?.schema as Record<string, unknown>).description).toBe(
       'The number of items to return',
     );

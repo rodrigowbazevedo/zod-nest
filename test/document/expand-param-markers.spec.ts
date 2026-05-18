@@ -197,7 +197,7 @@ describe('expandParamMarkers', () => {
     ]);
   });
 
-  it('duplicates Zod `.describe()` text onto both the parameter and its schema', () => {
+  it('leaves Zod `.describe()` text on the parameter schema, not on the parameter object', () => {
     const doc = docOf({
       paths: { '/x': { get: { parameters: [markerParam('query', 'QueryDto')] } } },
     });
@@ -222,10 +222,12 @@ describe('expandParamMarkers', () => {
         name: 'limit',
         in: 'query',
         required: false,
-        description: 'The number of items to return',
         schema: { type: 'number', description: 'The number of items to return' },
       },
     ]);
+    // No top-level `description` key — Swagger UI renders the schema-level
+    // description; lifting it to the parameter just added noise.
+    expect(params[0]).not.toHaveProperty('description');
   });
 
   it('throws UNEXPANDABLE_PARAM_DTO when the DTO body is not an object schema', () => {
