@@ -37,12 +37,7 @@ const customOverrideMap = new WeakMap<$ZodType, StoredFragments>();
 
 const isWrapper = (
   arg: OverrideJSONSchemaArg,
-): arg is { input?: SchemaObject; output?: SchemaObject } => {
-  if (arg === null || typeof arg !== 'object') {
-    return false;
-  }
-  return 'input' in arg || 'output' in arg;
-};
+): arg is { input?: SchemaObject; output?: SchemaObject } => 'input' in arg || 'output' in arg;
 
 /**
  * Register a fixed JSON Schema fragment for a specific Zod schema instance.
