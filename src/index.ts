@@ -4,6 +4,7 @@ export {
   defaultRegistry,
   extend,
   getLineage,
+  overrideJSONSchema,
   toOpenApi,
   ZOD_NEST_DTO_EXTENSION,
   ZOD_NEST_ERROR_DUPLICATE_ID,

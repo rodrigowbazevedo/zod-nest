@@ -143,7 +143,21 @@ try {
 }
 ```
 
-**Mitigation**: pass `strict: false` (emits `{}` for unrepresentable constructs), or supply an `override` callback that mutates `ctx.jsonSchema` to a representable form for these types. See [`swagger-integration.md`](swagger-integration.md#override-callback) for the override pattern.
+**Mitigation** — three options, most-targeted first:
+
+1. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema *instance* (most often `z.instanceof(File)` / `z.custom<T>()`). The engine writes the fragment verbatim everywhere that instance is emitted. See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
+
+   ```ts
+   import { z } from 'zod';
+   import { overrideJSONSchema } from 'zod-nest';
+
+   const FileSchema = z.instanceof(File);
+   overrideJSONSchema(FileSchema, { type: 'string', format: 'binary' });
+   ```
+
+2. **`override` callback** — pass a per-call `override` to `applyZodNest` / `toOpenApi` that mutates `ctx.jsonSchema` for matching types. Useful when the mapping should apply to *every* schema of a given Zod type (e.g. all `z.bigint()` → custom string format). See [`swagger-integration.md`](swagger-integration.md#override-callback) for the pattern.
+
+3. **`strict: false`** — globally relax the check; unrepresentable constructs emit `{}`. Reach for this only when you're knowingly trading schema fidelity for a clean boot.
 
 ## `ZodNestDocumentError`
 

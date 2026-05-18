@@ -334,6 +334,9 @@ Intentional (and a security improvement) — see [Serialization exception body c
 **"I get `ZodNestDocumentError: DANGLING_REF` at boot."**
 `applyZodNest` validates the final `$ref` graph. A dangling ref means a DTO is referenced from the doc but the registry doesn't know about it — typically a missing `createZodDto` call, a typo'd `.meta({ id })`, or two `ZodNestRegistry` instances being used in the same app. The error message lists every offending ref with a hint from the collected-usage table.
 
+**"I get `ZodNestUnrepresentableError` for my `z.instanceof(File)` / `z.custom<T>()` field."**
+JSON Schema can't represent `z.custom` / `z.instanceof` shapes — Zod emits `{}` and the engine throws in strict mode. Register a JSON Schema fragment once with `overrideJSONSchema(MyFileSchema, { type: 'string', format: 'binary' })` and the engine writes that fragment everywhere the same instance is used — no per-call `override` callback, no `@ApiBody({...})` workaround. See [`docs/recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema`](docs/recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
+
 **"My async validation refinements don't fire."**
 The pipe uses `safeParseAsync`, so async refinements work. Check that the schema is actually attached — `@Body() body: UserDto` (where `UserDto` is a `createZodDto` class) is the canonical wiring.
 
