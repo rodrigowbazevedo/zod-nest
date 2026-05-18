@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.4.0...v1.5.0) (2026-05-18)
+
+
+### Features
+
+* **helpers:** introduce zod-nest/helpers subpath with fragment catalog, sugar, enrich, presets ([#60](https://github.com/rodrigowbazevedo/zod-nest/issues/60)) ([38c9680](https://github.com/rodrigowbazevedo/zod-nest/commit/38c96801144b5f6d9c269dca50ead81d9862e829)), closes [#59](https://github.com/rodrigowbazevedo/zod-nest/issues/59)
+
 # [1.4.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.3.1...v1.4.0) (2026-05-18)
 
 
