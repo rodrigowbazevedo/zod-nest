@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { discoverDependents } from './discover-dependents.js';
+
 export interface ZodNestRegistry {
   readonly zodRegistry: typeof z.globalRegistry;
   register(schema: z.ZodType, id: string): void;
@@ -10,6 +12,9 @@ export interface ZodNestRegistry {
    * underlying Zod registry is `z.globalRegistry`, which may hold third-party
    * entries — bulk emission filters its output against this snapshot to keep
    * only zod-nest-known ids.
+   *
+   * Includes ids discovered transitively via `.meta({ id })` on descendants
+   * of explicitly-registered schemas.
    */
   ids(): readonly string[];
 }
@@ -17,16 +22,31 @@ export interface ZodNestRegistry {
 export const createRegistry = (): ZodNestRegistry => {
   const seen = new Map<string, Set<z.ZodType>>();
 
+  const recordOnce = (schema: z.ZodType, id: string): boolean => {
+    let set = seen.get(id);
+    if (set === undefined) {
+      set = new Set<z.ZodType>();
+      seen.set(id, set);
+    }
+    if (set.has(schema)) {
+      return false;
+    }
+    set.add(schema);
+    return true;
+  };
+
   return {
     zodRegistry: z.globalRegistry,
     register: (schema, id) => {
       z.globalRegistry.add(schema, { id });
-      let set = seen.get(id);
-      if (set === undefined) {
-        set = new Set<z.ZodType>();
-        seen.set(id, set);
+      if (!recordOnce(schema, id)) {
+        return;
       }
-      set.add(schema);
+      // `discoverDependents` walks the Zod tree once and yields every named
+      // descendant transitively (cycle-safe via its own visited set).
+      for (const [child, childId] of discoverDependents(schema)) {
+        recordOnce(child, childId);
+      }
     },
     hasCollision: (id) => {
       const set = seen.get(id);

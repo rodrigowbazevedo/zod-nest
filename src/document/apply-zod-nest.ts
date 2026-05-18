@@ -2,7 +2,9 @@ import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import type { Override } from '../schema/override.js';
 import type { ZodNestRegistry } from '../schema/registry.js';
+import type { CollectedUsage } from './collect-usage.js';
 
+import { COMPONENTS_SCHEMAS_PREFIX } from '../schema/constants.js';
 import { defaultRegistry } from '../schema/registry.js';
 import { bulkEmit } from './bulk-emit.js';
 import { collectUsage } from './collect-usage.js';
@@ -10,6 +12,7 @@ import { assertNoDanglingRefs } from './dangling-refs.js';
 import { mergeSchemas } from './merge-schemas.js';
 import { rewriteRefs } from './rewrite-refs.js';
 import { stripMarkers } from './strip-markers.js';
+import { walkRefs } from './walk-refs.js';
 
 export interface ApplyZodNestOptions {
   /**
@@ -61,16 +64,63 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions): Ope
     override: opts.override,
     strict: opts.strict,
   });
+  const extended = extendExposureViaRefs(collected, inputSchemas, outputSchemas);
   const { divergentOutputIds, renames } = mergeSchemas({
     doc,
     inputSchemas,
     outputSchemas,
-    collected,
+    collected: extended,
     collisions: registry.getCollisions(),
   });
   rewriteRefs({ doc, renames, divergentOutputIds });
   stripMarkers(doc);
-  assertNoDanglingRefs({ doc, collected });
+  assertNoDanglingRefs({ doc, collected: extended });
 
   return doc;
+};
+
+/**
+ * Closes the input/output exposure sets over `$ref`s. A nested `.meta({ id })`
+ * schema declared without `createZodDto` is registered transitively (see
+ * `registry.register`) and emitted by `bulkEmit`, but `collectUsage` won't
+ * see it directly — it walks request/response bodies and `@ZodResponse`
+ * metadata, not nested refs. Without this closure, `mergeSchemas` would
+ * skip the nested body, leaving a dangling `$ref` in the final document.
+ */
+const extendExposureViaRefs = (
+  collected: CollectedUsage,
+  inputSchemas: ReadonlyMap<string, unknown>,
+  outputSchemas: ReadonlyMap<string, unknown>,
+): CollectedUsage => ({
+  ...collected,
+  inputExposedIds: closeOverRefs(collected.inputExposedIds, inputSchemas),
+  outputExposedIds: closeOverRefs(collected.outputExposedIds, outputSchemas),
+});
+
+const closeOverRefs = (
+  seed: ReadonlySet<string>,
+  bodies: ReadonlyMap<string, unknown>,
+): Set<string> => {
+  const out = new Set(seed);
+  const queue = [...seed];
+  while (queue.length > 0) {
+    const id = queue.shift() as string;
+    const body = bodies.get(id);
+    if (body === undefined) {
+      continue;
+    }
+    walkRefs(body, (ref) => {
+      if (!ref.startsWith(COMPONENTS_SCHEMAS_PREFIX)) {
+        return undefined;
+      }
+      const target = ref.slice(COMPONENTS_SCHEMAS_PREFIX.length);
+      if (out.has(target)) {
+        return undefined;
+      }
+      out.add(target);
+      queue.push(target);
+      return undefined;
+    });
+  }
+  return out;
 };
