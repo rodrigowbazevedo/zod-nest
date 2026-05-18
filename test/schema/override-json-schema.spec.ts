@@ -173,27 +173,63 @@ describe('overrideJSONSchema', () => {
       expect(outputOut.description).toBe('caller-wins');
     });
 
-    it('singleOrArray pattern: union(array, item.transform(v => [v])) emits divergent shapes', () => {
+    it('singleOrArray pattern: a single registration on the outer pipe covers both io sides', () => {
       // Real-world coercion helper from the consumer report. Input accepts
-      // `T | T[]` (item OR array); output is always `T[]` because the
-      // transform normalized the scalar branch. The Zod `.transform(...)` call
-      // produces a pipe whose `def.out` is the underlying transform node —
-      // register on both so the inner transform doesn't trip strict mode.
+      // `T | T[]`; output is always `T[]`. `.transform(...)` produces a pipe
+      // whose `def.out` is the inner transform node — but the engine
+      // suppresses the inner's strict-mode hit when an outer pipe
+      // registration covers it, so consumers register only on the outer pipe.
       const item = z.string();
       const pipe = item.transform((v) => [v]);
-      const innerTransform = pipe._zod.def.out as unknown as z.ZodType;
       const schema = z.union([z.array(item), pipe]);
 
       const itemFrag: SchemaObject = { type: 'string' };
       const arrFrag: SchemaObject = { type: 'array', items: { type: 'string' } };
       overrideJSONSchema(pipe, { input: itemFrag, output: arrFrag });
-      overrideJSONSchema(innerTransform, { input: itemFrag, output: arrFrag });
 
       const inputOut = toOpenApi(schema, { io: 'input', registry }).schema;
       const outputOut = toOpenApi(schema, { io: 'output', registry }).schema;
 
       expect(inputOut).toEqual({ anyOf: [arrFrag, itemFrag] });
       expect(outputOut).toEqual({ anyOf: [arrFrag, arrFrag] });
+    });
+
+    it('outer-pipe coverage is io-scoped: only-`input` registration still throws on output emission', () => {
+      // Sanity: the strict-mode suppression must not bleed across io sides.
+      // With only `input` registered, the output pass has no covering
+      // fragment, so the inner transform's empty emission stays a hit.
+      const item = z.string();
+      const pipe = item.transform((v) => [v]);
+
+      overrideJSONSchema(pipe, { input: { type: 'string' } });
+
+      expect(() => toOpenApi(pipe, { io: 'output', registry })).toThrow(
+        ZodNestUnrepresentableError,
+      );
+    });
+
+    it('outer-pipe coverage is registration-scoped: a bare transform without a covering pipe still throws', () => {
+      // Sanity: the suppression must only trigger when an outer pipe is
+      // actually registered. An anonymous transform on its own remains
+      // strict-mode-unrepresentable.
+      const bareTransform = z.string().transform((v) => [v]);
+
+      expect(() => toOpenApi(bareTransform, { io: 'output', registry })).toThrow(
+        ZodNestUnrepresentableError,
+      );
+    });
+
+    it('nested pipes: outer-pipe coverage propagates through pipe-of-pipe chains', () => {
+      // pipe-of-pipe-of-transform — coverage must walk through the chain so
+      // the deepest transform's strict-mode hit is suppressed by the
+      // outermost registration.
+      const inner = z.string().transform((v) => parseInt(v, 10));
+      const outer = inner.transform((n) => n * 2);
+      const fragment: SchemaObject = { type: 'integer' };
+
+      overrideJSONSchema(outer, { output: fragment });
+
+      expect(toOpenApi(outer, { io: 'output', registry }).schema).toEqual(fragment);
     });
   });
 });

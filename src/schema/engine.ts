@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-import type { $ZodTypes } from 'zod/v4/core';
+import type { $ZodType, $ZodTypes } from 'zod/v4/core';
 import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
 import type { ZodNestRegistry } from './registry.js';
 
 import { createCompositionOverride, DEFAULT_BUILD_REF } from './composition.js';
 import { ZOD_NEST_ERROR_DUPLICATE_ID, ZOD_NEST_ERROR_EXTENSION } from './constants.js';
-import { createCustomOverride } from './custom-override.js';
+import { createCustomOverride, peekRegistration } from './custom-override.js';
 import { ZodNestUnrepresentableError } from './errors.js';
 import { combine, primitiveOverride } from './override.js';
 import { postProcess } from './post-process.js';
@@ -54,7 +54,43 @@ export interface ToOpenApiResult {
 interface UnrepresentableHit {
   path: (string | number)[];
   zodType: string;
+  /**
+   * Schema instance that emitted empty. Kept so `consumeUnrepresentable`
+   * can drop hits whose outer pipe later marked them covered — pipes process
+   * inner before outer in reverse-seen order, so the inner's hit fires
+   * before the outer pipe gets to declare coverage.
+   */
+  zodSchema: $ZodType;
 }
+
+/**
+ * Mark a pipe's descent target as covered by an outer registration when
+ * the override for the outer pipe fires. Recurses for nested
+ * pipe-of-pipe chains (e.g. `pipe(pipe2, transform)`) so the deep inner
+ * descent target also has its strict-mode hit suppressed.
+ *
+ * Mirrors Zod's `pipeProcessor` descent rules (`json-schema-processors.js`):
+ *   - `io === 'output'` → cover `def.out`
+ *   - `io === 'input'`  → cover `def.out` when `def.in` is a `$ZodTransform`
+ *     (Zod skips preprocessing on input emission), else `def.in`.
+ */
+const markPipeCoverage = (
+  schema: $ZodType,
+  io: 'input' | 'output',
+  covered: WeakSet<$ZodType>,
+): void => {
+  const def = schema._zod.def as { type: string; in?: $ZodType; out?: $ZodType };
+  if (def.type !== 'pipe' || def.in === undefined || def.out === undefined) {
+    return;
+  }
+  const target =
+    io === 'output' ? def.out : def.in._zod.traits.has('$ZodTransform') ? def.out : def.in;
+  if (covered.has(target)) {
+    return;
+  }
+  covered.add(target);
+  markPipeCoverage(target, io, covered);
+};
 
 /**
  * Parameters for `buildToJsonSchemaOptions` — the shared option-bag builder
@@ -108,15 +144,27 @@ export const buildToJsonSchemaOptions = (
   const customOverride = createCustomOverride(params.io);
   const merged = combine(primitiveOverride, compositionOverride, customOverride, params.override);
   const unrepresentableHits: UnrepresentableHit[] = [];
+  // Inner descent targets shadowed by an outer pipe registration. Populated
+  // JIT during traversal: Zod processes inner-before-outer in reverse-seen
+  // order, but `consumeUnrepresentable` runs only after traversal completes,
+  // so by then the outer pipe's coverage declaration has landed.
+  const coveredByPipe = new WeakSet<$ZodType>();
 
   const wrapped: Override = (ctx) => {
     merged(ctx);
+    if (ctx.zodSchema._zod.def.type === 'pipe') {
+      const record = peekRegistration(ctx.zodSchema);
+      if (record !== undefined && record[params.io] !== undefined) {
+        markPipeCoverage(ctx.zodSchema, params.io, coveredByPipe);
+      }
+    }
     if (!strict || !isStrictlyUnrepresentable(ctx.jsonSchema, ctx.zodSchema)) {
       return;
     }
     unrepresentableHits.push({
       path: [...ctx.path],
       zodType: ctx.zodSchema._zod.def.type,
+      zodSchema: ctx.zodSchema,
     });
   };
 
@@ -136,7 +184,7 @@ export const buildToJsonSchemaOptions = (
   return {
     options,
     consumeUnrepresentable: () => {
-      const firstHit = unrepresentableHits[0];
+      const firstHit = unrepresentableHits.find((hit) => !coveredByPipe.has(hit.zodSchema));
       if (firstHit !== undefined) {
         throw new ZodNestUnrepresentableError(firstHit.path, firstHit.zodType);
       }
