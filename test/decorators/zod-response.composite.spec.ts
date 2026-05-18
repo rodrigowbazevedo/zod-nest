@@ -14,6 +14,8 @@ interface ApiResponseMeta {
     isArray?: boolean;
     schema?: { type?: string; prefixItems?: { $ref: string }[]; items?: false };
     description?: string;
+    headers?: Record<string, unknown>;
+    links?: Record<string, unknown>;
   };
 }
 
@@ -58,6 +60,36 @@ class Controller {
   @Get('wildcard')
   @ZodResponse({ status: '2XX', type: UserDto })
   wildcard(): void {}
+
+  @Get('desc-object')
+  @ZodResponse({
+    status: HttpStatus.OK,
+    type: UserDto,
+    description: { description: 'object form' },
+  })
+  descObjectOnly(): void {}
+
+  @Get('desc-headers')
+  @ZodResponse({
+    status: HttpStatus.OK,
+    type: UserDto,
+    description: {
+      description: 'with headers',
+      headers: { 'X-Rate-Limit': { schema: { type: 'integer' } } },
+    },
+  })
+  descWithHeaders(): void {}
+
+  @Get('desc-links')
+  @ZodResponse({
+    status: HttpStatus.OK,
+    type: UserDto,
+    description: {
+      description: 'with links',
+      links: { GetUserById: { operationId: 'getUser' } },
+    },
+  })
+  descWithLinks(): void {}
 }
 
 const apiResponseMeta = (handler: object): ApiResponseMeta | undefined =>
@@ -122,5 +154,24 @@ describe('@ZodResponse — composite swagger application', () => {
   it('passes wildcard status keys through to @nestjs/swagger', () => {
     const meta = apiResponseMeta(Controller.prototype.wildcard);
     expect(meta?.['2XX']?.type).toBe(UserDto);
+  });
+
+  it('accepts the description object form (description only)', () => {
+    const meta = apiResponseMeta(Controller.prototype.descObjectOnly);
+    expect(meta?.['200']?.description).toBe('object form');
+    expect(meta?.['200']?.headers).toBeUndefined();
+    expect(meta?.['200']?.links).toBeUndefined();
+  });
+
+  it('passes headers through when set on the description object', () => {
+    const meta = apiResponseMeta(Controller.prototype.descWithHeaders);
+    expect(meta?.['200']?.description).toBe('with headers');
+    expect(meta?.['200']?.headers).toEqual({ 'X-Rate-Limit': { schema: { type: 'integer' } } });
+  });
+
+  it('passes links through when set on the description object', () => {
+    const meta = apiResponseMeta(Controller.prototype.descWithLinks);
+    expect(meta?.['200']?.description).toBe('with links');
+    expect(meta?.['200']?.links).toEqual({ GetUserById: { operationId: 'getUser' } });
   });
 });
