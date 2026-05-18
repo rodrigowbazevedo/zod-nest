@@ -115,7 +115,7 @@
   },
   "publishConfig": {
     "access": "public",
-    "provenance": false
+    "provenance": true
   },
   "dependencies": {
     "fast-json-stable-stringify": "^2.1.0"
