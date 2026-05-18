@@ -7,7 +7,7 @@ import swc from 'unplugin-swc';
 // non-`@Optional()` `Reflector` on `ZodSerializerInterceptor`); without it,
 // consumers hit `Nest can't resolve dependencies of …` at bootstrap. See #35.
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/helpers/index.ts'],
   format: ['cjs', 'esm'],
   dts: true,
   splitting: false,

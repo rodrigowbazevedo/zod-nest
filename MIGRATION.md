@@ -245,7 +245,7 @@ Run your project's typecheck and test suite. zod-nest-specific gotchas to watch 
 - **I/O suffix only when needed** — single `User` entry collapses input + output when their JSON Schemas are byte-equal; splits to `User` + `UserOutput` only on divergence.
 - **Schema metadata for Swagger UI** — `title`, `description`, `examples`, `deprecated` on `.meta({ ... })` flow through to Swagger UI rendering.
 - **Composition layer (experimental)** — `extend(Parent, builder)` + `getLineage(schema)` emit OpenAPI `allOf`. See [`docs/composition.md`](docs/composition.md).
-- **Custom emission overrides** — `Override` callback on `applyZodNest` for file uploads, opaque blobs, anything Zod doesn't model.
+- **Custom emission overrides** — `overrideJSONSchema(schema, fragment)` for per-instance registration, plus a `zod-nest/helpers` subpath shipping common JSON Schema fragments (`binaryFragment`, `uuidFragment`, …), typed sugar (`binary`, `opaque`), type-strict `enrich(...)`, and ready-to-drop presets (`FileSchema`, `BlobSchema`, `BufferSchema`). Per-call `Override` callback on `applyZodNest` for the per-emission escape hatch.
 
 ## Serialization exception body changes
 
@@ -353,7 +353,24 @@ A `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` argument is bound to a `c
 Fixed in `applyZodNest` — it now writes `openapi: '3.1.0'` as its final step, regardless of `DocumentBuilder.setOpenAPIVersion(...)`. If you're still seeing `3.0.0`, double-check that the doc you're inspecting is the post-`applyZodNest` document (not the raw output from `SwaggerModule.createDocument`).
 
 **"I get `ZodNestUnrepresentableError` for my `z.instanceof(File)` / `z.custom<T>()` field."**
-JSON Schema can't represent `z.custom` / `z.instanceof` shapes — Zod emits `{}` and the engine throws in strict mode. Register a JSON Schema fragment once with `overrideJSONSchema(MyFileSchema, { type: 'string', format: 'binary' })` and the engine writes that fragment everywhere the same instance is used — no per-call `override` callback, no `@ApiBody({...})` workaround. For coercion shapes where the request and response sides need different fragments, pass `{ input, output }` instead of a raw fragment (additive overload, non-breaking). See [`docs/recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema`](docs/recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
+JSON Schema can't represent `z.custom` / `z.instanceof` shapes — Zod emits `{}` and the engine throws in strict mode. For the common cases (`File` / `Blob` / `Buffer`) drop in the shipped presets:
+
+```ts
+import { FileSchema } from 'zod-nest/helpers';
+class UploadDto extends createZodDto(z.object({ file: FileSchema })) {}
+```
+
+For everything else, register a JSON Schema fragment yourself using the `zod-nest/helpers` catalog so you don't have to hand-write the magic objects:
+
+```ts
+import { overrideJSONSchema } from 'zod-nest';
+import { binary, uuidFragment } from 'zod-nest/helpers';
+
+const PdfUpload = overrideJSONSchema(z.instanceof(File), binary({ contentMediaType: 'application/pdf' }));
+const UserId = overrideJSONSchema(z.custom<string>(), uuidFragment);
+```
+
+For coercion shapes where the request and response sides need different fragments, pass `{ input, output }` instead of a raw fragment (additive overload, non-breaking). See [`docs/recipes/custom-openapi-overrides.md`](docs/recipes/custom-openapi-overrides.md) for the full helpers catalog and the I/O divergence pattern.
 
 **"My async validation refinements don't fire."**
 The pipe uses `safeParseAsync`, so async refinements work. Check that the schema is actually attached — `@Body() body: UserDto` (where `UserDto` is a `createZodDto` class) is the canonical wiring.

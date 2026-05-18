@@ -1,65 +1,139 @@
 # Recipe: Custom OpenAPI emission overrides
 
-For Zod constructs that don't map cleanly to JSON Schema — file uploads (`z.instanceof(Buffer)`), opaque blobs, framework-specific shapes — pass an `override` callback to `applyZodNest`. The callback runs on top of the built-in chain (composition `allOf`, primitive overrides) and can mutate the emitted JSON Schema in place.
+For Zod constructs that don't map cleanly to JSON Schema — file uploads (`z.instanceof(File)`), opaque blobs, framework-specific shapes — `zod-nest` offers three escape hatches, in order of ergonomic weight:
 
-## File uploads
+1. **Pre-registered schemas** from [`zod-nest/helpers`](#the-zod-nesthelpers-toolkit) — `FileSchema` / `BlobSchema` / `BufferSchema`. Drop into a DTO and you're done.
+2. **Per-instance registration** via [`overrideJSONSchema`](#per-instance-registration-with-overridejsonschema) — pair any Zod schema with a fixed JSON Schema fragment (use the helpers' fragment catalog so you don't have to hand-write the magic objects).
+3. **Per-call `override` callback** on [`applyZodNest`](#per-call-override-callback) — the global escape hatch that mutates the emitted JSON Schema in place. Use when the gap is per-emission, not per-instance.
 
-NestJS' `@nestjs/platform-express` exposes uploaded files as `Express.Multer.File`. Model the field with `z.instanceof(...)` and emit it as an OpenAPI `binary` string:
+## The `zod-nest/helpers` toolkit
+
+A subpath shipping common JSON Schema fragments, typed sugar functions, a type-strict `enrich` for composition, and three pre-registered Zod schemas for binary runtime types. Import what you need:
+
+```ts
+import {
+  // Fragment catalog (frozen const objects)
+  uuidFragment, dateTimeFragment, binaryFragment, opaqueFragment, /* … */
+  // Sugar functions
+  binary, opaque,
+  // Generic, type-strict enrichment
+  enrich,
+  // Pre-registered Zod schemas
+  FileSchema, BlobSchema, BufferSchema,
+} from 'zod-nest/helpers';
+```
+
+### Fragment catalog
+
+| Fragment | Emits |
+| --- | --- |
+| `dateTimeFragment` | `{ type: 'string', format: 'date-time' }` |
+| `dateFragment` | `{ type: 'string', format: 'date' }` |
+| `timeFragment` | `{ type: 'string', format: 'time' }` |
+| `uuidFragment` | `{ type: 'string', format: 'uuid' }` |
+| `emailFragment` | `{ type: 'string', format: 'email' }` |
+| `uriFragment` | `{ type: 'string', format: 'uri' }` |
+| `hostnameFragment` | `{ type: 'string', format: 'hostname' }` |
+| `ipv4Fragment` / `ipv6Fragment` | `{ type: 'string', format: 'ipv4' / 'ipv6' }` |
+| `binaryFragment` | `{ type: 'string', format: 'binary' }` |
+| `byteFragment` | `{ type: 'string', format: 'byte' }` (base64) |
+| `int32Fragment` / `int64Fragment` | `{ type: 'integer', format: 'int32' / 'int64' }` |
+| `floatFragment` / `doubleFragment` | `{ type: 'number', format: 'float' / 'double' }` |
+| `opaqueFragment` | `{ type: 'object', additionalProperties: true }` |
+
+Many of these mirror what Zod constructs already emit (`z.uuid()` → `uuidFragment` shape, `z.email()` → `emailFragment` shape, etc.). The helpers don't *replace* those constructs — they're a parallel catalog for programmatic fragment assembly: alongside `z.custom<T>()`, in `overrideJSONSchema` calls, in custom override callbacks, in tests that build expected fragments.
+
+### Type-strict `enrich`
+
+`enrich(base, extras)` merges a catalog fragment with extras whose shape is dictated by the base's family. Passing wrong-family extras is a compile-time error.
+
+```ts
+enrich(uuidFragment, { description: 'User id', minLength: 36 });    // ok
+enrich(binaryFragment, { contentMediaType: 'application/pdf' });    // ok
+enrich(int64Fragment, { minimum: 0, multipleOf: 100 });             // ok
+enrich(uuidFragment, { contentMediaType: 'application/pdf' });      // TS error
+enrich(int32Fragment, { minLength: 1 });                            // TS error
+```
+
+### Sugar functions
+
+`binary()` and `opaque()` are typed wrappers over `enrich(binaryFragment, …)` / `enrich(opaqueFragment, …)`. They exist because the `binary` option set (`contentMediaType` / `contentEncoding`) is nuanced enough to deserve a dedicated entry point, discoverable via auto-complete:
+
+```ts
+binary();                                              // { type: 'string', format: 'binary' }
+binary({ contentMediaType: 'application/pdf' });       // … + contentMediaType
+opaque({ description: 'JWT passthrough' });            // { type: 'object', additionalProperties: true, description: '…' }
+```
+
+### Pre-registered Zod schemas
+
+`FileSchema`, `BlobSchema`, and `BufferSchema` are ready-to-use Zod schemas already wired through `overrideJSONSchema` to emit `binaryFragment`. Drop them directly into a DTO:
 
 ```ts
 import { z } from 'zod';
-import { applyZodNest, createZodDto, ZodResponse } from 'zod-nest';
+import { createZodDto } from 'zod-nest';
+import { FileSchema } from 'zod-nest/helpers';
 
-const uploadSchema = z
-  .object({
-    title: z.string(),
-    file: z.instanceof(Object).meta({ id: 'UploadedFile' }),
-  })
-  .meta({ id: 'Upload' });
-
-class UploadDto extends createZodDto(uploadSchema) {}
-
-// In main.ts:
-const doc = applyZodNest(raw, {
-  app,
-  override: (ctx) => {
-    if (ctx.zodSchema._zod.def.type === 'custom') {
-      ctx.jsonSchema.type = 'string';
-      ctx.jsonSchema.format = 'binary';
-      delete ctx.jsonSchema.properties;
-      delete ctx.jsonSchema.required;
-    }
-  },
-});
+class UploadDto extends createZodDto(
+  z.object({ title: z.string(), file: FileSchema }),
+) {}
 ```
 
-The override fires for every `z.instanceof(...)` / `z.custom(...)` construct. Branch on the schema metadata if you want to handle specific custom types differently.
+Each preset uses `z.instanceof(...)` at the runtime layer — `File`, `Blob`, `Buffer` are all globals under zod-nest's Node 22+ floor.
+
+## File uploads
+
+NestJS' `@nestjs/platform-express` exposes uploaded files as `Express.Multer.File`. The easiest path: use `FileSchema` (or `BlobSchema` / `BufferSchema`) from the helpers subpath.
+
+```ts
+import { z } from 'zod';
+import { createZodDto } from 'zod-nest';
+import { FileSchema } from 'zod-nest/helpers';
+
+class UploadDto extends createZodDto(
+  z.object({ title: z.string(), file: FileSchema }),
+) {}
+```
+
+If you need a tighter content-type description, register your own schema with `binary({...})`:
+
+```ts
+import { createZodDto, overrideJSONSchema } from 'zod-nest';
+import { binary } from 'zod-nest/helpers';
+
+const PdfUploadSchema = overrideJSONSchema(
+  z.instanceof(File),
+  binary({ contentMediaType: 'application/pdf' }),
+);
+
+class PdfUploadDto extends createZodDto(
+  z.object({ title: z.string(), file: PdfUploadSchema }),
+) {}
+```
 
 ## Per-instance registration with `overrideJSONSchema`
 
-When you have a *single* `z.custom` / `z.instanceof` schema instance you want to keep using everywhere — `createZodDto`, `@ZodResponse`, request body, nested objects — without threading a per-call `override` through every site, register the JSON Schema fragment once:
+When the shipped presets don't fit — a runtime type other than `File`/`Blob`/`Buffer`, a branded `z.custom<T>()`, an `z.unknown()` you want documented but not introspected — register a JSON Schema fragment against the schema instance:
 
 ```ts
 import { z } from 'zod';
 import { createZodDto, overrideJSONSchema } from 'zod-nest';
+import { uuidFragment, binaryFragment, opaque } from 'zod-nest/helpers';
 
-const FileSchema = z.instanceof(File);
+// Branded id type emitted as a UUID string
+type UserId = string & { readonly __brand: 'UserId' };
+const UserIdSchema = overrideJSONSchema(z.custom<UserId>(), uuidFragment);
 
-overrideJSONSchema(FileSchema, {
-  type: 'string',
-  format: 'binary',
-  description: 'CSV file uploaded as multipart/form-data',
-});
-
-class UploadDto extends createZodDto(
-  z.object({
-    title: z.string(),
-    file: FileSchema,
-  }),
+// Inline composition — overrideJSONSchema returns the schema, so it chains
+class ProfileDto extends createZodDto(
+  z.object({ userId: UserIdSchema, name: z.string() }),
 ) {}
+
+// Opaque passthrough payload
+const PayloadSchema = overrideJSONSchema(z.unknown(), opaque({ description: 'JWT' }));
 ```
 
-Every emission of `FileSchema` — direct or nested — now writes the registered fragment verbatim. No `override` callback on `applyZodNest`, no `@ApiBody({...})` workaround.
+Every emission of a registered schema — direct or nested — writes the registered fragment verbatim. No `override` callback on `applyZodNest`, no `@ApiBody({...})` workaround.
 
 For the symmetric case on the response side (binary downloads / streaming exports), see [`binary-downloads.md`](binary-downloads.md) — same `overrideJSONSchema` pattern, paired with `@ZodResponse` instead of `@Body`.
 
@@ -70,7 +144,7 @@ For the symmetric case on the response side (binary downloads / streaming export
 3. **`overrideJSONSchema` registration** (per-instance map lookup)
 4. Caller's per-call `override` (per-emission escape hatch)
 
-**Idempotent.** Subsequent `overrideJSONSchema(sameInstance, newFragment)` calls overwrite the prior registration (last-write-wins). The registration is keyed by schema *identity* — two separate `z.instanceof(File)` calls produce two separate schemas and would each need their own registration. If you want the same fragment everywhere, share the schema instance.
+**Idempotent.** Subsequent `overrideJSONSchema(sameInstance, newFragment)` calls overwrite the prior registration (last-write-wins). The registration is keyed by schema *identity* — two separate `z.instanceof(File)` calls produce two separate schemas and would each need their own registration. If you want the same fragment everywhere, share the schema instance (or use the shipped preset).
 
 **Memory.** The registration map is a `WeakMap` keyed by schema identity — when your schema instance goes out of scope, the registration is collected with it.
 
@@ -118,64 +192,62 @@ Output emission: `{ anyOf: [arrFrag, arrFrag] }` (always array).
 
 ## Opaque blobs
 
-When a field carries a value your API doesn't introspect (a passthrough JWT, a base64-encoded payload, an upstream-controlled shape), emit it as an opaque JSON Schema object so consumers know it exists but don't try to validate its shape:
+When a field carries a value your API doesn't introspect (a passthrough JWT, a base64-encoded payload, an upstream-controlled shape), use `opaqueFragment` or the `opaque()` sugar:
 
 ```ts
-const messageSchema = z
-  .object({
-    id: z.string(),
-    payload: z.unknown().meta({ id: 'OpaquePayload' }),
-  })
-  .meta({ id: 'Message' });
+import { z } from 'zod';
+import { createZodDto, overrideJSONSchema } from 'zod-nest';
+import { opaque } from 'zod-nest/helpers';
 
-// In applyZodNest:
-override: (ctx) => {
-  if (ctx.zodSchema._zod.def.type === 'unknown') {
-    ctx.jsonSchema.type = 'object';
-    ctx.jsonSchema.description = 'Opaque payload — shape not validated by this API.';
-    ctx.jsonSchema.additionalProperties = true;
-  }
-};
+const PayloadSchema = overrideJSONSchema(
+  z.unknown(),
+  opaque({ description: 'Opaque payload — shape not validated by this API.' }),
+);
+
+class MessageDto extends createZodDto(
+  z.object({ id: z.string(), payload: PayloadSchema }),
+) {}
 ```
 
 `z.unknown()` is already permissive at runtime — the override only changes how Swagger UI describes it.
 
 ## Date constructs
 
-`z.date()` isn't representable as JSON Schema by default (strict mode throws `ZodNestUnrepresentableError`). Emit it as ISO-8601 instead:
+`z.date()` is **already handled** by `primitiveOverride` — it emits as `{ type: 'string', format: 'date-time' }` without any registration. You only need an override when you want to *deviate* from that default (e.g. emit as a unix timestamp number). For most apps, prefer `z.iso.datetime()` over `z.date()` — it round-trips correctly through JSON.
+
+If you do want a custom `Date` representation:
 
 ```ts
-override: (ctx) => {
-  if (ctx.zodSchema._zod.def.type === 'date') {
-    ctx.jsonSchema.type = 'string';
-    ctx.jsonSchema.format = 'date-time';
-  }
-};
-```
+import { overrideJSONSchema } from 'zod-nest';
 
-For most apps, prefer `z.iso.datetime()` over `z.date()` — it round-trips correctly through JSON without needing an override. Save the override for cases where you genuinely have a `Date` instance at the runtime boundary (e.g. from a database client returning native `Date` objects).
+const UnixTimestampSchema = overrideJSONSchema(z.date(), {
+  type: 'integer',
+  format: 'int64',
+  description: 'Milliseconds since epoch',
+});
+```
 
 ## Big integers
 
-Same pattern for `z.bigint()`:
+Same story as dates — `z.bigint()` is already handled by `primitiveOverride` (emits as `{ type: 'integer' }`). Override only if you want a different representation (e.g. string-encoded to preserve precision across JSON):
 
 ```ts
-override: (ctx) => {
-  if (ctx.zodSchema._zod.def.type === 'bigint') {
-    ctx.jsonSchema.type = 'string';
-    ctx.jsonSchema.pattern = '^-?\\d+$';
-    ctx.jsonSchema.description = 'Arbitrary-precision integer, serialized as string.';
-  }
-};
+const BigIntStringSchema = overrideJSONSchema(z.bigint(), {
+  type: 'string',
+  pattern: '^-?\\d+$',
+  description: 'Arbitrary-precision integer, serialized as string.',
+});
 ```
 
-This assumes you've already wired a `JSON.stringify` replacer to encode `bigint` as a string at the response boundary — the override only describes the wire format; the actual serialization is on you.
+This assumes you've wired a `JSON.stringify` replacer to encode `bigint` as a string at the response boundary — the override only describes the wire format; the actual serialization is on you.
 
-## Composing multiple overrides
+## Per-call `override` callback
 
-The `override` argument accepts a single function. If you need to chain logic for several constructs, write one callback that switches:
+When the gap is per-emission rather than per-instance — e.g. you want to mutate every `z.custom(...)` emission across the document — pass an `override` to `applyZodNest`:
 
 ```ts
+import type { Override } from 'zod-nest';
+
 const myOverride: Override = (ctx) => {
   const type = ctx.zodSchema._zod.def.type;
   switch (type) {
@@ -185,15 +257,8 @@ const myOverride: Override = (ctx) => {
       delete ctx.jsonSchema.properties;
       break;
 
-    case 'date':
-      ctx.jsonSchema.type = 'string';
-      ctx.jsonSchema.format = 'date-time';
-      break;
-
-    case 'bigint':
-      ctx.jsonSchema.type = 'string';
-      ctx.jsonSchema.pattern = '^-?\\d+$';
-      break;
+    // primitiveOverride already handles 'date' and 'bigint'; override only if
+    // you want to deviate from those defaults.
   }
 };
 

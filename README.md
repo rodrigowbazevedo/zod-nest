@@ -433,6 +433,14 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 **Schema engine** — single-schema mode and extension points
 - `toOpenApi(schema, opts)`, `createRegistry()`, `defaultRegistry`, `ZodNestRegistry`, `Override`, `OverrideContext`, `overrideJSONSchema(schema, fragment | { input?, output? })`, `OverrideJSONSchemaArg`, `ZodNestError`, `ZodNestUnrepresentableError`, `extend`, `getLineage`, `LineageEntry`
 
+**Helpers** (subpath: `zod-nest/helpers`) — common JSON Schema fragments + presets for assembling overrides
+- **Fragment catalog** (frozen consts): `dateTimeFragment`, `dateFragment`, `timeFragment`, `uuidFragment`, `emailFragment`, `uriFragment`, `hostnameFragment`, `ipv4Fragment`, `ipv6Fragment`, `binaryFragment`, `byteFragment`, `int32Fragment`, `int64Fragment`, `floatFragment`, `doubleFragment`, `opaqueFragment`
+- **Sugar functions**: `binary(opts?)`, `opaque(opts?)`
+- **Type-strict composition**: `enrich(base, extras)` — extras are typed per fragment family
+- **Pre-registered Zod schemas**: `FileSchema`, `BlobSchema`, `BufferSchema` (all `z.instanceof(...)` + `binaryFragment`)
+
+See [`docs/recipes/custom-openapi-overrides.md`](docs/recipes/custom-openapi-overrides.md) for the full catalog and usage patterns.
+
 ## Documentation
 
 | Topic | Doc |

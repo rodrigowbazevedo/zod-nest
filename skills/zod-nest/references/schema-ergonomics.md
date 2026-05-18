@@ -107,9 +107,89 @@ longer's.
 
 Canonical: <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/composition.md>.
 
+## 5. Unrepresentable schema exposed via DTO without `overrideJSONSchema`
+
+**Detection** — a schema bound to a const (or composed into one) uses one of
+the unrepresentable Zod constructs:
+
+- **High-signal**: `z.custom(...)`, `z.instanceof(...)`. These always emit
+  `{}` to JSON Schema and trip `ZodNestUnrepresentableError` under
+  `strict: true`.
+- **Medium-signal**: `.transform(...)` *not wrapped by an outer `.pipe()`
+  covering it* — i.e. the transform's output reaches the DTO boundary
+  directly. A `z.string().transform(...).pipe(z.number())` is fine because
+  the outer `.pipe()` covers it; a bare `.transform()` inside `createZodDto`
+  is not.
+- **Low-signal (mention conceptually, don't enumerate in normal output)**:
+  `z.symbol()`, `z.nan()`, `z.map()`, `z.set()`, `z.undefined()`, `z.void()`.
+- **Excluded** — `z.date()` and `z.bigint()` are already handled by the
+  engine's `primitiveOverride` (emitted as `string`/`date-time` and
+  `integer` respectively). Rule 5 never fires for these.
+
+…AND that schema (or any const wrapping it) flows into a `createZodDto(...)`,
+`@ZodResponse(...)`, or `@Body()` / `@Query()` / `@Param()` / `@Headers()`
+parameter type, AND there is no `overrideJSONSchema(<schema>, …)` call in
+scope for it, AND the schema is not one of the shipped presets (`FileSchema`
+/ `BlobSchema` / `BufferSchema` from `zod-nest/helpers`).
+
+**Severity** — depends on the project's `applyZodNest({ strict })` setting
+(probe `main.ts` / `bootstrap.ts` once and cache):
+
+- `strict: false` → 🟡. *"Schema emits `{}` to OpenAPI; consumers can't
+  introspect the shape."*
+- `strict: true` (or unknown — **fallback**):
+  - `z.custom` / `z.instanceof` → 🔴. *"Will throw
+    `ZodNestUnrepresentableError` at `applyZodNest` time."*
+  - `.transform` / lower-signal types → 🟡. *"May throw
+    `ZodNestUnrepresentableError` at `applyZodNest` time if not covered by
+    an outer pipe."*
+
+**Proposed edit** — show **one** concrete form per case, not a ladder of
+variations. Leave enrichment (`contentMediaType`, descriptions, etc.) to the
+user.
+
+- **`z.instanceof(File)` / `z.instanceof(Blob)` / `z.instanceof(Buffer)`** →
+  suggest the matching preset from `zod-nest/helpers`:
+
+  ```ts
+  import { FileSchema } from 'zod-nest/helpers';
+
+  class UploadDto extends createZodDto(
+    z.object({ file: FileSchema }),
+  ) {}
+  ```
+
+- **Other `z.custom<T>()` / `z.instanceof(Other)`** → suggest a bare
+  `overrideJSONSchema(<schema>, <fragment>)` call, naming the fragment from
+  the catalog that best matches the runtime type (or `binaryFragment` /
+  `opaqueFragment` if nothing else fits). Don't fabricate `contentMediaType`
+  / `description` values:
+
+  ```ts
+  import { overrideJSONSchema } from 'zod-nest';
+  import { uuidFragment } from 'zod-nest/helpers';
+
+  const UserIdSchema = overrideJSONSchema(z.custom<UserId>(), uuidFragment);
+  ```
+
+- **Bare `.transform(...)`** not covered by an outer pipe → link the
+  recipe's I/O divergence section; show the wrapper signature
+  `overrideJSONSchema(s, { input, output })` as a template only, with the
+  input / output bodies as placeholders for the user to fill in.
+
+The full fragment catalog (`dateTimeFragment`, `uuidFragment`,
+`binaryFragment`, `opaqueFragment`, `int64Fragment`, etc.) plus the
+`binary(opts?)` / `opaque(opts?)` sugar and the type-strict `enrich(base,
+extras)` helper all live at `zod-nest/helpers`.
+
+Canonical: <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/custom-openapi-overrides.md>.
+
 ## Out of scope
 
-- **`.refine()` / `.transform()` patterns** — schema semantics, not naming or
-  composition.
+- **`.refine()` patterns** — schema semantics, not naming or composition.
+- **General `.transform()` semantics** — value coercion, defaulting, etc. —
+  out of scope. `.transform()` is in scope **only** for Rule 5's
+  unrepresentable-emission case (when the transform's output reaches a DTO
+  boundary without an outer `.pipe()` covering it).
 - **Branded types / `.brand()`** — type-system concern.
 - **Per-field validation message customization** — i18n / UX, not ergonomics.

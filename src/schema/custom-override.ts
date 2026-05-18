@@ -65,12 +65,15 @@ const isWrapper = (
  * Idempotent: subsequent calls for the same schema overwrite the prior
  * registration (last-write-wins).
  */
-export const overrideJSONSchema = (schema: z.ZodType, arg: OverrideJSONSchemaArg): void => {
-  if (isWrapper(arg)) {
-    customOverrideMap.set(schema, { input: arg.input, output: arg.output });
-    return;
-  }
-  customOverrideMap.set(schema, { input: arg, output: arg });
+export const overrideJSONSchema = <T extends z.ZodType>(
+  schema: T,
+  arg: OverrideJSONSchemaArg,
+): T => {
+  const overrideSchema = isWrapper(arg) ? arg : { input: arg, output: arg };
+
+  customOverrideMap.set(schema, overrideSchema);
+
+  return schema;
 };
 
 /**
