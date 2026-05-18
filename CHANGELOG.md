@@ -1,3 +1,10 @@
+## [0.10.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.10.0...v0.10.1) (2026-05-18)
+
+
+### Bug Fixes
+
+* **build:** emit design:paramtypes metadata via SWC plugin ([#39](https://github.com/rodrigowbazevedo/zod-nest/issues/39)) ([7b450ba](https://github.com/rodrigowbazevedo/zod-nest/commit/7b450ba6deeb414379943d2fc005fc19aae696aa)), closes [#35](https://github.com/rodrigowbazevedo/zod-nest/issues/35) [#35](https://github.com/rodrigowbazevedo/zod-nest/issues/35)
+
 # [0.10.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.9.0...v0.10.0) (2026-05-18)
 
 
