@@ -1,3 +1,10 @@
+# [0.12.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.11.0...v0.12.0) (2026-05-18)
+
+
+### Features
+
+* **response:** accept '1XX'..'5XX' wildcards and 'default' in @ZodResponse ([#44](https://github.com/rodrigowbazevedo/zod-nest/issues/44)) ([06e5a71](https://github.com/rodrigowbazevedo/zod-nest/commit/06e5a718dd847e5ae6a719c1908817ad436ae1cc)), closes [#29](https://github.com/rodrigowbazevedo/zod-nest/issues/29)
+
 # [0.11.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.10.1...v0.11.0) (2026-05-18)
 
 
