@@ -1,3 +1,15 @@
+# [1.0.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.13.0...v1.0.0) (2026-05-18)
+
+
+* fix!: tighten peer-dep ranges + add reflect-metadata + rxjs to compat matrix ([#48](https://github.com/rodrigowbazevedo/zod-nest/issues/48)) ([a06de61](https://github.com/rodrigowbazevedo/zod-nest/commit/a06de612a890d86f1e9e346e7991a13d5d1bb338)), closes [#41](https://github.com/rodrigowbazevedo/zod-nest/issues/41) [#42](https://github.com/rodrigowbazevedo/zod-nest/issues/42)
+
+
+---
+
+### Migrating
+
+This release contains breaking changes. See [MIGRATION.md](https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md) for the upgrade path.
+
 # [0.13.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.12.0...v0.13.0) (2026-05-18)
 
 
