@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.1.1...v1.2.0) (2026-05-18)
+
+
+### Features
+
+* **schema:** transitively register nested .meta({ id }) schemas ([#52](https://github.com/rodrigowbazevedo/zod-nest/issues/52)) ([7485be4](https://github.com/rodrigowbazevedo/zod-nest/commit/7485be4c4155593f5160062824f9ca20c1083731)), closes [#46](https://github.com/rodrigowbazevedo/zod-nest/issues/46)
+
 ## [1.1.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.1.0...v1.1.1) (2026-05-18)
 
 
