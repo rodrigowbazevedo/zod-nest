@@ -54,6 +54,68 @@ describe('ZodNestRegistry.register() — transitive closure', () => {
     );
   });
 
+  it('walks through tuple items + rest, record, map, set, and pipe', () => {
+    const Item0 = z.literal('i0').meta({ id: 'Trans_TupItem0' });
+    const Item1 = z.literal('i1').meta({ id: 'Trans_TupItem1' });
+    const Rest = z.literal('rest').meta({ id: 'Trans_TupRest' });
+    const RecVal = z.literal('rv').meta({ id: 'Trans_RecVal' });
+    const MapVal = z.literal('mv').meta({ id: 'Trans_MapVal' });
+    const SetVal = z.literal('sv').meta({ id: 'Trans_SetVal' });
+    const PipeIn = z.string().meta({ id: 'Trans_PipeIn' });
+    const PipeOut = z.literal('po').meta({ id: 'Trans_PipeOut' });
+
+    const Composite = z.object({
+      tup: z.tuple([Item0, Item1]).rest(Rest),
+      rec: z.record(z.string(), RecVal),
+      map: z.map(z.string(), MapVal),
+      set: z.set(SetVal),
+      pipe: z.pipe(PipeIn, PipeOut),
+    });
+
+    const registry = createRegistry();
+    registry.register(Composite, 'Trans_CompositeRoot');
+
+    expect(new Set(registry.ids())).toEqual(
+      new Set([
+        'Trans_CompositeRoot',
+        'Trans_TupItem0',
+        'Trans_TupItem1',
+        'Trans_TupRest',
+        'Trans_RecVal',
+        'Trans_MapVal',
+        'Trans_SetVal',
+        'Trans_PipeIn',
+        'Trans_PipeOut',
+      ]),
+    );
+  });
+
+  it('walks a tuple with no rest (the `def.rest === null` path)', () => {
+    const Only = z.literal('only').meta({ id: 'Trans_TupNoRest_Item' });
+    const Composite = z.object({ tup: z.tuple([Only]) });
+
+    const registry = createRegistry();
+    registry.register(Composite, 'Trans_TupNoRest_Root');
+
+    expect(new Set(registry.ids())).toEqual(
+      new Set(['Trans_TupNoRest_Root', 'Trans_TupNoRest_Item']),
+    );
+  });
+
+  it('visits a shared child only once when reached from two parents in the same tree', () => {
+    // `Shared` is referenced from BOTH siblings — gets pushed onto the
+    // walker stack twice but must only contribute one entry to `seen`.
+    const Shared = z.literal('s').meta({ id: 'Trans_Shared' });
+    const Composite = z.object({ a: Shared, b: Shared });
+
+    const registry = createRegistry();
+    registry.register(Composite, 'Trans_SharedRoot');
+
+    const collisions = registry.getCollisions();
+    expect(collisions.has('Trans_Shared')).toBe(false);
+    expect(new Set(registry.ids())).toEqual(new Set(['Trans_SharedRoot', 'Trans_Shared']));
+  });
+
   it('does not infinite-loop on a self-referential z.lazy schema and still walks past the cycle', () => {
     const Leaf = z.string().meta({ id: 'Trans_RecLeaf' });
     interface Node {
