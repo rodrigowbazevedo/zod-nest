@@ -7,6 +7,7 @@ import { defaultRegistry } from '../schema/registry.js';
 import { bulkEmit } from './bulk-emit.js';
 import { collectUsage } from './collect-usage.js';
 import { assertNoDanglingRefs } from './dangling-refs.js';
+import { extendExposureViaRefs } from './expose-closure.js';
 import { mergeSchemas } from './merge-schemas.js';
 import { rewriteRefs } from './rewrite-refs.js';
 import { stripMarkers } from './strip-markers.js';
@@ -61,16 +62,17 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions): Ope
     override: opts.override,
     strict: opts.strict,
   });
+  const extended = extendExposureViaRefs(collected, inputSchemas, outputSchemas);
   const { divergentOutputIds, renames } = mergeSchemas({
     doc,
     inputSchemas,
     outputSchemas,
-    collected,
+    collected: extended,
     collisions: registry.getCollisions(),
   });
   rewriteRefs({ doc, renames, divergentOutputIds });
   stripMarkers(doc);
-  assertNoDanglingRefs({ doc, collected });
+  assertNoDanglingRefs({ doc, collected: extended });
 
   return doc;
 };

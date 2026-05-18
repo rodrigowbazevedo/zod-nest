@@ -514,3 +514,56 @@ describe('applyZodNest — composability with user-supplied pre/post passes', ()
     await app.close();
   });
 });
+
+// ─── Nested .meta({ id }) auto-pickup ──────────────────────────────────────
+
+describe('applyZodNest — nested .meta({ id }) schemas are registered transitively', () => {
+  // Helper schema declared with `.meta({ id })` but NOT wrapped in
+  // `createZodDto`. nestjs-zod allowed this pattern; previously zod-nest
+  // dropped the helper from `components.schemas` and `assertNoDanglingRefs`
+  // would throw. After the transitive-registration fix, the helper is
+  // emitted as a named component.
+  const NestedFileType = z.enum(['csv', 'xlsx', 'json']).meta({ id: 'NestedFileType' });
+  class NestedParentDto extends createZodDto(
+    z.object({ datasetId: z.number(), fileType: NestedFileType }),
+    { id: 'NestedParent' },
+  ) {}
+
+  @Controller('nested')
+  class NestedController {
+    @Post()
+    create(@Body() body: NestedParentDto): NestedParentDto {
+      return body;
+    }
+  }
+
+  it('emits both the wrapping DTO and the nested helper into components.schemas without dangling refs', async () => {
+    const { app, raw } = await bootstrap([NestedController]);
+    const doc = applyZodNest(raw, { app });
+
+    const components = schemasOf(doc);
+    expect(components.NestedParent).toBeDefined();
+    expect(components.NestedFileType).toBeDefined();
+
+    // The nested schema is emitted as a real body, not a $ref or marker.
+    const helper = components.NestedFileType as Record<string, unknown>;
+    expect(helper.type).toBe('string');
+    expect(helper.enum).toEqual(['csv', 'xlsx', 'json']);
+
+    // The parent references the helper via $ref.
+    expect(refAt(components.NestedParent, 'properties', 'fileType', '$ref')).toBe(
+      `${ROOT}NestedFileType`,
+    );
+
+    await app.close();
+  });
+});
+
+// Collision DETECTION for nested .meta({ id }) schemas is covered at the
+// registry level in `test/schema/registry.transitive.spec.ts`. End-to-end
+// decoration through `applyZodNest` for `.meta({ id })`-style collisions
+// is not yet supported — Zod v4's bulk `toJSONSchema` throws on duplicate
+// ids before zod-nest's collision decoration can run. The existing
+// `createZodDto({ id })` collision path (above) works because that path
+// uses `globalRegistry.add` which overwrites instead of stacking. See
+// follow-up issue for the nested-collision decoration gap.
