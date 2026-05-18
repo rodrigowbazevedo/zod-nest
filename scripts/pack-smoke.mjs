@@ -70,8 +70,22 @@ try {
   log(`sandbox: ${sandbox}`);
 
   log('running npm pack');
-  const packOut = execSync('npm pack --json', { cwd: ROOT, encoding: 'utf-8' });
-  const packMeta = JSON.parse(packOut)[0];
+  // `--ignore-scripts` skips the `prepare` lifecycle (husky setup) so its
+  // stdout doesn't pollute `--json`'s output. CI's `HUSKY=0` env makes
+  // husky print `HUSKY=0 skip install` to stdout, which then breaks
+  // `JSON.parse` here. We don't need prepare-time effects during pack.
+  //
+  // Defensive parse on top: slice from the first `[` so any future
+  // pre-pack stdout noise still parses.
+  const packOutRaw = execSync('npm pack --json --ignore-scripts', {
+    cwd: ROOT,
+    encoding: 'utf-8',
+  });
+  const jsonStart = packOutRaw.indexOf('[');
+  if (jsonStart === -1) {
+    throw new Error(`npm pack --json produced no JSON array:\n${packOutRaw}`);
+  }
+  const packMeta = JSON.parse(packOutRaw.slice(jsonStart))[0];
   tarballPathInRoot = join(ROOT, packMeta.filename);
   log(`tarball: ${packMeta.filename} (${packMeta.size} bytes)`);
 
