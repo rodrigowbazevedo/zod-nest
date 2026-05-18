@@ -161,18 +161,16 @@ const buildParameter = (
     );
     effectiveRequired = true;
   }
-  const entry: Record<string, unknown> = {
+  // Zod emits `.describe()` onto `schema.description`; leave it there rather
+  // than promoting it to the parameter object. Swagger UI renders it fine
+  // from the schema, and an earlier copy-to-parameter pass added visible
+  // duplication noise without improving rendering.
+  return {
     name,
     in: marker.in,
     required: effectiveRequired,
     schema,
   };
-  if (typeof schema.description === 'string') {
-    // Duplicate the description onto the parameter object as well as leaving
-    // it on the schema — maximum Swagger-UI compatibility, see plan answer 3.
-    entry.description = schema.description;
-  }
-  return entry;
 };
 
 // `paramIn` is validated as a non-empty string by `readMarker` before reaching

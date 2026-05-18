@@ -86,7 +86,7 @@ Properties become `in: 'cookie'` parameters. Same uniform expansion as the other
 
 ## Field metadata that flows through
 
-Anything you attach via Zod `.meta({ ... })` or `.describe(...)` on a field lands on the expanded parameter. `description` is duplicated onto both the parameter object (`parameters[i].description`) and the parameter schema (`parameters[i].schema.description`) for maximum Swagger-UI compatibility.
+Anything you attach via Zod `.meta({ ... })` or `.describe(...)` on a field lands on the expanded parameter's `schema` — `description`, `examples`, `deprecated`, etc. Swagger UI reads these straight off `parameters[i].schema` and renders them in the per-field details pane.
 
 ```ts
 const SearchQuery = z.object({
@@ -95,7 +95,7 @@ const SearchQuery = z.object({
 });
 ```
 
-Swagger UI renders the description next to the parameter name and again in the per-field details pane.
+`applyZodNest` doesn't lift these fields to the parameter object — keeping a single source of truth on the schema is what every modern OpenAPI 3.1 consumer expects.
 
 ## When the expansion bails out
 
