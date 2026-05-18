@@ -1,3 +1,10 @@
+# [0.10.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.9.0...v0.10.0) (2026-05-18)
+
+
+### Features
+
+* **release:** provenance + dry-run + MIGRATION.md link in notes ([#38](https://github.com/rodrigowbazevedo/zod-nest/issues/38)) ([5ddbaf2](https://github.com/rodrigowbazevedo/zod-nest/commit/5ddbaf27dda494752ac07244e5f0684f0fba23f5)), closes [#34](https://github.com/rodrigowbazevedo/zod-nest/issues/34) [#if](https://github.com/rodrigowbazevedo/zod-nest/issues/if)
+
 # [0.9.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v0.8.2...v0.9.0) (2026-05-18)
 
 
