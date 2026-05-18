@@ -55,6 +55,21 @@ jobs:
 
       - run: npm run build
 
+      # Dry-run gate: catches release-config errors (broken plugin chain,
+      # missing tokens, malformed templates, dangling `BREAKING CHANGE:`
+      # parsing) BEFORE the actual publish. The real release step below
+      # only runs if dry-run exits 0.
+      #
+      # `--dry-run` exercises every plugin's `verifyConditions`, `analyze`,
+      # `generate-notes` and `prepare` hooks but stops short of `publish`
+      # / `success`. A failure here aborts the whole job before
+      # `npm publish` touches the registry — far safer than catching the
+      # error in the publish step itself.
+      - name: Release (dry-run)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release --dry-run
+
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
