@@ -1,0 +1,33 @@
+{
+  "$comment": "Source of truth for the compatibility matrix. Edit this file to extend or shrink supported peer-dep ranges; the workflow at .github/workflows/compat-matrix.yml expands these cells into a strategy matrix and fails if any cell's test suite breaks.",
+  "cells": [
+    {
+      "name": "floor",
+      "zod": "4.4.0",
+      "@nestjs/common": "10.0.0",
+      "@nestjs/core": "10.0.0",
+      "@nestjs/swagger": "8.0.0"
+    },
+    {
+      "name": "zod-latest",
+      "zod": "latest",
+      "@nestjs/common": "10.0.0",
+      "@nestjs/core": "10.0.0",
+      "@nestjs/swagger": "8.0.0"
+    },
+    {
+      "name": "nest-latest",
+      "zod": "4.4.0",
+      "@nestjs/common": "latest",
+      "@nestjs/core": "latest",
+      "@nestjs/swagger": "latest"
+    },
+    {
+      "name": "all-latest",
+      "zod": "latest",
+      "@nestjs/common": "latest",
+      "@nestjs/core": "latest",
+      "@nestjs/swagger": "latest"
+    }
+  ]
+}
