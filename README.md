@@ -431,7 +431,7 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 - `ZodNestModule.forRoot(options?)`, `ZodNestModuleOptions`, `DEFAULT_REDACT_KEYS`, `DEFAULT_MAX_LOGGED_VALUE_BYTES`, `ZOD_NEST_OPTIONS`
 
 **Schema engine** — single-schema mode and extension points
-- `toOpenApi(schema, opts)`, `createRegistry()`, `defaultRegistry`, `ZodNestRegistry`, `Override`, `OverrideContext`, `ZodNestError`, `ZodNestUnrepresentableError`, `extend`, `getLineage`, `LineageEntry`
+- `toOpenApi(schema, opts)`, `createRegistry()`, `defaultRegistry`, `ZodNestRegistry`, `Override`, `OverrideContext`, `overrideJSONSchema(schema, fragment)`, `ZodNestError`, `ZodNestUnrepresentableError`, `extend`, `getLineage`, `LineageEntry`
 
 ## Documentation
 

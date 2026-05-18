@@ -35,6 +35,43 @@ const doc = applyZodNest(raw, {
 
 The override fires for every `z.instanceof(...)` / `z.custom(...)` construct. Branch on the schema metadata if you want to handle specific custom types differently.
 
+## Per-instance registration with `overrideJSONSchema`
+
+When you have a *single* `z.custom` / `z.instanceof` schema instance you want to keep using everywhere — `createZodDto`, `@ZodResponse`, request body, nested objects — without threading a per-call `override` through every site, register the JSON Schema fragment once:
+
+```ts
+import { z } from 'zod';
+import { createZodDto, overrideJSONSchema } from 'zod-nest';
+
+const FileSchema = z.instanceof(File);
+
+overrideJSONSchema(FileSchema, {
+  type: 'string',
+  format: 'binary',
+  description: 'CSV file uploaded as multipart/form-data',
+});
+
+class UploadDto extends createZodDto(
+  z.object({
+    title: z.string(),
+    file: FileSchema,
+  }),
+) {}
+```
+
+Every emission of `FileSchema` — direct or nested — now writes the registered fragment verbatim. No `override` callback on `applyZodNest`, no `@ApiBody({...})` workaround.
+
+**Precedence.** Per-call `override` (passed to `applyZodNest` / `toOpenApi`) still wins over a registration — registrations sit between `compositionOverride` and the caller's `override` in the chain. The intuitive ladder:
+
+1. `primitiveOverride` (built-in `bigint` / `date` mappings)
+2. `compositionOverride` (`extend()`-derived → `allOf`)
+3. **`overrideJSONSchema` registration** (per-instance map lookup)
+4. Caller's per-call `override` (per-emission escape hatch)
+
+**Idempotent.** Subsequent `overrideJSONSchema(sameInstance, newFragment)` calls overwrite the prior registration (last-write-wins). The registration is keyed by schema *identity* — two separate `z.instanceof(File)` calls produce two separate schemas and would each need their own registration. If you want the same fragment everywhere, share the schema instance.
+
+**Memory.** The registration map is a `WeakMap` keyed by schema identity — when your schema instance goes out of scope, the registration is collected with it.
+
 ## Opaque blobs
 
 When a field carries a value your API doesn't introspect (a passthrough JWT, a base64-encoded payload, an upstream-controlled shape), emit it as an opaque JSON Schema object so consumers know it exists but don't try to validate its shape:

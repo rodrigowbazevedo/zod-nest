@@ -99,9 +99,11 @@ The error message lists every offending ref with a hint from the collected-usage
 - `z.never()`
 - `z.function(...)`
 
-Mitigation: handle these via an `override` callback, or set `strict: false` to emit `{}` for them.
+Mitigation — three options, most-targeted first:
 
-`strict: false` — unrepresentable constructs emit as empty schemas. The spec validates, but the OpenAPI contract loses information. Use this when you have a small number of unrepresentable constructs you intentionally want to model as opaque.
+1. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema *instance*. Best for `z.custom` / `z.instanceof` (e.g. multipart `File` fields). See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
+2. **`override` callback** — per-call hook that fires for every schema of a matching Zod type. Useful when one rule should cover all `z.bigint()` / all `z.date()`. See [`override` callback](#override-callback) below.
+3. **`strict: false`** — globally relax the check; unrepresentable constructs emit as empty schemas. The spec validates, but the OpenAPI contract loses information. Use this when you have a small number of unrepresentable constructs you intentionally want to model as opaque.
 
 ## `override` callback
 
