@@ -14,10 +14,14 @@ This guide is for projects on the public [`nestjs-zod`](https://github.com/BenLo
 
 ## Prerequisites
 
-- **Zod ≥ 4.4.0**. Migrate from v3 first if you haven't; [Zod's v3-to-v4 guide](https://zod.dev/v4) is the path.
-- **NestJS ≥ 10**, **`@nestjs/swagger` ≥ 8**.
-- **Node ≥ 22**.
+- **Zod `>=4.4.0 <5.0.0`**. Migrate from v3 first if you haven't; [Zod's v3-to-v4 guide](https://zod.dev/v4) is the path.
+- **NestJS `>=11.0.1 <12.0.0`** (both `@nestjs/common` and `@nestjs/core`). **`@nestjs/swagger` `>=11.0.0 <12.0.0`** — swagger 11 was the first release to accept nest 11 as a peer.
+- **`rxjs` `>=7.1.0 <8.0.0`** (typically pulled in transitively by NestJS).
+- **`reflect-metadata` `>=0.2.0 <0.3.0`** — this is now a declared peer; install it explicitly if your existing setup only had it transitively from NestJS 10.
+- **Node `>=22`**.
 - **Drop `class-validator` / `class-transformer`** if you installed them only for `nestjs-zod` interop. If they're used elsewhere in your app (legacy DTOs, custom validators), leave them — `zod-nest` doesn't conflict, it just doesn't interoperate.
+
+> Coming from NestJS 10? `zod-nest >=0.13.0` requires NestJS 11. NestJS 10 was dropped because it conflicts at install with the `reflect-metadata` 0.2.x line — the prior peer-dep declaration was wrong about supporting it.
 
 ## Install / uninstall
 
@@ -26,7 +30,7 @@ npm uninstall nestjs-zod
 npm install zod-nest zod@^4
 ```
 
-Peer dependencies (`@nestjs/common`, `@nestjs/core`, `@nestjs/swagger`, `rxjs`) are not bundled — they come from your app.
+Peer dependencies (`@nestjs/common`, `@nestjs/core`, `@nestjs/swagger`, `rxjs`, `reflect-metadata`) are not bundled — they come from your app.
 
 ## Breaking changes (side-by-side)
 
@@ -348,5 +352,8 @@ Dropped. Use `schema.parse(input)` / `schema.safeParse(input)` directly — they
 
 **"Can I use `class-validator` decorators on a `zod-nest` DTO?"**
 No. The DTO class returned by `createZodDto` is Zod-native. If you have legacy DTOs using `class-validator`, leave them as plain `@nestjs/swagger`-decorated classes; `zod-nest` doesn't touch them. Hybrid projects work as long as each DTO sticks to one library.
+
+**"`npm install zod-nest` errors with `ERESOLVE … reflect-metadata`."**
+Your app is on NestJS 10. `zod-nest >=0.13.0` declares `@nestjs/common >=11`; NestJS 10 pinned `reflect-metadata@^0.1.x`, which can't coexist with the `reflect-metadata >=0.2.0` peer this library now requires. Upgrade your NestJS to 11.x, or stay on `zod-nest@<0.13.0`.
 
 For anything not covered here, file an issue at <https://github.com/rodrigowbazevedo/zod-nest/issues> with the smallest reproduction you can build.
