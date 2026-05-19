@@ -244,14 +244,88 @@ describe('@ZodBody', () => {
       expect(props['dupe']?.type).toBe('number');
     });
 
-    it('throws ZodNestError when an arm is not a z.object', () => {
+    it('merges intersection-of-unions into a flat object with all properties optional', () => {
+      // The canonical user case (taxonomy translation): two unions of objects
+      // intersected. Without flatten:true this emits `allOf: [oneOf, oneOf]`
+      // which Swagger UI's multipart form generator can't render. With
+      // flatten:true the body is a flat object whose fields cover every
+      // variant — runtime validation against the original schema still
+      // enforces the precise variant shape.
       const registry = createRegistry();
-      const objArm = z.object({ a: z.string() });
-      const unionArm = z.union([z.object({ x: z.number() }), z.object({ y: z.boolean() })]);
-      const schema = z.intersection(objArm, unionArm);
+      const schema = z.intersection(
+        z.union([z.object({ a: z.string() }), z.object({ b: z.string() })]),
+        z.union([z.object({ c: z.string() }), z.object({ d: z.string() })]),
+      );
+
+      class Controller {
+        @Post()
+        @ZodBody(schema, { registry, flatten: true })
+        handler(): void {}
+      }
+
+      const body = findBody(Controller.prototype.handler);
+      expect(body?.schema?.$ref).toBeUndefined();
+      expect(body?.schema?.allOf).toBeUndefined();
+      expect(body?.schema?.oneOf).toBeUndefined();
+      expect(body?.schema?.type).toBe('object');
+      const props = body?.schema?.properties as Record<string, unknown>;
+      expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c', 'd']);
+      // Union-crossed → no property is required at the spec level.
+      const required = body?.schema?.required as unknown;
+      expect(required === undefined || (Array.isArray(required) && required.length === 0)).toBe(
+        true,
+      );
+    });
+
+    it('flattens a bare union of objects with all properties optional', () => {
+      const registry = createRegistry();
+      const schema = z.union([
+        z.object({ alpha: z.string(), shared: z.string() }),
+        z.object({ beta: z.number(), shared: z.string() }),
+      ]);
+
+      class Controller {
+        @Post()
+        @ZodBody(schema, { registry, flatten: true })
+        handler(): void {}
+      }
+
+      const body = findBody(Controller.prototype.handler);
+      expect(body?.schema?.type).toBe('object');
+      const props = body?.schema?.properties as Record<string, unknown>;
+      expect(Object.keys(props).sort()).toEqual(['alpha', 'beta', 'shared']);
+      const required = body?.schema?.required as unknown;
+      expect(required === undefined || (Array.isArray(required) && required.length === 0)).toBe(
+        true,
+      );
+    });
+
+    it('flattens a discriminated union of objects', () => {
+      const registry = createRegistry();
+      const schema = z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('a'), value: z.string() }),
+        z.object({ kind: z.literal('b'), count: z.number() }),
+      ]);
+
+      class Controller {
+        @Post()
+        @ZodBody(schema, { registry, flatten: true })
+        handler(): void {}
+      }
+
+      const body = findBody(Controller.prototype.handler);
+      expect(body?.schema?.type).toBe('object');
+      const props = body?.schema?.properties as Record<string, unknown>;
+      expect(Object.keys(props).sort()).toEqual(['count', 'kind', 'value']);
+    });
+
+    it('throws ZodNestError when a leaf is not a z.object', () => {
+      const registry = createRegistry();
+      // Primitive leaf in a union arm — not flattenable.
+      const schema = z.union([z.object({ a: z.string() }), z.string()]);
 
       expect(() => ZodBody(schema, { registry, flatten: true })).toThrow(
-        /requires the schema to be a `z\.object\(\{\.\.\.\}\)` or an intersection whose arms are all object schemas/,
+        /requires every leaf of the schema to be a `z\.object\(\{\.\.\.\}\)`/,
       );
     });
 

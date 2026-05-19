@@ -117,9 +117,21 @@ export class TaxonomyTranslationController {
 
 What it does:
 
-- Merges each intersection arm's `.shape` into a single anonymous `z.object` and emits that **inline** into the operation's request body — no `$ref`, no `allOf`, no `components.schemas` entry for the merged root.
+- Walks the schema, collecting every `z.object` leaf reachable through intersections and/or unions. Merges all collected shapes into a single anonymous `z.object` and emits it **inline** into the operation's request body — no `$ref`, no `allOf`, no `oneOf`, no `components.schemas` entry for the merged root.
 - Per-property `.meta({ id })` schemas keep their normal `$ref` emission (e.g. `candidate_trafficking: FileSchema` still refs `#/components/schemas/File`). Only the *root* is flattened.
-- Property collisions across arms resolve last-arm-wins, mirroring `z.object({ ...Left.shape, ...Right.shape })`.
+- Property collisions resolve right-arm-wins, mirroring `z.object({ ...Left.shape, ...Right.shape })`.
+
+Supported shapes:
+
+- `z.object({...})` — no-op (already flat).
+- `z.intersection(obj, obj)` — pure intersection of objects; merged with `required` preserved per-property.
+- Nested intersections, e.g. `z.intersection(z.intersection(A, B), C)`.
+- `z.union([obj, obj, ...])` / `z.discriminatedUnion(...)` — all variant shapes merged. **Every property becomes optional** in the emitted spec because no single field is guaranteed across the original variants.
+- `z.intersection(union(...), union(...))` — the user's canonical case (taxonomy translation, e.g.). Combines the above; anything reachable through a union is optional in the result.
+
+Trade-off when union arms are present: the emitted spec is *less precise* than the original schema. "Must supply variant A or variant B" becomes "any subset of A's and B's fields is allowed at the spec level." Runtime validation via `@Body(new ZodValidationPipe(originalSchema))` still enforces the precise variant shape — the precision loss is doc-only.
+
+Rejected shapes: any non-object leaf at any depth (primitives, tuples, transforms, nullable wrappers around non-objects). `flatten: true` throws `ZodNestError` with a clear remediation pointer.
 
 When to use it:
 
@@ -129,9 +141,9 @@ When to use it:
 When to skip it:
 
 - JSON-only endpoints — keep the default (`flatten: false`) to retain the structural composition in the doc.
-- Schemas that aren't pure intersections of objects — `flatten: true` throws if any arm is a union, primitive, or other non-object.
+- Schemas with non-object leaves — `flatten: true` will throw.
 
-This is a Swagger-UI compatibility escape hatch, not a general recommendation. Trade-off: the merged root no longer appears in `components.schemas`, so it can't be reused via `$ref` elsewhere. If you need both, split the schema across decorators.
+This is a Swagger-UI compatibility escape hatch, not a general recommendation. Trade-off: the merged root no longer appears in `components.schemas` and (for union-bearing schemas) the spec is less restrictive than the actual validation.
 
 ## When to use `createZodDto` vs. these decorators
 
