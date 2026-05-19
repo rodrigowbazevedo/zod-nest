@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.7.0...v1.7.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **peer-deps:** align rxjs floor with required types layout (>=7.6.0) ([#81](https://github.com/rodrigowbazevedo/zod-nest/issues/81)) ([c120c17](https://github.com/rodrigowbazevedo/zod-nest/commit/c120c17373692b4fc3ef505ff80b67dc62f345f5)), closes [#79](https://github.com/rodrigowbazevedo/zod-nest/issues/79)
+
 # [1.7.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.6.1...v1.7.0) (2026-05-19)
 
 
