@@ -493,15 +493,15 @@ See [`docs/recipes/custom-openapi-overrides.md`](docs/recipes/custom-openapi-ove
 
 ## Compatibility matrix
 
-`zod-nest` declares explicit min + max peer-dep ranges in `package.json`: `zod >=4.4.0 <5.0.0`, `@nestjs/common >=11.0.1 <12.0.0`, `@nestjs/core >=11.0.1 <12.0.0`, `@nestjs/swagger >=11.0.0 <12.0.0`, `rxjs >=7.1.0 <8.0.0`, `reflect-metadata >=0.2.0 <0.3.0`, Node `>=22`. CI validates those claims by running the full test suite against the cells below; a red cell is a real blocker. Upper bounds are deliberate — a new peer major has to land in a real PR with a `/check-upstream-updates` audit before consumers can install it against this library.
+`zod-nest` declares explicit min + max peer-dep ranges in `package.json`: `zod >=4.4.0 <5.0.0`, `@nestjs/common >=11.0.1 <12.0.0`, `@nestjs/core >=11.0.1 <12.0.0`, `@nestjs/swagger >=11.0.0 <12.0.0`, `rxjs >=7.6.0 <8.0.0`, `reflect-metadata >=0.2.0 <0.3.0`, Node `>=22`. CI validates those claims by running the full test suite against the cells below; a red cell is a real blocker. Upper bounds are deliberate — a new peer major has to land in a real PR with a `/check-upstream-updates` audit before consumers can install it against this library.
 
 | Cell | `zod` | `@nestjs/common` | `@nestjs/core` | `@nestjs/swagger` | `rxjs` | `reflect-metadata` |
 |---|---|---|---|---|---|---|
-| `floor` | 4.4.0 | 11.0.1 | 11.0.1 | 11.0.0 | 7.1.0 | 0.2.0 |
-| `zod-latest` | latest | 11.0.1 | 11.0.1 | 11.0.0 | 7.1.0 | 0.2.0 |
-| `nest-latest` | 4.4.0 | latest | latest | latest | 7.1.0 | 0.2.0 |
+| `floor` | 4.4.0 | 11.0.1 | 11.0.1 | 11.0.0 | 7.6.0 | 0.2.0 |
+| `zod-latest` | latest | 11.0.1 | 11.0.1 | 11.0.0 | 7.6.0 | 0.2.0 |
+| `nest-latest` | 4.4.0 | latest | latest | latest | 7.6.0 | 0.2.0 |
 | `rxjs-latest` | 4.4.0 | 11.0.1 | 11.0.1 | 11.0.0 | latest | 0.2.0 |
-| `reflect-metadata-latest` | 4.4.0 | 11.0.1 | 11.0.1 | 11.0.0 | 7.1.0 | latest |
+| `reflect-metadata-latest` | 4.4.0 | 11.0.1 | 11.0.1 | 11.0.0 | 7.6.0 | latest |
 | `all-latest` | latest | latest | latest | latest | latest | latest |
 
 Cell definitions live in [`.github/compat-matrix.json`](.github/compat-matrix.json). The CI workflow ([`.github/workflows/compat-matrix.yml`](.github/workflows/compat-matrix.yml)) runs on every push to `main` and weekly on Monday — when a cell fails, the workflow opens (or comments on) a GitHub issue labelled `compat-matrix-failure` so the regression is tracked outside the Actions UI. Editing the JSON is the formal way to extend or shrink supported ranges. Node is not matrixed — the `>=22` floor is enforced by `engines`.

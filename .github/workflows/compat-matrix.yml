@@ -65,12 +65,15 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          # Each cell pins its own Node major (22 or 24) — that's how Node 22
+          # client compatibility is verified. The standard ci.yml gate runs
+          # Node 24 only.
+          node-version: ${{ matrix.cell.node }}
           cache: npm
 
       - run: npm ci
 
-      - name: Apply compat overrides + run test suite
+      - name: Apply compat overrides + run test suite + pack-smoke
         env:
           COMPAT_CELL: ${{ toJson(matrix.cell) }}
         run: node scripts/run-compat.mjs

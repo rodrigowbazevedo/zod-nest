@@ -63,10 +63,15 @@ const runPass = (
   };
   built.consumeUnrepresentable();
 
+  // Iterate Zod's emission (the source of truth for what was actually
+  // emitted) and keep only the ids we registered. Inverts the older
+  // `for (knownIds) { if (raw.schemas has id) ... }` shape so the filter
+  // branches are naturally covered by the existing "filter outside ids"
+  // test instead of a defensive guard that was never exercised.
   const filtered = new Map<string, unknown>();
-  for (const id of knownIds) {
-    if (Object.prototype.hasOwnProperty.call(raw.schemas, id)) {
-      filtered.set(id, raw.schemas[id]);
+  for (const [id, schema] of Object.entries(raw.schemas)) {
+    if (knownIds.has(id)) {
+      filtered.set(id, schema);
     }
   }
   return filtered;

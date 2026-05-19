@@ -1,35 +1,69 @@
 {
-  "$comment": "Source of truth for the compatibility matrix. Edit this file to extend or shrink supported peer-dep ranges; the workflow at .github/workflows/compat-matrix.yml expands these cells into a strategy matrix and fails if any cell's test suite breaks. Each cell pins every peer the consumer can independently vary (zod / nest-common / nest-core / nest-swagger / rxjs / reflect-metadata) so the floor cell actually exercises the floor, not just the floors we remembered to list.",
+  "$comment": "Source of truth for the compatibility matrix. Edit this file to extend or shrink supported peer-dep ranges; the workflow at .github/workflows/compat-matrix.yml expands these cells into a strategy matrix and fails if any cell's test suite + pack-smoke breaks. Each cell pins every peer the consumer can independently vary (zod / nest-common / nest-core / nest-swagger / rxjs / reflect-metadata) plus the Node major to run under, so we exercise the floor on the floor Node AND the ceiling on the ceiling Node. Pack-smoke runs inside each cell via scripts/run-compat.mjs, so a cell is green only if the BUILT tarball installs and bootstraps under the cell's Node + peer pin.",
   "cells": [
     {
-      "name": "floor",
+      "name": "floor-node22",
+      "node": "22",
       "zod": "4.4.0",
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
     {
-      "name": "zod-latest",
+      "name": "floor-node24",
+      "node": "24",
+      "zod": "4.4.0",
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "7.6.0",
+      "reflect-metadata": "0.2.0"
+    },
+    {
+      "name": "zod-latest-node22",
+      "node": "22",
       "zod": "latest",
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
     {
-      "name": "nest-latest",
+      "name": "zod-latest-node24",
+      "node": "24",
+      "zod": "latest",
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "7.6.0",
+      "reflect-metadata": "0.2.0"
+    },
+    {
+      "name": "nest-latest-node22",
+      "node": "22",
       "zod": "4.4.0",
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
       "@nestjs/swagger": "latest",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
     {
-      "name": "rxjs-latest",
+      "name": "nest-latest-node24",
+      "node": "24",
+      "zod": "4.4.0",
+      "@nestjs/common": "latest",
+      "@nestjs/core": "latest",
+      "@nestjs/swagger": "latest",
+      "rxjs": "7.6.0",
+      "reflect-metadata": "0.2.0"
+    },
+    {
+      "name": "rxjs-latest-node22",
+      "node": "22",
       "zod": "4.4.0",
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
@@ -38,16 +72,48 @@
       "reflect-metadata": "0.2.0"
     },
     {
-      "name": "reflect-metadata-latest",
+      "name": "rxjs-latest-node24",
+      "node": "24",
       "zod": "4.4.0",
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
-      "rxjs": "7.1.0",
+      "rxjs": "latest",
+      "reflect-metadata": "0.2.0"
+    },
+    {
+      "name": "reflect-metadata-latest-node22",
+      "node": "22",
+      "zod": "4.4.0",
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "latest"
     },
     {
-      "name": "all-latest",
+      "name": "reflect-metadata-latest-node24",
+      "node": "24",
+      "zod": "4.4.0",
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "7.6.0",
+      "reflect-metadata": "latest"
+    },
+    {
+      "name": "all-latest-node22",
+      "node": "22",
+      "zod": "latest",
+      "@nestjs/common": "latest",
+      "@nestjs/core": "latest",
+      "@nestjs/swagger": "latest",
+      "rxjs": "latest",
+      "reflect-metadata": "latest"
+    },
+    {
+      "name": "all-latest-node24",
+      "node": "24",
       "zod": "latest",
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
