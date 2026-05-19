@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.6.1...v1.7.0) (2026-05-19)
+
+
+### Features
+
+* **decorators:** @ZodBody/@ZodQuery/@ZodHeaders/@ZodCookies for union-typed schemas ([#69](https://github.com/rodrigowbazevedo/zod-nest/issues/69)) ([2acb4a5](https://github.com/rodrigowbazevedo/zod-nest/commit/2acb4a5777ba4a914ae6f0c4375edd38a32ec6f0)), closes [#67](https://github.com/rodrigowbazevedo/zod-nest/issues/67) [#68](https://github.com/rodrigowbazevedo/zod-nest/issues/68)
+
 ## [1.6.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.6.0...v1.6.1) (2026-05-19)
 
 
