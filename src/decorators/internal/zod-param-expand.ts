@@ -8,7 +8,8 @@ import { ZodNestError } from '../../schema/errors.js';
 import { defaultRegistry, registerSchema } from '../../schema/registry.js';
 import { resolveSchemaRef } from './zod-schema-ref.js';
 
-const isZodObject = (schema: z.ZodType): schema is z.ZodObject => schema._zod.def.type === 'object';
+export const isZodObject = (schema: z.ZodType): schema is z.ZodObject =>
+  schema._zod.def.type === 'object';
 
 export interface ExpandedParam {
   readonly name: string;

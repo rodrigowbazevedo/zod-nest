@@ -89,6 +89,16 @@ class CasesController {
     @Param('userId') _userId: string,
     @Headers('x-trace-id') _traceId: string | undefined,
   ): void {}
+
+  @Post('flattened-multipart')
+  @ZodBody(
+    z.intersection(
+      z.object({ a: z.string(), b: z.string() }).meta({ id: 'FlatLeft' }),
+      z.object({ c: z.string(), d: z.string() }).meta({ id: 'FlatRight' }),
+    ),
+    { registry, flatten: true },
+  )
+  flattenedMultipart(): void {}
 }
 
 describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', () => {
@@ -158,5 +168,30 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     const schemas = doc.components?.schemas as Record<string, unknown>;
     expect(schemas['ListingQuery']).toBeUndefined();
     expect(schemas['ListingHeaders']).toBeUndefined();
+  });
+
+  // ─── flatten: true (Swagger UI multipart compatibility) ─────────────────
+
+  it('emits a flat inline body — no $ref, no allOf — when flatten: true', () => {
+    const op = opAt(doc, '/cases/flattened-multipart', 'post');
+    const requestBody = op.requestBody as Record<string, unknown> | undefined;
+    const content = requestBody?.content as
+      | Record<string, { schema?: Record<string, unknown> }>
+      | undefined;
+    const schema = content?.['application/json']?.schema;
+    expect(schema?.$ref).toBeUndefined();
+    expect(schema?.allOf).toBeUndefined();
+    expect(schema?.type).toBe('object');
+    const props = schema?.properties as Record<string, unknown>;
+    expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('keeps named per-arm schemas out of components.schemas when flatten:true is used', () => {
+    // FlatLeft / FlatRight are arms of the flattened intersection but are
+    // not referenced anywhere — the flatten path bypasses the registry for
+    // the root. They should NOT surface in `components.schemas`.
+    const schemas = doc.components?.schemas as Record<string, unknown>;
+    expect(schemas['FlatLeft']).toBeUndefined();
+    expect(schemas['FlatRight']).toBeUndefined();
   });
 });

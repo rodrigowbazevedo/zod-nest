@@ -107,6 +107,8 @@ All decorators are method-level (applied next to `@Get` / `@Post` / etc.). Valid
 
 Schema id resolution mirrors `createZodDto`: `options.id` overrides any `.meta({ id })` on the schema. When the schema has no id, the JSON Schema body is inlined directly into the operation (the schema is not added to `components.schemas` for reuse — that's the documented trade-off for anonymous use).
 
+`@ZodBody` accepts an opt-in `flatten: true` that merges intersection-of-object arms into a single inline object body. Use it when Swagger UI's `multipart/form-data` `try-it-out` form needs to render the body — the UI doesn't follow `$ref` or unwrap `allOf`. See [`recipes/intersection-with-union.md`](recipes/intersection-with-union.md) for the trade-off (no `components.schemas` entry for the merged root) and the full pattern.
+
 For the full pattern with code, see [`recipes/intersection-with-union.md`](recipes/intersection-with-union.md).
 
 ### `DANGLING_REF`

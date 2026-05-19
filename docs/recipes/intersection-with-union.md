@@ -88,6 +88,63 @@ export class TemplatesController {
 
 Optionality on each property maps to OpenAPI `required: false`. Named property schemas (each property with its own `.meta({ id })`) become `$ref`s in the parameter; anonymous property schemas inline.
 
+## Swagger UI + `multipart/form-data` — `flatten: true`
+
+`@ZodBody` defaults to the most semantic emission: a `$ref` to `components.schemas[<id>]`, with `z.intersection(A, B)` rendered as `{ allOf: [{ $ref: A }, { $ref: B }] }`. Downstream codegen tools and most OpenAPI viewers handle this fine.
+
+**Swagger UI's `try-it-out` form generator for `multipart/form-data` does not.** It needs a flat `{ type: 'object', properties: {...} }` literal at the operation's `schema` site — it won't follow `$ref` and won't unwrap `allOf`. A file-upload endpoint whose body is `z.intersection(CandidateInput, ReferenceInput)` renders a single stub field instead of the actual form inputs (file pickers, array inputs, etc.).
+
+Opt into flattening with `flatten: true`:
+
+```ts
+const CreateTaxonomyTranslation = z.intersection(
+  CandidateInputSchema,
+  ReferenceInputSchema,
+);
+
+@Controller('taxonomy-translations')
+export class TaxonomyTranslationController {
+  @Post()
+  @ZodBody(CreateTaxonomyTranslation, { flatten: true })
+  async create(
+    @Body(new ZodValidationPipe(CreateTaxonomyTranslation))
+    body: z.infer<typeof CreateTaxonomyTranslation>,
+  ) {
+    /* ... */
+  }
+}
+```
+
+What it does:
+
+- Walks the schema, collecting every `z.object` leaf reachable through intersections and/or unions. Merges all collected shapes into a single anonymous `z.object` and emits it **inline** into the operation's request body — no `$ref`, no `allOf`, no `oneOf`, no `components.schemas` entry for the merged root.
+- Per-property `.meta({ id })` schemas keep their normal `$ref` emission (e.g. `candidate_trafficking: FileSchema` still refs `#/components/schemas/File`). Only the *root* is flattened.
+- Property collisions resolve right-arm-wins, mirroring `z.object({ ...Left.shape, ...Right.shape })`.
+
+Supported shapes:
+
+- `z.object({...})` — no-op (already flat).
+- `z.intersection(obj, obj)` — pure intersection of objects; merged with `required` preserved per-property.
+- Nested intersections, e.g. `z.intersection(z.intersection(A, B), C)`.
+- `z.union([obj, obj, ...])` / `z.discriminatedUnion(...)` — all variant shapes merged. **Every property becomes optional** in the emitted spec because no single field is guaranteed across the original variants.
+- `z.intersection(union(...), union(...))` — the user's canonical case (taxonomy translation, e.g.). Combines the above; anything reachable through a union is optional in the result.
+
+Trade-off when union arms are present: the emitted spec is *less precise* than the original schema. "Must supply variant A or variant B" becomes "any subset of A's and B's fields is allowed at the spec level." Runtime validation via `@Body(new ZodValidationPipe(originalSchema))` still enforces the precise variant shape — the precision loss is doc-only.
+
+Rejected shapes: any non-object leaf at any depth (primitives, tuples, transforms, nullable wrappers around non-objects). `flatten: true` throws `ZodNestError` with a clear remediation pointer.
+
+When to use it:
+
+- The endpoint's content type is `multipart/form-data` (file uploads, mixed binary + JSON fields) AND
+- You want Swagger UI's "Try it out" form to render the field inputs.
+
+When to skip it:
+
+- JSON-only endpoints — keep the default (`flatten: false`) to retain the structural composition in the doc.
+- Schemas with non-object leaves — `flatten: true` will throw.
+
+This is a Swagger-UI compatibility escape hatch, not a general recommendation. Trade-off: the merged root no longer appears in `components.schemas` and (for union-bearing schemas) the spec is less restrictive than the actual validation.
+
 ## When to use `createZodDto` vs. these decorators
 
 | Schema shape | Recommended approach |
