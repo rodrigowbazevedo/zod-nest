@@ -41,10 +41,10 @@ export const ZodHeaders = (schema: z.ZodType, options?: ZodHeadersOptions): Meth
     required,
     schema: paramSchemaBody(resolution),
   }));
-  return (_target, _propertyKey, descriptor: PropertyDescriptor): void => {
-    const handler = descriptor.value as object | undefined;
-    if (handler === undefined) {
-      return;
+  return (_target, _propertyKey, descriptor) => {
+    const handler = descriptor.value;
+    if (typeof handler !== 'function') {
+      throw new TypeError('[zod-nest] @ZodHeaders can only be applied to methods.');
     }
     const existing: unknown[] = Reflect.getMetadata(API_PARAMETERS_KEY, handler) ?? [];
     Reflect.defineMetadata(API_PARAMETERS_KEY, [...existing, ...newEntries], handler);

@@ -79,4 +79,14 @@ describe('@ZodCookies', () => {
       /requires a `z.object\(\{\.\.\.\}\)` schema/,
     );
   });
+
+  it('throws TypeError when applied to something other than a method', () => {
+    const registry = createRegistry();
+    const decorator = ZodCookies(z.object({ sid: z.string() }).meta({ id: 'GuardCookies' }), {
+      registry,
+    });
+    expect(() => decorator({}, 'x', { value: undefined })).toThrow(
+      /@ZodCookies can only be applied to methods/,
+    );
+  });
 });

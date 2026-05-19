@@ -63,4 +63,14 @@ describe('@ZodHeaders', () => {
       /requires a `z.object\(\{\.\.\.\}\)` schema/,
     );
   });
+
+  it('throws TypeError when applied to something other than a method', () => {
+    const registry = createRegistry();
+    const decorator = ZodHeaders(z.object({ x: z.string() }).meta({ id: 'GuardHeaders' }), {
+      registry,
+    });
+    expect(() => decorator({}, 'x', { value: undefined })).toThrow(
+      /@ZodHeaders can only be applied to methods/,
+    );
+  });
 });

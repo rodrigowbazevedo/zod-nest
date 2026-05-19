@@ -124,4 +124,44 @@ describe('@ZodBody', () => {
       $ref: '#/components/schemas/ZodBody_UnionScalar',
     });
   });
+
+  it('defaults to defaultRegistry when options are omitted entirely', () => {
+    // No options arg at all — exercises the `options?.registry ?? defaultRegistry`
+    // and `options?.id` short-circuit branches. Uses a unique id so it doesn't
+    // collide with other suites also writing into defaultRegistry.
+    const schema = z.object({ x: z.string() }).meta({ id: 'ZodBody_DefaultRegistry_Unique_4f1c' });
+
+    class Controller {
+      @Post()
+      @ZodBody(schema)
+      handler(): void {}
+    }
+
+    expect(findBody(Controller.prototype.handler)?.schema).toEqual({
+      $ref: '#/components/schemas/ZodBody_DefaultRegistry_Unique_4f1c',
+    });
+  });
+
+  it('registers named children of an anonymous root so nested $refs resolve', () => {
+    // Inline-mode path with a named descendant: the root has no id (so the
+    // body is inlined into the operation), but a child has `.meta({ id })`
+    // and gets registered into the registry. Without that walk,
+    // `applyZodNest`'s bulk-emit would skip the child and the inlined body's
+    // nested $ref would dangle.
+    const registry = createRegistry();
+    const NamedChild = z.object({ value: z.string() }).meta({ id: 'ZodBody_NamedChild' });
+    const anonymousRoot = z.object({ child: NamedChild });
+
+    class Controller {
+      @Post()
+      @ZodBody(anonymousRoot, { registry })
+      handler(): void {}
+    }
+
+    expect(registry.ids()).toContain('ZodBody_NamedChild');
+    const body = findBody(Controller.prototype.handler);
+    expect(body?.schema?.$ref).toBeUndefined();
+    const props = body?.schema?.properties as Record<string, { $ref?: string }> | undefined;
+    expect(props?.['child']?.$ref).toBe('#/components/schemas/ZodBody_NamedChild');
+  });
 });

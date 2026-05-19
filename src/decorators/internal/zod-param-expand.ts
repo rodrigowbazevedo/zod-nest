@@ -58,13 +58,8 @@ export const expandObjectSchema = (
   // else references it (`@ZodBody`, another decorator, a manual `$ref`).
   // Idempotent + harmless when the schema is anonymous.
   registerSchema(schema, registry, { id: options.id });
-  const { shape } = schema;
   const result: ExpandedParam[] = [];
-  for (const name of Object.keys(shape)) {
-    const propSchema = shape[name];
-    if (propSchema === undefined) {
-      continue;
-    }
+  for (const [name, propSchema] of Object.entries(schema.shape)) {
     const resolution = resolveSchemaRef(propSchema, { registry });
     const required = options.forceRequired === true || !isOptionalProp(propSchema);
     result.push({ name, required, resolution });
