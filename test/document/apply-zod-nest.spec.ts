@@ -19,7 +19,7 @@ import { z } from 'zod';
 import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
 
-import { applyZodNest, createZodDto, ZodNestDocumentError, ZodResponse } from '../../src';
+import { applyZodNest, createZodDto, extend, ZodNestDocumentError, ZodResponse } from '../../src';
 
 const ROOT = '#/components/schemas/';
 
@@ -697,6 +697,55 @@ describe('applyZodNest — nested .meta({ id }) schemas are registered transitiv
     expect(refAt(components.NestedParent, 'properties', 'fileType', '$ref')).toBe(
       `${ROOT}NestedFileType`,
     );
+
+    await app.close();
+  });
+});
+
+// ─── extend() parent auto-registration ─────────────────────────────────────
+
+describe('applyZodNest — extend() parent with .meta({ id }) is auto-registered', () => {
+  // Regression: `.extend()` produces a flat object, so the parent isn't a
+  // transitive descendant of the child. Without auto-registration in
+  // `extend()`, a meta-tagged parent that's never wrapped in `createZodDto`
+  // was $ref'd from the child's allOf but missing from `components.schemas`,
+  // tripping DANGLING_REF in `assertNoDanglingRefs`.
+  const ExtendParentFieldset = z
+    .object({ id: z.string(), label: z.string() })
+    .meta({ id: 'ExtendParentFieldset' });
+  class ExtendChildDto extends createZodDto(
+    extend(ExtendParentFieldset, (s) =>
+      s.extend({ value: z.number() }).meta({ id: 'ExtendChildDto' }),
+    ),
+    { id: 'ExtendChildDto' },
+  ) {}
+
+  @Controller('extend-parent')
+  class ExtendParentController {
+    @Post()
+    @ZodResponse({ type: ExtendChildDto })
+    create(@Body() body: ExtendChildDto): ExtendChildDto {
+      return body;
+    }
+  }
+
+  it('emits the extend() parent body into components.schemas without dangling refs', async () => {
+    const { app, raw } = await bootstrap([ExtendParentController]);
+    const doc = applyZodNest(raw, { app });
+
+    const components = schemasOf(doc);
+    expect(components.ExtendChildDto).toBeDefined();
+    expect(components.ExtendParentFieldset).toBeDefined();
+
+    // Parent body is a real object, not a $ref shell.
+    const parent = components.ExtendParentFieldset as Record<string, unknown>;
+    expect(parent.type).toBe('object');
+    expect(parent.properties).toMatchObject({ id: { type: 'string' }, label: { type: 'string' } });
+
+    // Child references the parent via $ref inside its allOf.
+    const child = components.ExtendChildDto as { allOf?: ({ $ref?: string } | unknown)[] };
+    expect(child.allOf).toBeDefined();
+    expect((child.allOf?.[0] as { $ref?: string }).$ref).toBe(`${ROOT}ExtendParentFieldset`);
 
     await app.close();
   });

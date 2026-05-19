@@ -111,6 +111,8 @@ The emission falls back to a flat body — the parent's keys are inlined into `C
 
 If you want the `allOf` behaviour, give the parent an id (`.meta({ id: 'Base' })` or wrap it in `createZodDto(base, { id: 'Base' })`).
 
+A **named** parent (`.meta({ id })`) used only as an `extend()` parent — i.e. never wrapped in `createZodDto` and not referenced from any registered DTO's tree — is registered automatically. `extend()` calls `registerSchema(parent)` for you, so the parent's body lands in `components.schemas` and the child's `$ref` resolves. Earlier versions required an explicit `createZodDto` wrapper to avoid `ZodNestDocumentError: DANGLING_REF` for this pattern.
+
 ## Multi-level chains
 
 `extend` records the parent → child link one hop at a time, and the OpenAPI emission threads the chain through transitive `$ref`s:

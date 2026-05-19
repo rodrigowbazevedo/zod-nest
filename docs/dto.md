@@ -47,6 +47,21 @@ Step 4 is the minification trap — class names become single-character identifi
 
 **When `options.id` and `schema.meta.id` both exist, `options.id` wins.** This is by design: a caller passing an explicit id is making a deliberate per-DTO override decision.
 
+### Registering without `createZodDto`
+
+`registerSchema(schema, registry?, options?)` is the standalone version of steps 1–2 above — it resolves a schema's id from `options.id` (if provided) then `.meta({ id })`, and registers it with the given registry (defaults to `defaultRegistry`). `createZodDto` itself routes through this helper.
+
+```ts
+import { registerSchema } from 'zod-nest';
+
+const Fieldset = z.object({ id: z.string(), label: z.string() }).meta({ id: 'Fieldset' });
+registerSchema(Fieldset); // → 'Fieldset', registered in defaultRegistry
+```
+
+Returns the resolved id, or `undefined` when the schema has no `.meta({ id })` and no `options.id` was given. Idempotent.
+
+Most callers won't need this directly — `createZodDto` is the usual entry point, and `extend()` registers its parent + result automatically since 1.6. Reach for `registerSchema` when you have a named schema that doesn't fit either path (e.g. a non-extend sub-schema you want emitted into `components.schemas` for reference from a third-party doc generator).
+
 ## Schema metadata for Swagger UI
 
 `.meta({ ... })` isn't just for `id`. Any standard JSON Schema annotation you attach to the schema flows through `z.toJSONSchema` into the OpenAPI document, and Swagger UI renders them in the interactive view:

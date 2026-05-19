@@ -38,7 +38,21 @@ export const createRegistry = (): ZodNestRegistry => {
   return {
     zodRegistry: z.globalRegistry,
     register: (schema, id) => {
-      z.globalRegistry.add(schema, { id });
+      // `globalRegistry.add` overwrites the schema's entire meta entry; we
+      // must merge so user-supplied fields (`title`, `description`,
+      // anything else in `.meta({...})`) survive registration. The `has`
+      // gate avoids promoting parent-inherited meta into a local entry
+      // — `get()` returns parent-merged metadata when the schema has no
+      // local entry, and writing that back here would freeze the
+      // inherited fields against the schema.
+      if (z.globalRegistry.has(schema)) {
+        const existing = z.globalRegistry.get(schema);
+        if (existing?.id !== id) {
+          z.globalRegistry.add(schema, { ...(existing ?? {}), id });
+        }
+      } else {
+        z.globalRegistry.add(schema, { id });
+      }
       if (!recordOnce(schema, id)) {
         return;
       }
@@ -68,3 +82,41 @@ export const createRegistry = (): ZodNestRegistry => {
 
 /** Process-wide default registry, used when no explicit `options.registry` is passed. */
 export const defaultRegistry: ZodNestRegistry = createRegistry();
+
+export interface RegisterSchemaOptions {
+  /** Forces this id, overriding any `.meta({ id })` already on the schema. */
+  readonly id?: string;
+}
+
+/**
+ * Register a schema with the given registry, resolving its id from (in order):
+ * an explicit `options.id`, then `.meta({ id })` on the schema. Returns the
+ * resolved id, or `undefined` when neither source yields one (the call is then
+ * a no-op — callers with their own fallback path handle that case).
+ *
+ * Shared by `createZodDto` and `extend` so a schema named via `.meta({ id })`
+ * gets its body emitted into `components.schemas` even when it never flows
+ * through `createZodDto` (e.g. used only as an `extend()` parent — Zod's
+ * `.extend()` produces a flat object, so the parent isn't a transitive
+ * descendant of the child and would otherwise be missed by `discoverDependents`).
+ *
+ * Idempotent — `registry.register` already deduplicates repeat calls.
+ */
+export const registerSchema = (
+  schema: z.ZodType,
+  registry: ZodNestRegistry = defaultRegistry,
+  options?: RegisterSchemaOptions,
+): string | undefined => {
+  const explicit = options?.id;
+  if (typeof explicit === 'string' && explicit !== '') {
+    registry.register(schema, explicit);
+    return explicit;
+  }
+  const meta = registry.zodRegistry.get(schema);
+  const metaId = meta === undefined ? undefined : (meta as { id?: unknown }).id;
+  if (typeof metaId !== 'string' || metaId === '') {
+    return undefined;
+  }
+  registry.register(schema, metaId);
+  return metaId;
+};

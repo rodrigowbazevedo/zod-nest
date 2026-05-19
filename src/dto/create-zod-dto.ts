@@ -3,7 +3,7 @@ import type { ZodNestRegistry } from '../schema/registry.js';
 import type { CreateZodDtoOptions, Io, ZodDto } from './dto.types.js';
 
 import { ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
-import { defaultRegistry } from '../schema/registry.js';
+import { defaultRegistry, registerSchema } from '../schema/registry.js';
 import { makeZodDtoMarker } from './marker.js';
 import { resolveOutput } from './output-dto.js';
 import { ZOD_DTO_SYMBOL } from './symbols.js';
@@ -11,19 +11,7 @@ import { ZOD_DTO_SYMBOL } from './symbols.js';
 let anonCounter = 0;
 let warnedOnAnonymous = false;
 
-const resolveId = (
-  registry: ZodNestRegistry,
-  schema: z.ZodType,
-  providedId: string | undefined,
-  className: string,
-): string => {
-  if (providedId !== undefined && providedId !== '') {
-    return providedId;
-  }
-  const meta = registry.zodRegistry.get(schema) as { id?: string } | undefined;
-  if (meta && typeof meta.id === 'string' && meta.id !== '') {
-    return meta.id;
-  }
+const resolveFallbackId = (className: string): string => {
   if (className !== '' && className.length > 1) {
     return className;
   }
@@ -54,7 +42,15 @@ export const createZodDto = <TSchema extends z.ZodType>(
     if (cachedId !== undefined) {
       return cachedId;
     }
-    cachedId = resolveId(registry, schema, options?.id, className);
+    // `registerSchema` resolves explicit id → `.meta({ id })`. When both miss,
+    // fall back to the DTO-specific className → anonymous-counter chain
+    // (with one-time minification warning).
+    const named = registerSchema(schema, registry, { id: options?.id });
+    if (named !== undefined) {
+      cachedId = named;
+      return cachedId;
+    }
+    cachedId = resolveFallbackId(className);
     registry.register(schema, cachedId);
     return cachedId;
   };

@@ -98,6 +98,7 @@ A `$ref` in the doc points at a `components.schemas` key that no longer exists a
 - A marker was stripped but its rename target wasn't populated — typically a registry mismatch where the DTO is referenced via `@Body() body: UserDto` but `UserDto` wasn't registered to the right `ZodNestRegistry`.
 - A user-supplied pre-pass left a stale ref behind.
 - A `.meta({ id })` typo — the schema is registered under `User`, but the consumer refers to `Users`.
+- A named sub-schema referenced from a registered DTO's tree but never wrapped in `createZodDto` and never registered. `extend()` parents are auto-resolved since 1.6 (via `registerSchema`); for other cases, call `registerSchema(schema)` once or wrap the schema in `createZodDto`.
 
 The error message lists every offending ref with a hint from the collected-usage table: was the id seen on input only, output only, both, or unknown? "Unknown" usually means a missing `.meta({ id })` or unregistered DTO.
 

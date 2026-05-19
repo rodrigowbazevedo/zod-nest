@@ -431,7 +431,7 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 - `ZodNestModule.forRoot(options?)`, `ZodNestModuleOptions`, `DEFAULT_REDACT_KEYS`, `DEFAULT_MAX_LOGGED_VALUE_BYTES`, `ZOD_NEST_OPTIONS`
 
 **Schema engine** — single-schema mode and extension points
-- `toOpenApi(schema, opts)`, `createRegistry()`, `defaultRegistry`, `ZodNestRegistry`, `Override`, `OverrideContext`, `overrideJSONSchema(schema, fragment | { input?, output? })`, `OverrideJSONSchemaArg`, `ZodNestError`, `ZodNestUnrepresentableError`, `extend`, `getLineage`, `LineageEntry`
+- `toOpenApi(schema, opts)`, `createRegistry()`, `defaultRegistry`, `registerSchema(schema, registry?, options?)`, `ZodNestRegistry`, `RegisterSchemaOptions`, `Override`, `OverrideContext`, `overrideJSONSchema(schema, fragment | { input?, output? })`, `OverrideJSONSchemaArg`, `ZodNestError`, `ZodNestUnrepresentableError`, `extend`, `getLineage`, `LineageEntry`
 
 **Helpers** (subpath: `zod-nest/helpers`) — common JSON Schema fragments + presets for assembling overrides
 - **Fragment catalog** (frozen consts): `dateTimeFragment`, `dateFragment`, `timeFragment`, `uuidFragment`, `emailFragment`, `uriFragment`, `hostnameFragment`, `ipv4Fragment`, `ipv6Fragment`, `binaryFragment`, `byteFragment`, `int32Fragment`, `int64Fragment`, `floatFragment`, `doubleFragment`, `opaqueFragment`
