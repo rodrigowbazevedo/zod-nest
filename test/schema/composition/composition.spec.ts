@@ -4,7 +4,7 @@ import type { SchemaObject } from '../../../src/schema/openapi.types.js';
 
 import { extend } from '../../../src/schema/composition.js';
 import { toOpenApi } from '../../../src/schema/engine.js';
-import { createRegistry } from '../../../src/schema/registry.js';
+import { createRegistry, defaultRegistry } from '../../../src/schema/registry.js';
 
 const emit = (schema: z.ZodType): SchemaObject => {
   const registry = createRegistry();
@@ -172,6 +172,41 @@ describe('composition emission — interplay with primitiveOverride', () => {
     const body = emit(Child) as { allOf?: { properties?: Record<string, unknown> }[] };
     const delta = body.allOf?.[1];
     expect((delta?.properties?.counter as { type?: string })?.type).toBe('integer');
+  });
+});
+
+describe('composition emission — extend() auto-registers named parent + result', () => {
+  // Regression for the dangling-ref bug: Zod's `.extend()` flattens, so the
+  // parent isn't a transitive descendant of the result. `extend()` itself
+  // now eager-registers both (in defaultRegistry), and the composition
+  // override re-registers in the active registry as a backstop — together
+  // these guarantee the parent's body is emitted into `components.schemas`.
+
+  it('extend() eager-registers the named parent and result in defaultRegistry', () => {
+    const Parent = z.object({ x: z.string() }).meta({ id: 'Comp_Auto_Eager_Parent' });
+    const Child = extend(Parent, (s) =>
+      s.extend({ y: z.string() }).meta({ id: 'Comp_Auto_Eager_Child' }),
+    );
+    void Child;
+
+    const ids = new Set(defaultRegistry.ids());
+    expect(ids.has('Comp_Auto_Eager_Parent')).toBe(true);
+    expect(ids.has('Comp_Auto_Eager_Child')).toBe(true);
+  });
+
+  it('override-time backstop registers the parent in a custom registry at emit time', () => {
+    const Parent = z.object({ id: z.string() }).meta({ id: 'Comp_Auto_Backstop_Parent' });
+    const Child = extend(Parent, (s) =>
+      s.extend({ role: z.string() }).meta({ id: 'Comp_Auto_Backstop_Child' }),
+    );
+
+    // Fresh, isolated registry. extend() wrote to defaultRegistry above, so
+    // a positive result here proves the override-time call into this
+    // registry actually fired.
+    const registry = createRegistry();
+    toOpenApi(Child, { io: 'input', registry });
+
+    expect(new Set(registry.ids())).toEqual(new Set(['Comp_Auto_Backstop_Parent']));
   });
 });
 

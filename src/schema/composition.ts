@@ -12,6 +12,7 @@ import type { Override } from './override.js';
 import type { ZodNestRegistry } from './registry.js';
 
 import { DEFS_PREFIX } from './constants.js';
+import { registerSchema } from './registry.js';
 
 /**
  * Lineage record for a composition-derived schema. Read by the override to
@@ -74,6 +75,15 @@ export const extend = <P extends z.ZodObject, S extends z.ZodObject>(
   if (!propsMap.has(parent)) {
     propsMap.set(parent, computeShapeKeys(parent));
   }
+  // Auto-register named parent/result so their bodies land in
+  // `components.schemas`. Zod's `.extend()` produces a flat object, so the
+  // parent isn't a transitive descendant of the result — without this, a
+  // parent named only via `.meta({ id })` would be referenced by `$ref` but
+  // never emitted, yielding `DANGLING_REF`. No-op when the schema is
+  // anonymous. The composition override (below) re-registers against the
+  // active registry at emit time as a backstop for custom-registry users.
+  registerSchema(parent);
+  registerSchema(result);
   return result;
 };
 
@@ -128,6 +138,10 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
       // Anonymous parent — fall back to Zod's flat emission.
       return;
     }
+    // Backstop the eager `extend()` registration above: that only writes to
+    // `defaultRegistry`, so custom-registry users need the parent surfaced
+    // here too. Idempotent against the eager call.
+    registerSchema(entry.parent, registry);
 
     const childProps = jsonSchema.properties ?? {};
     const childRequired = jsonSchema.required ?? [];
