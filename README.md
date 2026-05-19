@@ -147,6 +147,8 @@ Every DTO is one Zod schema wrapped in a class. The class exists so NestJS' intr
 
 The class returned by `createZodDto(schema)` carries `schema`, `id`, `io: 'input'`, and a lazy `Output` sibling. `parse` / `safeParse` are static methods on the class. The class is tagged with `Symbol.for('zod-nest.dto')` so `ZodValidationPipe` and `ZodSerializerInterceptor` can discriminate it from plain constructors. The id comes from `schema.meta({ id })` when present (preferred) or from the second-argument options.
 
+When the inferred type is a union — bare `z.union`, `z.discriminatedUnion`, or `z.intersection(obj, union)` — TS rejects the union as a class base (`TS2509: Base constructor return type ... is not an object type`). To keep the class declaration compiling, the instance type is collapsed (lossy on mutually-exclusive discriminants). Use `Dto.parse(input)` to recover the precise `z.infer<typeof schema>` when working with unions.
+
 See [`docs/dto.md`](docs/dto.md) for the full surface.
 
 ### I/O suffix rules
