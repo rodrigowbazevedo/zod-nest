@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.6.0...v1.6.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **schema:** guard discoverDependents against undefined child slots ([#65](https://github.com/rodrigowbazevedo/zod-nest/issues/65)) ([25a578d](https://github.com/rodrigowbazevedo/zod-nest/commit/25a578d34ce4f21d46ecfb46f80d6cd994eee5e3))
+
 # [1.6.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.5.1...v1.6.0) (2026-05-19)
 
 
