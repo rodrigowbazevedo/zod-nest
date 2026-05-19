@@ -88,6 +88,51 @@ export class TemplatesController {
 
 Optionality on each property maps to OpenAPI `required: false`. Named property schemas (each property with its own `.meta({ id })`) become `$ref`s in the parameter; anonymous property schemas inline.
 
+## Swagger UI + `multipart/form-data` — `flatten: true`
+
+`@ZodBody` defaults to the most semantic emission: a `$ref` to `components.schemas[<id>]`, with `z.intersection(A, B)` rendered as `{ allOf: [{ $ref: A }, { $ref: B }] }`. Downstream codegen tools and most OpenAPI viewers handle this fine.
+
+**Swagger UI's `try-it-out` form generator for `multipart/form-data` does not.** It needs a flat `{ type: 'object', properties: {...} }` literal at the operation's `schema` site — it won't follow `$ref` and won't unwrap `allOf`. A file-upload endpoint whose body is `z.intersection(CandidateInput, ReferenceInput)` renders a single stub field instead of the actual form inputs (file pickers, array inputs, etc.).
+
+Opt into flattening with `flatten: true`:
+
+```ts
+const CreateTaxonomyTranslation = z.intersection(
+  CandidateInputSchema,
+  ReferenceInputSchema,
+);
+
+@Controller('taxonomy-translations')
+export class TaxonomyTranslationController {
+  @Post()
+  @ZodBody(CreateTaxonomyTranslation, { flatten: true })
+  async create(
+    @Body(new ZodValidationPipe(CreateTaxonomyTranslation))
+    body: z.infer<typeof CreateTaxonomyTranslation>,
+  ) {
+    /* ... */
+  }
+}
+```
+
+What it does:
+
+- Merges each intersection arm's `.shape` into a single anonymous `z.object` and emits that **inline** into the operation's request body — no `$ref`, no `allOf`, no `components.schemas` entry for the merged root.
+- Per-property `.meta({ id })` schemas keep their normal `$ref` emission (e.g. `candidate_trafficking: FileSchema` still refs `#/components/schemas/File`). Only the *root* is flattened.
+- Property collisions across arms resolve last-arm-wins, mirroring `z.object({ ...Left.shape, ...Right.shape })`.
+
+When to use it:
+
+- The endpoint's content type is `multipart/form-data` (file uploads, mixed binary + JSON fields) AND
+- You want Swagger UI's "Try it out" form to render the field inputs.
+
+When to skip it:
+
+- JSON-only endpoints — keep the default (`flatten: false`) to retain the structural composition in the doc.
+- Schemas that aren't pure intersections of objects — `flatten: true` throws if any arm is a union, primitive, or other non-object.
+
+This is a Swagger-UI compatibility escape hatch, not a general recommendation. Trade-off: the merged root no longer appears in `components.schemas`, so it can't be reused via `$ref` elsewhere. If you need both, split the schema across decorators.
+
 ## When to use `createZodDto` vs. these decorators
 
 | Schema shape | Recommended approach |

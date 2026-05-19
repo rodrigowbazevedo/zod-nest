@@ -164,4 +164,114 @@ describe('@ZodBody', () => {
     const props = body?.schema?.properties as Record<string, { $ref?: string }> | undefined;
     expect(props?.['child']?.$ref).toBe('#/components/schemas/ZodBody_NamedChild');
   });
+
+  describe('flatten: true', () => {
+    it('merges an intersection of two named object schemas into a flat inline body', () => {
+      const registry = createRegistry();
+      const Left = z.object({ a: z.string(), b: z.number() }).meta({ id: 'ZB_Flat_Left' });
+      const Right = z.object({ c: z.boolean() }).meta({ id: 'ZB_Flat_Right' });
+      const schema = z.intersection(Left, Right).meta({ id: 'ZB_Flat_Root' });
+
+      class Controller {
+        @Post()
+        @ZodBody(schema, { registry, flatten: true })
+        handler(): void {}
+      }
+
+      const body = findBody(Controller.prototype.handler);
+      expect(body?.schema?.$ref).toBeUndefined();
+      expect(body?.schema?.type).toBe('object');
+      const props = body?.schema?.properties as Record<string, unknown>;
+      expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c']);
+      // Root id is deliberately not registered when flattening — the merged
+      // object is anonymous and lives only in the operation body.
+      expect(registry.ids()).not.toContain('ZB_Flat_Root');
+    });
+
+    it('flattens nested intersections', () => {
+      const registry = createRegistry();
+      const A = z.object({ a: z.string() });
+      const B = z.object({ b: z.number() });
+      const C = z.object({ c: z.boolean() });
+      const schema = z.intersection(z.intersection(A, B), C);
+
+      class Controller {
+        @Post()
+        @ZodBody(schema, { registry, flatten: true })
+        handler(): void {}
+      }
+
+      const body = findBody(Controller.prototype.handler);
+      const props = body?.schema?.properties as Record<string, unknown>;
+      expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c']);
+    });
+
+    it('preserves per-property $ref for named child schemas', () => {
+      const registry = createRegistry();
+      const NamedChild = z.object({ v: z.string() }).meta({ id: 'ZB_Flat_NamedChild' });
+      const Left = z.object({ child: NamedChild });
+      const Right = z.object({ other: z.string() });
+      const schema = z.intersection(Left, Right);
+
+      class Controller {
+        @Post()
+        @ZodBody(schema, { registry, flatten: true })
+        handler(): void {}
+      }
+
+      const body = findBody(Controller.prototype.handler);
+      const props = body?.schema?.properties as Record<string, { $ref?: string; type?: string }>;
+      expect(props['child']?.$ref).toBe('#/components/schemas/ZB_Flat_NamedChild');
+      expect(props['other']?.type).toBe('string');
+      expect(registry.ids()).toContain('ZB_Flat_NamedChild');
+    });
+
+    it('resolves property collisions with last-arm-wins', () => {
+      const registry = createRegistry();
+      const Left = z.object({ dupe: z.string() });
+      const Right = z.object({ dupe: z.number() });
+      const schema = z.intersection(Left, Right);
+
+      class Controller {
+        @Post()
+        @ZodBody(schema, { registry, flatten: true })
+        handler(): void {}
+      }
+
+      const body = findBody(Controller.prototype.handler);
+      const props = body?.schema?.properties as Record<string, { type?: string }>;
+      // Right arm wins: `dupe` ends up as a number.
+      expect(props['dupe']?.type).toBe('number');
+    });
+
+    it('throws ZodNestError when an arm is not a z.object', () => {
+      const registry = createRegistry();
+      const objArm = z.object({ a: z.string() });
+      const unionArm = z.union([z.object({ x: z.number() }), z.object({ y: z.boolean() })]);
+      const schema = z.intersection(objArm, unionArm);
+
+      expect(() => ZodBody(schema, { registry, flatten: true })).toThrow(
+        /requires the schema to be a `z\.object\(\{\.\.\.\}\)` or an intersection whose arms are all object schemas/,
+      );
+    });
+
+    it('is a no-op for a bare z.object (emits the same body as without flatten)', () => {
+      const registry = createRegistry();
+      const schema = z.object({ q: z.string(), n: z.number() });
+
+      class Controller {
+        @Post('flat')
+        @ZodBody(schema, { registry, flatten: true })
+        flatHandler(): void {}
+
+        @Post('plain')
+        @ZodBody(schema, { registry })
+        plainHandler(): void {}
+      }
+
+      const flat = findBody(Controller.prototype.flatHandler);
+      const plain = findBody(Controller.prototype.plainHandler);
+      expect(flat?.schema).toEqual(plain?.schema);
+    });
+  });
 });
