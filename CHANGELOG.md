@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.5.1...v1.6.0) (2026-05-19)
+
+
+### Features
+
+* **schema:** auto-register named extend() parents via shared registerSchema helper ([#64](https://github.com/rodrigowbazevedo/zod-nest/issues/64)) ([2dba914](https://github.com/rodrigowbazevedo/zod-nest/commit/2dba914fa4baafb28e9f053fe535b347e718f11d)), closes [#63](https://github.com/rodrigowbazevedo/zod-nest/issues/63)
+
 ## [1.5.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.5.0...v1.5.1) (2026-05-19)
 
 
