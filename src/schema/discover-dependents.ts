@@ -93,7 +93,11 @@ export const discoverDependents = (schema: z.ZodType): ReadonlyArray<[z.ZodType,
     }
     visited.add(current);
     for (const child of collectChildren(current)) {
-      if (visited.has(child)) {
+      // Defensive: a malformed/in-progress schema can yield an undefined slot
+      // (sparse object shape, undefined tuple item, etc.). The walker treats
+      // such slots as "no child here" rather than crashing — the user's
+      // schema may still emit fine through `toJSONSchema`.
+      if (child === undefined || visited.has(child)) {
         continue;
       }
       const id = readId(child);
