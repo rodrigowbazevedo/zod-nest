@@ -99,6 +99,16 @@ class CasesController {
     { registry, flatten: true },
   )
   flattenedMultipart(): void {}
+
+  @Post('flattened-with-named-child')
+  @ZodBody(
+    z.intersection(
+      z.object({ blob: z.object({ raw: z.string() }).meta({ id: 'FlatNamedBlob' }) }),
+      z.object({ count: z.number() }),
+    ),
+    { registry, flatten: true },
+  )
+  flattenedWithNamedChild(): void {}
 }
 
 describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', () => {
@@ -193,5 +203,15 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     const schemas = doc.components?.schemas as Record<string, unknown>;
     expect(schemas['FlatLeft']).toBeUndefined();
     expect(schemas['FlatRight']).toBeUndefined();
+  });
+
+  it('emits components.schemas entries for named child schemas referenced inside a flattened body', () => {
+    // Regression: when `flatten: true` produces an inline body like
+    // `{ type: 'object', properties: { csv: { $ref: ... } } }`, the nested
+    // refs must still trigger emission. Earlier `collectUsage` only walked
+    // top-level `$ref`s in request bodies; nested refs inside flattened
+    // bodies got dropped, surfacing as `DANGLING_REF` at doc-build time.
+    const schemas = doc.components?.schemas as Record<string, unknown>;
+    expect(schemas['FlatNamedBlob']).toBeDefined();
   });
 });
