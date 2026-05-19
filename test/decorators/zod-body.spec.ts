@@ -347,5 +347,63 @@ describe('@ZodBody', () => {
       const plain = findBody(Controller.prototype.plainHandler);
       expect(flat?.schema).toEqual(plain?.schema);
     });
+
+    it('throws when an intersection has a non-object LEFT arm', () => {
+      const registry = createRegistry();
+      const schema = z.intersection(z.string(), z.object({ a: z.string() }));
+      expect(() => ZodBody(schema, { registry, flatten: true })).toThrow(
+        /requires every leaf of the schema to be a `z\.object\(\{\.\.\.\}\)`/,
+      );
+    });
+
+    it('throws when an intersection has a non-object RIGHT arm', () => {
+      const registry = createRegistry();
+      const schema = z.intersection(z.object({ a: z.string() }), z.string());
+      expect(() => ZodBody(schema, { registry, flatten: true })).toThrow(
+        /requires every leaf of the schema to be a `z\.object\(\{\.\.\.\}\)`/,
+      );
+    });
+
+    it('marks every property optional when only one arm of the intersection is union-shaped', () => {
+      // Mixed shape: pure object on the left, union of objects on the right.
+      // Exercises the `unionCrossed: left.unionCrossed || right.unionCrossed`
+      // branch where left=false / right=true.
+      const registry = createRegistry();
+      const schema = z.intersection(
+        z.object({ alwaysHere: z.string() }),
+        z.union([z.object({ v1: z.string() }), z.object({ v2: z.number() })]),
+      );
+
+      class Controller {
+        @Post()
+        @ZodBody(schema, { registry, flatten: true })
+        handler(): void {}
+      }
+
+      const body = findBody(Controller.prototype.handler);
+      const props = body?.schema?.properties as Record<string, unknown>;
+      expect(Object.keys(props).sort()).toEqual(['alwaysHere', 'v1', 'v2']);
+      const required = body?.schema?.required as unknown;
+      // unionCrossed → all properties optional, including `alwaysHere` from
+      // the non-union arm. Documented trade-off.
+      expect(required === undefined || (Array.isArray(required) && required.length === 0)).toBe(
+        true,
+      );
+    });
+
+    it('defaults to defaultRegistry when flatten:true is set without an explicit registry', () => {
+      // Exercises `options.registry ?? defaultRegistry` inside `resolveBodySchema`.
+      const schema = z.intersection(z.object({ x: z.string() }), z.object({ y: z.string() }));
+
+      class Controller {
+        @Post()
+        @ZodBody(schema, { flatten: true })
+        handler(): void {}
+      }
+
+      const body = findBody(Controller.prototype.handler);
+      const props = body?.schema?.properties as Record<string, unknown>;
+      expect(Object.keys(props).sort()).toEqual(['x', 'y']);
+    });
   });
 });
