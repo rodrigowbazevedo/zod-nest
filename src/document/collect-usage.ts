@@ -10,6 +10,7 @@ import { isZodDto } from '../dto/predicates.js';
 import { getResponseVariants } from '../response/metadata.js';
 import { COMPONENTS_SCHEMAS_PREFIX, ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
 import { HTTP_METHODS } from './http-methods.js';
+import { walkRefs } from './walk-refs.js';
 
 export interface CollectedUsage {
   /** dtoIds referenced as input via requestBody / parameters `$ref`s in the doc. */
@@ -159,25 +160,30 @@ const collectRefFromSchema = (
   if (!isPlainRecord(schema)) {
     return;
   }
-  const ref = schema.$ref;
-  if (typeof ref !== 'string' || !ref.startsWith(COMPONENTS_SCHEMAS_PREFIX)) {
-    return;
-  }
-  const className = ref.slice(COMPONENTS_SCHEMAS_PREFIX.length);
-  // Class-DTO refs go through the rename map (NestJS materializes
-  // `components.schemas[ClassName]` and the marker says the real dtoId is X).
-  // Decorator-emitted refs (`@ZodBody` / `@ZodQuery` / ...) target the id
-  // directly with no marker hop — match it against the registry's known ids.
-  // Refs to anything else (third-party `@ApiResponse({ schema: { $ref } })`)
-  // are left untouched.
-  const renamed = classToDtoId.get(className);
-  if (renamed !== undefined) {
-    ids.add(renamed);
-    return;
-  }
-  if (knownIds.has(className)) {
-    ids.add(className);
-  }
+  // Deep-walk so refs nested inside an inline body (e.g. `@ZodBody` with
+  // `flatten: true` emits `{ type: 'object', properties: { p: { $ref } } }`)
+  // are seeded too — the closure pass `extendExposureViaRefs` only walks
+  // emitted bodies, not inline operation bodies, so it can't pick up
+  // nested refs that never lived in `inputSchemas` / `outputSchemas`.
+  walkRefs(schema, (ref) => {
+    if (!ref.startsWith(COMPONENTS_SCHEMAS_PREFIX)) {
+      return undefined;
+    }
+    const className = ref.slice(COMPONENTS_SCHEMAS_PREFIX.length);
+    // Class-DTO refs go through the rename map (NestJS materializes
+    // `components.schemas[ClassName]` and the marker says the real dtoId is X).
+    // Decorator-emitted refs (`@ZodBody` / `@ZodQuery` / ...) target the id
+    // directly with no marker hop — match it against the registry's known ids.
+    // Refs to anything else (third-party `@ApiResponse({ schema: { $ref } })`)
+    // are left untouched.
+    const renamed = classToDtoId.get(className);
+    if (renamed !== undefined) {
+      ids.add(renamed);
+    } else if (knownIds.has(className)) {
+      ids.add(className);
+    }
+    return undefined;
+  });
 };
 
 const collectOutputExposedIds = (app: INestApplication): Set<string> => {
