@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`toOpenApi — composite snapshot renders a multi-feature composite as expected: user-refs 1`] = `
 {

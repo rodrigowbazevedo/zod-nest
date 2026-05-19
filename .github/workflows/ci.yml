@@ -12,12 +12,13 @@ concurrency:
 
 jobs:
   build:
-    name: Node ${{ matrix.node }}
+    # Node 24 is the build/release Node (see release.yml). Node 22 client
+    # compatibility is verified separately by the compat-matrix workflow,
+    # which cross-products peer-dep cells with Node 22 + Node 24 and runs
+    # pack-smoke under each. Keeping the standard PR gate to a single
+    # Node version keeps the gate fast.
+    name: Node 24
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node: ['22', '24']
     env:
       HUSKY: '0'
     steps:
@@ -25,7 +26,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node }}
+          node-version: '24'
           cache: npm
 
       - run: npm ci
@@ -45,7 +46,6 @@ jobs:
       - run: npm run pack:smoke
 
       - name: Upload coverage to Codecov
-        if: matrix.node == '24'
         uses: codecov/codecov-action@v6
         with:
           files: ./coverage/lcov.info
@@ -53,7 +53,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test results to Codecov
-        if: matrix.node == '24' && !cancelled()
+        if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           files: ./reports/junit.xml
