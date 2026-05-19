@@ -16,7 +16,7 @@ This guide is for projects on the public [`nestjs-zod`](https://github.com/BenLo
 
 - **Zod `>=4.4.0 <5.0.0`**. Migrate from v3 first if you haven't; [Zod's v3-to-v4 guide](https://zod.dev/v4) is the path.
 - **NestJS `>=11.0.1 <12.0.0`** (both `@nestjs/common` and `@nestjs/core`). **`@nestjs/swagger` `>=11.0.0 <12.0.0`** — swagger 11 was the first release to accept nest 11 as a peer.
-- **`rxjs` `>=7.1.0 <8.0.0`** (typically pulled in transitively by NestJS).
+- **`rxjs` `>=7.6.0 <8.0.0`** (typically pulled in transitively by NestJS). The `>=7.6.0` floor matches the rxjs minor that added `types` to its `exports` map — earlier minors don't expose TypeScript declarations under `moduleResolution: 'Bundler'`, so compiling against `zod-nest`'s shipped `.d.ts` would fail.
 - **`reflect-metadata` `>=0.2.0 <0.3.0`** — this is now a declared peer; install it explicitly if your existing setup only had it transitively from NestJS 10.
 - **Node `>=22`**.
 - **Drop `class-validator` / `class-transformer`** if you installed them only for `nestjs-zod` interop. If they're used elsewhere in your app (legacy DTOs, custom validators), leave them — `zod-nest` doesn't conflict, it just doesn't interoperate.
