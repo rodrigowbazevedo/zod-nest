@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.7.1...v1.8.0) (2026-05-19)
+
+
+### Features
+
+* **decorators:** @ZodBody({ flatten: true }) for Swagger UI multipart compatibility ([#80](https://github.com/rodrigowbazevedo/zod-nest/issues/80)) ([4373f37](https://github.com/rodrigowbazevedo/zod-nest/commit/4373f3794ddb94d7cd5289e33cb626080ee35394)), closes [#71](https://github.com/rodrigowbazevedo/zod-nest/issues/71)
+
 ## [1.7.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.7.0...v1.7.1) (2026-05-19)
 
 
