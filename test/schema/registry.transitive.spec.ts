@@ -152,6 +152,22 @@ describe('ZodNestRegistry.register() — transitive closure', () => {
     expect(collisions.get('Trans_Collide')?.size).toBe(2);
   });
 
+  it('skips an undefined child slot in the tree (defensive — no crash on malformed shapes)', () => {
+    // Construct an object whose shape silently carries an undefined slot.
+    // TypeScript would refuse this assignment, so we route around it via
+    // `Object.assign` to mimic the runtime shape user code can produce when
+    // an Object spread / conditional yields undefined.
+    const Named = z.string().meta({ id: 'Trans_UndefSlot_Named' });
+    const Parent = z.object({ named: Named });
+    Object.assign(Parent._zod.def.shape as Record<string, unknown>, { ghost: undefined });
+
+    const registry = createRegistry();
+    expect(() => registry.register(Parent, 'Trans_UndefSlot_Parent')).not.toThrow();
+    expect(new Set(registry.ids())).toEqual(
+      new Set(['Trans_UndefSlot_Parent', 'Trans_UndefSlot_Named']),
+    );
+  });
+
   it('is idempotent: re-registering the same schema/id is a no-op', () => {
     const Child = z.enum(['p', 'q']).meta({ id: 'Trans_Idem_Child' });
     const Parent = z.object({ child: Child });
