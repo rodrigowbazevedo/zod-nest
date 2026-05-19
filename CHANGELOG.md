@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.8.0...v1.8.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **document:** seed inputExposedIds from nested $refs in inline body schemas ([#82](https://github.com/rodrigowbazevedo/zod-nest/issues/82)) ([55a50d4](https://github.com/rodrigowbazevedo/zod-nest/commit/55a50d4f38ff40789ad1c2d3fa540245626ee902))
+
 # [1.8.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.7.1...v1.8.0) (2026-05-19)
 
 
