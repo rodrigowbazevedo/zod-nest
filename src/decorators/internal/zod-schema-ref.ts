@@ -19,7 +19,7 @@ import { defaultRegistry, registerSchema } from '../../schema/registry.js';
  *   any nested `$ref`s inside the inline body resolve at doc-build time.
  */
 export type SchemaRefResolution =
-  | { readonly kind: 'ref'; readonly id: string; readonly ref: { readonly $ref: string } }
+  | { readonly kind: 'ref'; readonly ref: { readonly $ref: string } }
   | { readonly kind: 'inline'; readonly schema: Record<string, unknown> };
 
 export interface ResolveSchemaRefOptions {
@@ -43,7 +43,7 @@ export const resolveSchemaRef = (
   const registry = options?.registry ?? defaultRegistry;
   const id = registerSchema(schema, registry, { id: options?.id });
   if (id !== undefined) {
-    return { kind: 'ref', id, ref: { $ref: `#/components/schemas/${id}` } };
+    return { kind: 'ref', ref: { $ref: `#/components/schemas/${id}` } };
   }
   for (const [child, childId] of discoverDependents(schema)) {
     registry.register(child, childId);

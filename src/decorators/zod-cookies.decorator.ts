@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type ZodNestRegistry } from '../schema/registry.js';
+import { API_PARAMETERS_KEY } from './internal/constants.js';
 import { expandObjectSchema, paramSchemaBody } from './internal/zod-param-expand.js';
 
 export interface ZodCookiesOptions {
@@ -9,15 +10,6 @@ export interface ZodCookiesOptions {
   /** Registry to register into. Defaults to `defaultRegistry`. */
   readonly registry?: ZodNestRegistry;
 }
-
-/**
- * `@nestjs/swagger`'s metadata key for accumulated parameter objects. Each
- * entry is `{ name, in, schema, required, ... }`. Mirrored verbatim from
- * `@nestjs/swagger/dist/constants.js`'s `DECORATORS.API_PARAMETERS` —
- * inlined as a string literal so we don't reach into the package's deep
- * import paths.
- */
-const API_PARAMETERS_KEY = 'swagger/apiParameters';
 
 interface CookieParameter {
   readonly name: string;

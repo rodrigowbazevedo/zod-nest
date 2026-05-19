@@ -3,19 +3,10 @@ import { z } from 'zod';
 import type { ZodNestRegistry } from '../../schema/registry.js';
 import type { SchemaRefResolution } from './zod-schema-ref.js';
 
+import { isOptionalProp } from '../../schema/composition.js';
 import { ZodNestError } from '../../schema/errors.js';
 import { defaultRegistry, registerSchema } from '../../schema/registry.js';
 import { resolveSchemaRef } from './zod-schema-ref.js';
-
-/**
- * Zod wrapper types that make a property's `required: false` in the
- * OpenAPI sense. Mirrors `src/schema/composition.ts:42` so a single source
- * of truth applies across composition and parameter expansion.
- */
-const OPTIONAL_WRAPPER_TYPES: ReadonlySet<string> = new Set(['optional', 'default']);
-
-const isOptionalProp = (propSchema: z.ZodType): boolean =>
-  OPTIONAL_WRAPPER_TYPES.has(propSchema._zod.def.type);
 
 const isZodObject = (schema: z.ZodType): schema is z.ZodObject => schema._zod.def.type === 'object';
 

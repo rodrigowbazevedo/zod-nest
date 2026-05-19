@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type ZodNestRegistry } from '../schema/registry.js';
+import { API_PARAMETERS_KEY } from './internal/constants.js';
 import { expandObjectSchema, paramSchemaBody } from './internal/zod-param-expand.js';
 
 export interface ZodHeadersOptions {
@@ -9,12 +10,6 @@ export interface ZodHeadersOptions {
   /** Registry to register into. Defaults to `defaultRegistry`. */
   readonly registry?: ZodNestRegistry;
 }
-
-/**
- * `@nestjs/swagger`'s method-level parameters metadata key. Mirrored verbatim
- * from `@nestjs/swagger/dist/constants.js`'s `DECORATORS.API_PARAMETERS`.
- */
-const API_PARAMETERS_KEY = 'swagger/apiParameters';
 
 interface HeaderParameter {
   readonly name: string;
