@@ -21,6 +21,14 @@ export type OverrideJSONSchemaArg = SchemaObject | { input?: SchemaObject; outpu
 export interface StoredFragments {
   input?: SchemaObject;
   output?: SchemaObject;
+  /**
+   * Description captured from the Zod schema at `overrideJSONSchema(...)` call
+   * time (`.describe(...)` / `.meta({ description })` both write to
+   * `z.globalRegistry`). Applied as a fallback at emission time when the
+   * per-direction fragment doesn't supply its own `description`. Fragment-
+   * supplied descriptions still win.
+   */
+  description?: string;
 }
 
 /**
@@ -69,7 +77,12 @@ export const overrideJSONSchema = <T extends z.ZodType>(
   schema: T,
   arg: OverrideJSONSchemaArg,
 ): T => {
-  const overrideSchema = isWrapper(arg) ? arg : { input: arg, output: arg };
+  const overrideSchema: StoredFragments = isWrapper(arg) ? { ...arg } : { input: arg, output: arg };
+
+  const schemaDescription = schema.description;
+  if (typeof schemaDescription === 'string') {
+    overrideSchema.description = schemaDescription;
+  }
 
   customOverrideMap.set(schema, overrideSchema);
 
@@ -97,6 +110,12 @@ export const peekRegistration = (schema: $ZodType): StoredFragments | undefined 
  * `ctx.jsonSchema = newObj` reassignments — only mutations on the existing
  * object reach the caller (see `composition.ts` for the same constraint).
  *
+ * Falls back to the schema's captured `description` (from `.describe(...)` /
+ * `.meta({ description })`) when the per-direction fragment doesn't supply
+ * one. Captured at `overrideJSONSchema(...)` call time so the inheritance
+ * doesn't depend on Zod's emission-time metadata pass. `title` is
+ * deliberately not inherited.
+ *
  * No-ops if the schema isn't registered, or if the registered record has no
  * fragment for the current `io` direction.
  */
@@ -114,5 +133,8 @@ export const createCustomOverride = (io: 'input' | 'output'): Override => {
       Reflect.deleteProperty(jsonSchema, key);
     }
     Object.assign(jsonSchema, fragment);
+    if (fragment.description === undefined && record.description !== undefined) {
+      jsonSchema.description = record.description;
+    }
   };
 };

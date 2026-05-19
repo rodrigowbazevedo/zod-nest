@@ -232,4 +232,100 @@ describe('overrideJSONSchema', () => {
       expect(toOpenApi(outer, { io: 'output', registry }).schema).toEqual(fragment);
     });
   });
+
+  describe('description inheritance', () => {
+    // `overrideJSONSchema` reads `schema.description` (the Zod v4 getter,
+    // sourced from `.describe(...)` and `.meta({ description })`) at call
+    // time and snapshots it onto `StoredFragments.description`. At emission
+    // time, the per-direction fragment wins; if it omits `description`, the
+    // captured value fills in. `title` is deliberately not inherited.
+    //
+    // A few tests use `z.globalRegistry.add(...)` directly to attach a
+    // description without producing a clone, sidestepping an unrelated
+    // strict-mode trip on the inner pre-clone instance.
+
+    it('inherits a `.describe(...)` description when the fragment omits one', () => {
+      const FileSchema = z.instanceof(File).describe('uploaded file');
+      overrideJSONSchema(FileSchema, { type: 'string', format: 'binary' });
+
+      expect(toOpenApi(FileSchema, { io: 'input', registry, strict: false }).schema).toEqual({
+        type: 'string',
+        format: 'binary',
+        description: 'uploaded file',
+      });
+    });
+
+    it('inherits a globalRegistry-set description when the fragment omits one', () => {
+      const FileSchema = z.instanceof(File);
+      z.globalRegistry.add(FileSchema, { description: 'uploaded file' });
+      overrideJSONSchema(FileSchema, { type: 'string', format: 'binary' });
+
+      expect(toOpenApi(FileSchema, { io: 'input', registry }).schema).toEqual({
+        type: 'string',
+        format: 'binary',
+        description: 'uploaded file',
+      });
+    });
+
+    it('fragment-supplied description wins over the captured schema description', () => {
+      const FileSchema = z.instanceof(File);
+      z.globalRegistry.add(FileSchema, { description: 'zod-side' });
+      overrideJSONSchema(FileSchema, {
+        type: 'string',
+        format: 'binary',
+        description: 'fragment-side',
+      });
+
+      expect(toOpenApi(FileSchema, { io: 'input', registry }).schema).toEqual({
+        type: 'string',
+        format: 'binary',
+        description: 'fragment-side',
+      });
+    });
+
+    it('does NOT inherit title from the schema (title is reserved for other schemas)', () => {
+      const FileSchema = z.instanceof(File);
+      z.globalRegistry.add(FileSchema, { title: 'UploadedFile', description: 'a file' });
+      overrideJSONSchema(FileSchema, { type: 'string', format: 'binary' });
+
+      const out = toOpenApi(FileSchema, { io: 'input', registry }).schema;
+      expect(out).toEqual({
+        type: 'string',
+        format: 'binary',
+        description: 'a file',
+      });
+      expect(out.title).toBeUndefined();
+    });
+
+    it('captures at call time: later description changes are not re-read', () => {
+      const FileSchema = z.instanceof(File);
+      z.globalRegistry.add(FileSchema, { description: 'at-call' });
+      overrideJSONSchema(FileSchema, { type: 'string', format: 'binary' });
+      z.globalRegistry.add(FileSchema, { description: 'changed-after' });
+
+      expect(toOpenApi(FileSchema, { io: 'input', registry }).schema).toEqual({
+        type: 'string',
+        format: 'binary',
+        description: 'at-call',
+      });
+    });
+
+    it('wrapper form: captured description fills omitted sides, supplied sides are unchanged', () => {
+      const Schema = z.custom<{ kind: 'thing' }>();
+      z.globalRegistry.add(Schema, { description: 'shared' });
+      overrideJSONSchema(Schema, {
+        input: { type: 'string' },
+        output: { type: 'object', description: 'out-only' },
+      });
+
+      expect(toOpenApi(Schema, { io: 'input', registry }).schema).toEqual({
+        type: 'string',
+        description: 'shared',
+      });
+      expect(toOpenApi(Schema, { io: 'output', registry }).schema).toEqual({
+        type: 'object',
+        description: 'out-only',
+      });
+    });
+  });
 });
