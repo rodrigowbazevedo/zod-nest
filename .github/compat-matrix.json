@@ -8,7 +8,7 @@
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
     {
@@ -18,7 +18,7 @@
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
     {
@@ -28,7 +28,7 @@
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
     {
@@ -38,7 +38,7 @@
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
     {
@@ -48,7 +48,7 @@
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
       "@nestjs/swagger": "latest",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
     {
@@ -58,7 +58,7 @@
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
       "@nestjs/swagger": "latest",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
     {
@@ -88,7 +88,7 @@
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "latest"
     },
     {
@@ -98,7 +98,7 @@
       "@nestjs/common": "11.0.1",
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
-      "rxjs": "7.1.0",
+      "rxjs": "7.6.0",
       "reflect-metadata": "latest"
     },
     {
