@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.5.0...v1.5.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **schema:** inherit Zod-side description in overrideJSONSchema when fragment omits one ([#62](https://github.com/rodrigowbazevedo/zod-nest/issues/62)) ([c7f9565](https://github.com/rodrigowbazevedo/zod-nest/commit/c7f9565c6b4a7be46ba4f790446fa58637ff975c)), closes [#61](https://github.com/rodrigowbazevedo/zod-nest/issues/61)
+
 # [1.5.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.4.0...v1.5.0) (2026-05-18)
 
 
