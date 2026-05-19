@@ -39,9 +39,9 @@ const propsMap = new WeakMap<
 >();
 
 /** Zod's wrapper types that make a property optional in JSON Schema's `required` sense. */
-const OPTIONAL_WRAPPER_TYPES: ReadonlySet<string> = new Set(['optional', 'default']);
+export const OPTIONAL_WRAPPER_TYPES: ReadonlySet<string> = new Set(['optional', 'default']);
 
-const isOptionalProp = (propSchema: z.ZodType): boolean =>
+export const isOptionalProp = (propSchema: z.ZodType): boolean =>
   OPTIONAL_WRAPPER_TYPES.has(propSchema._zod.def.type);
 
 const computeShapeKeys = (

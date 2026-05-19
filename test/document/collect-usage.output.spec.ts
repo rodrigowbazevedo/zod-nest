@@ -10,6 +10,9 @@ import type { OpenAPIObject } from '@nestjs/swagger';
 
 import { createZodDto, ZodResponse } from '../../src';
 import { collectUsage } from '../../src/document/collect-usage.js';
+import { createRegistry } from '../../src/schema/registry.js';
+
+const stubRegistry = createRegistry();
 
 class UserDto extends createZodDto(z.object({ id: z.string() }), { id: 'CollectOut_User' }) {}
 class ErrorDto extends createZodDto(z.object({ msg: z.string() }), { id: 'CollectOut_Error' }) {}
@@ -75,7 +78,7 @@ describe('collectUsage — controller walk (output side)', () => {
   });
 
   it('collects dtoIds from single, array, and tuple @ZodResponse variants across all controllers', () => {
-    const { outputExposedIds } = collectUsage(emptyDoc(), app);
+    const { outputExposedIds } = collectUsage(emptyDoc(), app, stubRegistry);
     expect([...outputExposedIds].sort()).toEqual([
       'CollectOut_Error',
       'CollectOut_Tag',
@@ -84,7 +87,7 @@ describe('collectUsage — controller walk (output side)', () => {
   });
 
   it('deduplicates ids across multiple variants referencing the same DTO', () => {
-    const { outputExposedIds } = collectUsage(emptyDoc(), app);
+    const { outputExposedIds } = collectUsage(emptyDoc(), app, stubRegistry);
     // UserDto appears in `one` (status 200), `list` (array), and `pair` (tuple[0]) — only one entry.
     const userCount = [...outputExposedIds].filter((id) => id === 'CollectOut_User').length;
     expect(userCount).toBe(1);
@@ -93,7 +96,7 @@ describe('collectUsage — controller walk (output side)', () => {
   it('ignores controller handlers without @ZodResponse metadata', () => {
     // PlainController.hello and UsersController.noResponse have no @ZodResponse;
     // their absence is implicit — no errors thrown, no extra ids emitted.
-    const { outputExposedIds } = collectUsage(emptyDoc(), app);
+    const { outputExposedIds } = collectUsage(emptyDoc(), app, stubRegistry);
     expect(outputExposedIds.has('CollectOut_User')).toBe(true);
     expect(outputExposedIds.size).toBe(3);
   });
@@ -108,7 +111,7 @@ describe('collectUsage — controller walk edge cases', () => {
     const localApp = moduleRef.createNestApplication({ logger: false });
     await localApp.init();
 
-    const { outputExposedIds } = collectUsage(emptyDoc(), localApp);
+    const { outputExposedIds } = collectUsage(emptyDoc(), localApp, stubRegistry);
     expect(outputExposedIds.size).toBe(0);
 
     await localApp.close();
@@ -129,7 +132,7 @@ describe('collectUsage — controller walk edge cases', () => {
       }),
     } as unknown as INestApplication;
 
-    const { outputExposedIds } = collectUsage(emptyDoc(), fakeApp);
+    const { outputExposedIds } = collectUsage(emptyDoc(), fakeApp, stubRegistry);
     expect(outputExposedIds.size).toBe(0);
   });
 });

@@ -24,6 +24,7 @@ For the long-form motivation, see [`docs/why-this-exists.md`](docs/why-this-exis
 - **`createZodDto`** — class wrapper around a Zod schema with introspectable `schema`, `id`, `io`, and a sibling `Output` class when input/output diverge.
 - **`ZodValidationPipe`** — auto-detects DTO from handler-arg metatype, accepts an explicit DTO or raw Zod schema, customizable exception factory.
 - **`@ZodResponse`** — stackable per status code, accepts a single DTO, an array (`[Dto]`), or a tuple (`[A, B, …]`). No internal `@HttpCode` — caller controls status.
+- **`@ZodBody` / `@ZodQuery` / `@ZodHeaders` / `@ZodCookies`** — method-level decorators that wire OpenAPI docs for schemas whose `z.infer<>` is a union (intersection-of-union, discriminated unions, etc.) — the ones that can't be wrapped in `createZodDto` because TS refuses unions as class bases (TS2509). Schema validation stays via `@Body(new ZodValidationPipe(schema))`; the type at the handler arg stays `z.infer<>`.
 - **`ZodSerializerInterceptor`** — response validation with a `passthroughOnError` escape hatch for untrusted upstream shapes.
 - **`applyZodNest`** — one call after `SwaggerModule.createDocument(...)` replaces the entire `cleanupOpenApiDoc` ritual.
 - **`ZodNestModule.forRoot`** — global pipe + interceptor + logging configuration in one place; optional (everything works standalone).
@@ -148,6 +149,37 @@ Every DTO is one Zod schema wrapped in a class. The class exists so NestJS' intr
 The class returned by `createZodDto(schema)` carries `schema`, `id`, `io: 'input'`, and a lazy `Output` sibling. `parse` / `safeParse` are static methods on the class. The class is tagged with `Symbol.for('zod-nest.dto')` so `ZodValidationPipe` and `ZodSerializerInterceptor` can discriminate it from plain constructors. The id comes from `schema.meta({ id })` when present (preferred) or from the second-argument options.
 
 See [`docs/dto.md`](docs/dto.md) for the full surface.
+
+### Schemas that don't fit a class
+
+A schema whose `z.infer<>` is a TypeScript union — `z.union`, `z.discriminatedUnion`, or `z.intersection(obj, union)` — can't be used as a class base because TS rejects unions as constructor return types (TS2509: *Base constructor return type ... is not an object type*). For these, skip `createZodDto` and pair the raw schema with parameter-level decorators that handle OpenAPI emission directly:
+
+```ts
+const IntersectionWithUnion = z
+  .intersection(
+    z.union([z.object({ a: z.string() }), z.object({ b: z.string() })]),
+    z.union([z.object({ c: z.string() }), z.object({ d: z.string() })]),
+  )
+  .meta({ id: 'IntersectionWithUnion' });
+
+type IntersectionWithUnionType = z.infer<typeof IntersectionWithUnion>;
+
+@Controller()
+export class Controller {
+  @Post()
+  @ZodBody(IntersectionWithUnion)
+  async post(
+    @Body(new ZodValidationPipe(IntersectionWithUnion))
+    body: IntersectionWithUnionType,
+  ): Promise<IntersectionWithUnionType> {
+    return body;
+  }
+}
+```
+
+The decorator set: `@ZodBody`, `@ZodQuery`, `@ZodHeaders`, `@ZodCookies`. All are method-level. They register the schema in the registry (so it lands in `components.schemas` when named) and apply the matching OpenAPI parameter metadata — `@ZodBody` writes the request body's `$ref`/inline schema; `@ZodQuery` / `@ZodHeaders` / `@ZodCookies` expand a `z.object` into one OpenAPI parameter per property. Validation stays manual via `@Body(new ZodValidationPipe(schema))` so the handler arg keeps its precise `z.infer<>` type.
+
+See [`docs/recipes/intersection-with-union.md`](docs/recipes/intersection-with-union.md) for the full pattern.
 
 ### I/O suffix rules
 
@@ -423,6 +455,9 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 
 **Response** — [`docs/responses.md`](docs/responses.md)
 - `@ZodResponse({ status?, type, description?, passthroughOnError? })`, `ZodSerializerInterceptor`, `ZodSerializationException`, `defaultStatusFor`, `resolveEffectiveStatus`, `ResponseStatusInput`, `ResponseStatusWildcard`, `ResponseVariant`, `ZOD_RESPONSES_METADATA_KEY`
+
+**Parameter decorators for raw schemas** — [`docs/recipes/intersection-with-union.md`](docs/recipes/intersection-with-union.md)
+- `@ZodBody(schema, options?)`, `@ZodQuery(schema, options?)`, `@ZodHeaders(schema, options?)`, `@ZodCookies(schema, options?)`, `ZodBodyOptions`, `ZodQueryOptions`, `ZodHeadersOptions`, `ZodCookiesOptions`
 
 **Document** — [`docs/swagger-integration.md`](docs/swagger-integration.md)
 - `applyZodNest(rawDoc, options)`, `ApplyZodNestOptions`, `ZodNestDocumentError`
