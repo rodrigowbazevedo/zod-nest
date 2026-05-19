@@ -67,7 +67,7 @@ export interface ApplyZodNestOptions {
 export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions): OpenAPIObject => {
   const registry = opts.registry ?? defaultRegistry;
 
-  const collected = collectUsage(doc, opts.app);
+  const collected = collectUsage(doc, opts.app, registry);
   const { inputSchemas, outputSchemas } = bulkEmit({
     registry,
     override: opts.override,

@@ -92,6 +92,23 @@ The error `details` carry `{ dtoId, in, io }` so the offending decorator is easy
 - Restructure the schema as an object whose fields become the parameters (the more common fix when the original DTO is a tuple or discriminated union).
 - For one-off primitive parameters, drop the DTO entirely and inline the type: `@Query('q') q: string` is a no-op for `ZodValidationPipe` (see [`validation-pipe.md`](validation-pipe.md)).
 
+## Bypassing `createZodDto` for union-typed schemas
+
+`createZodDto` requires the schema's `z.infer<>` to resolve to a single object type, since TS rejects unions as class bases (TS2509). For schemas where that doesn't hold — `z.intersection(obj, union)`, `z.discriminatedUnion`, or bare `z.union` — use the parameter-level decorators instead. They share the same registry + emission pipeline as `createZodDto` but skip the class step entirely:
+
+| Decorator | OpenAPI target | Schema requirement |
+|---|---|---|
+| `@ZodBody(schema, opts?)` | request body — `requestBody.content[...].schema` | any |
+| `@ZodQuery(schema, opts?)` | one query parameter per top-level property | must be `z.object` |
+| `@ZodHeaders(schema, opts?)` | one header parameter per top-level property | must be `z.object` |
+| `@ZodCookies(schema, opts?)` | one cookie parameter per top-level property | must be `z.object` |
+
+All decorators are method-level (applied next to `@Get` / `@Post` / etc.). Validation stays a separate concern — pair with `@Body(new ZodValidationPipe(schema))` (or `@Query(...)`, etc.) at the parameter so the handler arg keeps a precise `z.infer<>` type.
+
+Schema id resolution mirrors `createZodDto`: `options.id` overrides any `.meta({ id })` on the schema. When the schema has no id, the JSON Schema body is inlined directly into the operation (the schema is not added to `components.schemas` for reuse — that's the documented trade-off for anonymous use).
+
+For the full pattern with code, see [`recipes/intersection-with-union.md`](recipes/intersection-with-union.md).
+
 ### `DANGLING_REF`
 
 A `$ref` in the doc points at a `components.schemas` key that no longer exists after `applyZodNest`. Usually means:

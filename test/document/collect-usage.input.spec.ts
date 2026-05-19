@@ -4,10 +4,16 @@ import type { OpenAPIObject } from '@nestjs/swagger';
 import { collectUsage } from '../../src/document/collect-usage.js';
 import { makeZodDtoMarker } from '../../src/dto/marker.js';
 import { ZOD_NEST_DTO_EXTENSION } from '../../src/schema/constants.js';
+import { createRegistry } from '../../src/schema/registry.js';
 
 const stubApp = {
   get: () => ({ getControllers: () => [] }),
 } as unknown as INestApplication;
+
+// Fresh empty registry per test invocation — the existing suite predates
+// decorator-emitted refs (which need the registry to seed exposed ids) so
+// an empty registry matches the pre-change behavior exactly.
+const stubRegistry = createRegistry();
 
 const makeDoc = (override: { paths?: unknown; components?: unknown } = {}): OpenAPIObject =>
   ({
@@ -28,7 +34,11 @@ const markerSchema = (dtoId: string, io: 'input' | 'output' = 'input'): unknown 
 describe('collectUsage — input side + class→dtoId map', () => {
   it('returns empty sets when the doc has no zod-nest markers', () => {
     const doc = makeDoc();
-    const { inputExposedIds, outputExposedIds, classToDtoId } = collectUsage(doc, stubApp);
+    const { inputExposedIds, outputExposedIds, classToDtoId } = collectUsage(
+      doc,
+      stubApp,
+      stubRegistry,
+    );
 
     expect(inputExposedIds.size).toBe(0);
     expect(outputExposedIds.size).toBe(0);
@@ -46,7 +56,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       },
     });
 
-    const { classToDtoId } = collectUsage(doc, stubApp);
+    const { classToDtoId } = collectUsage(doc, stubApp, stubRegistry);
 
     expect(classToDtoId.get('UserDto')).toBe('User');
     expect(classToDtoId.get('TagDto')).toBe('Tag');
@@ -69,7 +79,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       components: { schemas: { UserDto: markerSchema('User') } },
     });
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect([...inputExposedIds]).toEqual(['User']);
   });
 
@@ -99,7 +109,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       },
     });
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect([...inputExposedIds]).toEqual(['TemplatesPaginationParams']);
   });
 
@@ -131,7 +141,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       },
     });
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect([...inputExposedIds]).toEqual(['RealDto']);
   });
 
@@ -152,7 +162,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       },
     });
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect([...inputExposedIds].sort()).toEqual(['Id', 'Query']);
   });
 
@@ -172,7 +182,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       components: { schemas: { NativeDto: { type: 'object' } } },
     });
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect(inputExposedIds.size).toBe(0);
   });
 
@@ -192,7 +202,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       components: { schemas: { FooDto: markerSchema('Bar') } },
     });
 
-    const { inputExposedIds, classToDtoId } = collectUsage(doc, stubApp);
+    const { inputExposedIds, classToDtoId } = collectUsage(doc, stubApp, stubRegistry);
     expect([...inputExposedIds]).toEqual(['Bar']);
     expect(classToDtoId.get('FooDto')).toBe('Bar');
   });
@@ -214,7 +224,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       components: { schemas: { UserDto: markerSchema('User') } },
     });
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect([...inputExposedIds]).toEqual(['User']);
   });
 
@@ -239,7 +249,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       components: { schemas: { UserDto: markerSchema('User') } },
     });
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect([...inputExposedIds]).toEqual(['User']);
   });
 
@@ -259,7 +269,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       },
     } as unknown as OpenAPIObject;
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect(inputExposedIds.size).toBe(0);
   });
 
@@ -280,7 +290,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       components: { schemas: { UserDto: markerSchema('User') } },
     } as unknown as OpenAPIObject;
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect(inputExposedIds.size).toBe(0);
   });
 
@@ -301,7 +311,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       },
     } as unknown as OpenAPIObject;
 
-    const { inputExposedIds } = collectUsage(doc, stubApp);
+    const { inputExposedIds } = collectUsage(doc, stubApp, stubRegistry);
     expect(inputExposedIds.size).toBe(0);
   });
 
@@ -321,7 +331,7 @@ describe('collectUsage — input side + class→dtoId map', () => {
       },
     } as unknown as OpenAPIObject;
 
-    const { classToDtoId } = collectUsage(doc, stubApp);
+    const { classToDtoId } = collectUsage(doc, stubApp, stubRegistry);
     expect(classToDtoId.size).toBe(0);
   });
 });

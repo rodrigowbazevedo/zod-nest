@@ -39,9 +39,13 @@ export type {
   ZodValidationPipeArg,
   ZodValidationPipeOptions,
 } from './pipes/index.js';
-export { ZodResponse } from './decorators/index.js';
+export { ZodBody, ZodCookies, ZodHeaders, ZodQuery, ZodResponse } from './decorators/index.js';
 export type {
   ResponseStatusInput,
+  ZodBodyOptions,
+  ZodCookiesOptions,
+  ZodHeadersOptions,
+  ZodQueryOptions,
   ZodResponseOptions,
   ZodResponseType,
 } from './decorators/index.js';
