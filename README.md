@@ -148,6 +148,8 @@ Every DTO is one Zod schema wrapped in a class. The class exists so NestJS' intr
 
 The class returned by `createZodDto(schema)` carries `schema`, `id`, `io: 'input'`, and a lazy `Output` sibling. `parse` / `safeParse` are static methods on the class. The class is tagged with `Symbol.for('zod-nest.dto')` so `ZodValidationPipe` and `ZodSerializerInterceptor` can discriminate it from plain constructors. The id comes from `schema.meta({ id })` when present (preferred) or from the second-argument options.
 
+**Naming is exposing.** Every schema put through `registerSchema()` — directly, or transitively via `createZodDto` / `@ZodBody` / `extend` / descendant discovery — lands in `components.schemas` when `applyZodNest` runs, regardless of whether any `$ref` in the doc points at it. If you give a schema `.meta({ id })`, you're declaring it documented. Anonymous schemas without an id stay inlined where used.
+
 See [`docs/dto.md`](docs/dto.md) for the full surface.
 
 ### Schemas that don't fit a class

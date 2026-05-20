@@ -5,6 +5,7 @@ import type { ZodNestRegistry } from '../../schema/registry.js';
 import { discoverDependents } from '../../schema/discover-dependents.js';
 import { toOpenApi } from '../../schema/engine.js';
 import { ZodNestError } from '../../schema/errors.js';
+import { registerSchema } from '../../schema/registry.js';
 import { isZodObject } from './zod-param-expand.js';
 
 /**
@@ -162,6 +163,13 @@ export const flattenObjectIntersection = (
     }
   }
   const merged = z.object(mergedShape);
+  // Register the root if it has a `.meta({ id })` so the schema's natural
+  // (non-flattened) emission lands in `components.schemas[id]` via the
+  // exposure-by-registration rule in `applyZodNest`. The inline operation
+  // body remains the flat merged form for Swagger UI compatibility — the
+  // catalog gets the structural composition (`allOf` / `oneOf`). No-op
+  // when the schema is anonymous.
+  registerSchema(schema, registry);
   // Walk named descendants of the *original* schema so per-property $refs
   // resolve when bulk-emit runs. `toOpenApi` below will also register
   // descendants of the merged shape, but the original may carry meta entries

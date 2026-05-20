@@ -117,9 +117,10 @@ export class TaxonomyTranslationController {
 
 What it does:
 
-- Walks the schema, collecting every `z.object` leaf reachable through intersections and/or unions. Merges all collected shapes into a single anonymous `z.object` and emits it **inline** into the operation's request body — no `$ref`, no `allOf`, no `oneOf`, no `components.schemas` entry for the merged root.
+- Walks the schema, collecting every `z.object` leaf reachable through intersections and/or unions. Merges all collected shapes into a single anonymous `z.object` and emits it **inline** into the operation's request body — no `$ref`, no `allOf`, no `oneOf` at the operation level.
 - Per-property `.meta({ id })` schemas keep their normal `$ref` emission (e.g. `candidate_trafficking: FileSchema` still refs `#/components/schemas/File`). Only the *root* is flattened.
 - Property collisions resolve right-arm-wins, mirroring `z.object({ ...Left.shape, ...Right.shape })`.
+- If the root itself has a `.meta({ id })`, the schema is **also** registered with its id and lands in `components.schemas[id]` in its *natural* (non-flattened) form (`allOf` / `oneOf`). The operation body stays flat; the schema catalog gets the structural composition. Both forms coexist.
 
 Supported shapes:
 
@@ -143,7 +144,7 @@ When to skip it:
 - JSON-only endpoints — keep the default (`flatten: false`) to retain the structural composition in the doc.
 - Schemas with non-object leaves — `flatten: true` will throw.
 
-This is a Swagger-UI compatibility escape hatch, not a general recommendation. Trade-off: the merged root no longer appears in `components.schemas` and (for union-bearing schemas) the spec is less restrictive than the actual validation.
+This is a Swagger-UI compatibility escape hatch, not a general recommendation. Trade-off: for union-bearing schemas the spec at the operation level is less restrictive than the actual runtime validation. (The named root in `components.schemas`, when `.meta({ id })` is present, still carries the precise composition.)
 
 ## When to use `createZodDto` vs. these decorators
 
