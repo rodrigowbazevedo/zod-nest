@@ -109,6 +109,18 @@ class CasesController {
     { registry, flatten: true },
   )
   flattenedWithNamedChild(): void {}
+
+  @Post('flattened-with-named-root')
+  @ZodBody(
+    z
+      .intersection(
+        z.object({ a: z.string() }).meta({ id: 'FlatNamedRootLeft' }),
+        z.object({ b: z.number() }).meta({ id: 'FlatNamedRootRight' }),
+      )
+      .meta({ id: 'FlatNamedRoot' }),
+    { registry, flatten: true },
+  )
+  flattenedWithNamedRoot(): void {}
 }
 
 describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', () => {
@@ -170,14 +182,16 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     expect(trace?.required).toBe(false);
   });
 
-  it('keeps root query/headers schemas out of components.schemas when not referenced', () => {
-    // The root object schemas for @ZodQuery / @ZodHeaders are containers for
-    // expansion — they're registered idempotently in the registry but only
-    // surface in `components.schemas` when something actually `$ref`s them
-    // (e.g. used elsewhere as a `@ZodBody`). This keeps the doc tight.
+  it('exposes named root query/headers schemas in components.schemas via registration', () => {
+    // The root object schemas for @ZodQuery / @ZodHeaders are registered with
+    // their ids by the decorator. Per the "every registered id is exposed"
+    // rule in applyZodNest, they land in `components.schemas` even though
+    // the operation expands them into per-property params (so no $ref points
+    // at the root in the doc). Naming the schema via `.meta({ id })` is the
+    // trigger — anonymous roots stay invisible.
     const schemas = doc.components?.schemas as Record<string, unknown>;
-    expect(schemas['ListingQuery']).toBeUndefined();
-    expect(schemas['ListingHeaders']).toBeUndefined();
+    expect(schemas['ListingQuery']).toBeDefined();
+    expect(schemas['ListingHeaders']).toBeDefined();
   });
 
   // ─── flatten: true (Swagger UI multipart compatibility) ─────────────────
@@ -196,13 +210,40 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c', 'd']);
   });
 
-  it('keeps named per-arm schemas out of components.schemas when flatten:true is used', () => {
-    // FlatLeft / FlatRight are arms of the flattened intersection but are
-    // not referenced anywhere — the flatten path bypasses the registry for
-    // the root. They should NOT surface in `components.schemas`.
+  it('exposes named per-arm schemas in components.schemas (via descendant registration)', () => {
+    // FlatLeft / FlatRight are arms of the flattened intersection — their
+    // ids are registered as descendants of the original schema (walked at
+    // decoration time) so per-property `$ref`s resolve. With the
+    // "every registered id is exposed" rule, they also land in
+    // `components.schemas` even though the operation's inline body doesn't
+    // `$ref` them directly.
     const schemas = doc.components?.schemas as Record<string, unknown>;
-    expect(schemas['FlatLeft']).toBeUndefined();
-    expect(schemas['FlatRight']).toBeUndefined();
+    expect(schemas['FlatLeft']).toBeDefined();
+    expect(schemas['FlatRight']).toBeDefined();
+  });
+
+  it('exposes the flattened root in components.schemas in its natural (allOf) form when it has .meta({ id })', () => {
+    // The operation body is the flat merged form (Swagger UI friendly),
+    // AND the schema catalog has the original `allOf` composition keyed
+    // by the root's id. Both forms coexist — operation gets the flat
+    // body for UI rendering, catalog gets the structural composition.
+    const op = opAt(doc, '/cases/flattened-with-named-root', 'post');
+    const requestBody = op.requestBody as Record<string, unknown> | undefined;
+    const content = requestBody?.content as
+      | Record<string, { schema?: Record<string, unknown> }>
+      | undefined;
+    const opSchema = content?.['application/json']?.schema;
+    expect(opSchema?.$ref).toBeUndefined();
+    expect(opSchema?.type).toBe('object');
+    const opProps = opSchema?.properties as Record<string, unknown>;
+    expect(Object.keys(opProps).sort()).toEqual(['a', 'b']);
+
+    const schemas = doc.components?.schemas as Record<string, unknown>;
+    expect(schemas['FlatNamedRoot']).toBeDefined();
+    const rootBody = schemas['FlatNamedRoot'] as Record<string, unknown>;
+    expect(rootBody.allOf).toBeDefined();
+    expect(schemas['FlatNamedRootLeft']).toBeDefined();
+    expect(schemas['FlatNamedRootRight']).toBeDefined();
   });
 
   it('emits components.schemas entries for named child schemas referenced inside a flattened body', () => {

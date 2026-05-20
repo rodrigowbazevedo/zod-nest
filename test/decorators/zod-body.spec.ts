@@ -183,9 +183,11 @@ describe('@ZodBody', () => {
       expect(body?.schema?.type).toBe('object');
       const props = body?.schema?.properties as Record<string, unknown>;
       expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c']);
-      // Root id is deliberately not registered when flattening — the merged
-      // object is anonymous and lives only in the operation body.
-      expect(registry.ids()).not.toContain('ZB_Flat_Root');
+      // Root id IS registered — the schema's natural (allOf) emission lands
+      // in `components.schemas[id]` via applyZodNest's exposure rule
+      // ("every registered id is exposed"). The operation body stays the
+      // flat merged form for Swagger UI compatibility.
+      expect(registry.ids()).toContain('ZB_Flat_Root');
     });
 
     it('flattens nested intersections', () => {

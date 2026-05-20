@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import type { Override } from '../schema/override.js';
 import type { ZodNestRegistry } from '../schema/registry.js';
+import type { CollectedUsage } from './collect-usage.js';
 
 import { defaultRegistry } from '../schema/registry.js';
 import { bulkEmit } from './bulk-emit.js';
@@ -12,6 +13,34 @@ import { extendExposureViaRefs } from './expose-closure.js';
 import { mergeSchemas } from './merge-schemas.js';
 import { rewriteRefs } from './rewrite-refs.js';
 import { stripMarkers } from './strip-markers.js';
+
+const withRegistryExposure = (
+  collected: CollectedUsage,
+  registry: ZodNestRegistry,
+): CollectedUsage => {
+  // Default-expose any registered id that no other mechanism has already
+  // exposed. Schemas already in `inputExposedIds` (doc refs, marker params)
+  // or `outputExposedIds` (`@ZodResponse` metadata) are left alone — the
+  // truth table in `mergeSchemas` is calibrated around the directional
+  // exposure for those, and forcing them into both sides would cause input
+  // /output divergence to split a previously-single-form emission into
+  // `Id` + `IdOutput` for response-only DTOs.
+  //
+  // Newly-exposed ids land in `inputExposedIds` — the default side for
+  // documentation purposes. The "input" form is permissive (`additionalProperties: true`
+  // on object schemas), which is the more general representation when no
+  // usage context says otherwise.
+  const alreadyExposed = new Set([...collected.inputExposedIds, ...collected.outputExposedIds]);
+  const extras = registry.ids().filter((id) => !alreadyExposed.has(id));
+  if (extras.length === 0) {
+    return collected;
+  }
+  return {
+    inputExposedIds: new Set([...collected.inputExposedIds, ...extras]),
+    outputExposedIds: collected.outputExposedIds,
+    classToDtoId: collected.classToDtoId,
+  };
+};
 
 const OPENAPI_VERSION = '3.1.0';
 
@@ -68,12 +97,17 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions): Ope
   const registry = opts.registry ?? defaultRegistry;
 
   const collected = collectUsage(doc, opts.app, registry);
+  // Every id in the registry is exposed by default — calling `registerSchema`
+  // (directly, or transitively via `createZodDto` / `@ZodBody` / `extend` /
+  // descendant discovery) is the user's stated intent to document the schema.
+  // Doc-walked refs and `@ZodResponse` metadata are additive on top.
+  const exposed = withRegistryExposure(collected, registry);
   const { inputSchemas, outputSchemas } = bulkEmit({
     registry,
     override: opts.override,
     strict: opts.strict,
   });
-  const extended = extendExposureViaRefs(collected, inputSchemas, outputSchemas);
+  const extended = extendExposureViaRefs(exposed, inputSchemas, outputSchemas);
   const { divergentOutputIds, renames } = mergeSchemas({
     doc,
     inputSchemas,

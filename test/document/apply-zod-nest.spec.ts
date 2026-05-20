@@ -19,7 +19,14 @@ import { z } from 'zod';
 import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
 
-import { applyZodNest, createZodDto, extend, ZodNestDocumentError, ZodResponse } from '../../src';
+import {
+  applyZodNest,
+  createRegistry,
+  createZodDto,
+  extend,
+  ZodNestDocumentError,
+  ZodResponse,
+} from '../../src';
 
 const ROOT = '#/components/schemas/';
 
@@ -494,7 +501,11 @@ describe('applyZodNest — controller with no zod-nest DTOs is a clean pass-thro
   it('runs without error and leaves the doc untouched (no errors, no extra schemas)', async () => {
     const { app, raw } = await bootstrap([PlainController]);
     const originalSchemaCount = Object.keys(raw.components?.schemas ?? {}).length;
-    const doc = applyZodNest(raw, { app });
+    // Use an isolated registry so the "every registered id is exposed" rule
+    // doesn't pull in DTOs from earlier suites that populated
+    // `defaultRegistry` at module load. The test's intent is "this isolated
+    // app with no DTOs produces no schemas".
+    const doc = applyZodNest(raw, { app, registry: createRegistry() });
     expect(Object.keys(schemasOf(doc)).length).toBe(originalSchemaCount);
     await app.close();
   });
