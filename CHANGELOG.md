@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.8.1...v1.9.0) (2026-05-20)
+
+
+### Features
+
+* **document:** expose every registered schema in components.schemas ([#83](https://github.com/rodrigowbazevedo/zod-nest/issues/83)) ([eb38839](https://github.com/rodrigowbazevedo/zod-nest/commit/eb3883923412e6457ad93fca442ff951db95db5a)), closes [#80](https://github.com/rodrigowbazevedo/zod-nest/issues/80) [#82](https://github.com/rodrigowbazevedo/zod-nest/issues/82)
+
 ## [1.8.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.8.0...v1.8.1) (2026-05-19)
 
 
