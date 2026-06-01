@@ -131,11 +131,9 @@ const applyCustomContentResponse = (
   ApiExtraModels(...dtos.map(asDtoFunction))(target, propertyKey, descriptor);
 
   if (variant.kind === 'array') {
-    // `buildArrayKind` guarantees `dtos.length === 1` for `array` kind.
-    const [dto] = dtos;
-    if (dto === undefined) {
-      throw new TypeError('[zod-nest] array response variant has no DTO.');
-    }
+    // `buildArrayKind` guarantees `dtos.length === 1` for `array` kind — same
+    // invariant the `application/json` array path relies on below.
+    const dto = dtos[0]!;
     const schema: ContentSchema = {
       type: 'array',
       items: { $ref: getSchemaPath(asDtoFunction(dto)) },

@@ -82,6 +82,14 @@ class StreamDocController {
   @Get('json')
   @ZodResponse({ type: Plain })
   json(): void {}
+
+  @Get('ndjson-array')
+  @ZodResponse({ type: [NdjsonRow], contentType: 'application/x-ndjson' })
+  ndjsonArray(): void {}
+
+  @Get('tuple-stream')
+  @ZodResponse({ type: [SseEvent, NdjsonRow], contentType: 'text/event-stream' })
+  tupleStream(): void {}
 }
 
 describe('@ZodResponse — streaming content types end-to-end with applyZodNest', () => {
@@ -127,6 +135,28 @@ describe('@ZodResponse — streaming content types end-to-end with applyZodNest'
     expect(Object.keys(content)).toEqual(['application/octet-stream']);
     expect(content['application/octet-stream']?.schema).toEqual({
       $ref: '#/components/schemas/Stream_Download',
+    });
+  });
+
+  it('emits an array response under a custom content type as array-of-$ref', () => {
+    const content = contentAt(doc, '/stream/ndjson-array', '200');
+    expect(Object.keys(content)).toEqual(['application/x-ndjson']);
+    expect(content['application/x-ndjson']?.schema).toEqual({
+      type: 'array',
+      items: { $ref: '#/components/schemas/Stream_NdjsonRow' },
+    });
+  });
+
+  it('emits a tuple response under a custom content type as prefixItems', () => {
+    const content = contentAt(doc, '/stream/tuple-stream', '200');
+    expect(Object.keys(content)).toEqual(['text/event-stream']);
+    expect(content['text/event-stream']?.schema).toEqual({
+      type: 'array',
+      prefixItems: [
+        { $ref: '#/components/schemas/Stream_SseEvent' },
+        { $ref: '#/components/schemas/Stream_NdjsonRow' },
+      ],
+      items: false,
     });
   });
 

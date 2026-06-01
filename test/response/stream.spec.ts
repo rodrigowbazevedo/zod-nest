@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 
 import { Header } from '@nestjs/common';
+import { HEADERS_METADATA } from '@nestjs/common/constants.js';
 import { z } from 'zod';
 
 import type { ResponseVariant } from '../../src/response/metadata.js';
@@ -41,8 +42,22 @@ class HeaderController {
   @Header('X-Custom', 'whatever')
   noContentType(): void {}
 
+  // `@Header` accepts a thunk value; it can't be resolved statically, so the
+  // Content-Type inference must ignore it.
+  @Header('Content-Type', () => 'text/event-stream')
+  thunkContentType(): void {}
+
   plain(): void {}
 }
+
+// A handler with malformed HEADERS_METADATA (a non-object entry) — exercises
+// the defensive guard in `headerContentType` that real `@Header` never produces.
+const malformedHeadersHandler = (): void => {};
+Reflect.defineMetadata(
+  HEADERS_METADATA,
+  [42, { name: 'X-Other', value: 'y' }],
+  malformedHeadersHandler,
+);
 
 describe('DEFAULT_STREAM_CONTENT_TYPES', () => {
   it('includes the SSE, NDJSON, binary and media-family defaults', () => {
@@ -134,6 +149,24 @@ describe('resolveContentType', () => {
     expect(
       resolveContentType(variant, HeaderController.prototype.plain, DEFAULT_STREAM_MATCHER),
     ).toBe(DEFAULT_CONTENT_TYPE);
+  });
+
+  it('ignores a thunk-valued @Header (only literal strings are resolvable)', () => {
+    const variant = makeVariant();
+    expect(
+      resolveContentType(
+        variant,
+        HeaderController.prototype.thunkContentType,
+        DEFAULT_STREAM_MATCHER,
+      ),
+    ).toBe(DEFAULT_CONTENT_TYPE);
+  });
+
+  it('skips malformed HEADERS_METADATA entries and falls back', () => {
+    const variant = makeVariant();
+    expect(resolveContentType(variant, malformedHeadersHandler, DEFAULT_STREAM_MATCHER)).toBe(
+      DEFAULT_CONTENT_TYPE,
+    );
   });
 });
 
