@@ -14,11 +14,11 @@ getUser(): UserDto {
 
 `@ZodResponse({ type })` accepts three shapes — discriminated at decoration time, not at request time:
 
-| `type` shape | Variant kind | Runtime validation |
-|---|---|---|
-| `Dto` | `'single'` | `Dto.schema.safeParseAsync(value)` |
-| `[Dto]` (length 1) | `'array'` | `z.array(Dto.schema).safeParseAsync(value)` |
-| `[A, B, ...]` (length ≥ 2) | `'tuple'` | `z.tuple([A.schema, B.schema, ...]).safeParseAsync(value)` |
+| `type` shape               | Variant kind | Runtime validation                                         |
+| -------------------------- | ------------ | ---------------------------------------------------------- |
+| `Dto`                      | `'single'`   | `Dto.schema.safeParseAsync(value)`                         |
+| `[Dto]` (length 1)         | `'array'`    | `z.array(Dto.schema).safeParseAsync(value)`                |
+| `[A, B, ...]` (length ≥ 2) | `'tuple'`    | `z.tuple([A.schema, B.schema, ...]).safeParseAsync(value)` |
 
 Empty arrays (`[]`) and non-DTO elements throw `TypeError` at decoration time — typos surface at module load, not the first request:
 
@@ -34,14 +34,14 @@ The wrapped Zod schema (array / tuple) is built **once at decoration time** and 
 Stack multiple `@ZodResponse` decorators to declare different DTOs per status code:
 
 ```ts
-class UserDto    extends createZodDto(z.object({ id: z.string() }),    { id: 'User' })  {}
-class ErrorDto   extends createZodDto(z.object({ code: z.number() }),  { id: 'Error' }) {}
-class FatalDto   extends createZodDto(z.object({ trace: z.string() }), { id: 'Fatal' }) {}
+class UserDto extends createZodDto(z.object({ id: z.string() }), { id: 'User' }) {}
+class ErrorDto extends createZodDto(z.object({ code: z.number() }), { id: 'Error' }) {}
+class FatalDto extends createZodDto(z.object({ trace: z.string() }), { id: 'Fatal' }) {}
 
 class Controller {
   @Get(':id')
-  @ZodResponse({                                           type: UserDto })  // success — 200 inferred
-  @ZodResponse({ status: HttpStatus.NOT_FOUND,             type: ErrorDto })
+  @ZodResponse({ type: UserDto }) // success — 200 inferred
+  @ZodResponse({ status: HttpStatus.NOT_FOUND, type: ErrorDto })
   @ZodResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, type: FatalDto })
   getUser(): void {}
 }
@@ -85,11 +85,11 @@ Resolution is **deferred to request time** because `@ZodResponse` runs before Ne
 
 `@ZodResponse({ status })` accepts the OpenAPI 3.1 range keys and the `'default'` sentinel in addition to numeric codes:
 
-| `status` value | Meaning |
-|---|---|
-| `200`, `201`, `404`, … | Exact numeric match against `response.statusCode`. |
-| `'1XX'` / `'2XX'` / `'3XX'` / `'4XX'` / `'5XX'` | Matches any status in that hundreds bucket (`'2XX'` → 200–299). |
-| `'default'` | Sugar for the handler's resolved default status. Collapsed to `undefined` on the variant; resolves at request time via the same `@HttpCode → method-default` chain as an omitted `status`. |
+| `status` value                                  | Meaning                                                                                                                                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `200`, `201`, `404`, …                          | Exact numeric match against `response.statusCode`.                                                                                                                                         |
+| `'1XX'` / `'2XX'` / `'3XX'` / `'4XX'` / `'5XX'` | Matches any status in that hundreds bucket (`'2XX'` → 200–299).                                                                                                                            |
+| `'default'`                                     | Sugar for the handler's resolved default status. Collapsed to `undefined` on the variant; resolves at request time via the same `@HttpCode → method-default` chain as an omitted `status`. |
 
 `ZodSerializerInterceptor` selects a variant in **two passes**:
 
@@ -101,10 +101,10 @@ Source order breaks ties within each pass.
 ```ts
 class Controller {
   @Get(':id')
-  @ZodResponse({ status: 204,       type: NoContentDto }) // exact wins for 204
-  @ZodResponse({ status: '2XX',     type: GenericOkDto }) // catches 200, 201, 202, 299
-  @ZodResponse({ status: '4XX',     type: ErrorDto     })
-  @ZodResponse({ status: '5XX',     type: FatalDto     })
+  @ZodResponse({ status: 204, type: NoContentDto }) // exact wins for 204
+  @ZodResponse({ status: '2XX', type: GenericOkDto }) // catches 200, 201, 202, 299
+  @ZodResponse({ status: '4XX', type: ErrorDto })
+  @ZodResponse({ status: '5XX', type: FatalDto })
   getUser(): void {}
 }
 ```
@@ -126,42 +126,76 @@ This matches what consumers already write in `@ApiResponse({ status: 'default' }
 
 `@ZodResponse` is a **composite decorator**: in addition to registering the runtime variant, it applies `@ApiResponse(...)` (or the array/tuple equivalent) so the OpenAPI document carries the response shape automatically. No need to write `@ApiResponse({ type })` alongside `@ZodResponse({ type })` — the response card is emitted for you.
 
-| Variant kind | What the doc gets |
-|---|---|
-| `@ZodResponse({ type: Dto })` | `responses.<status>.content['application/json'].schema = { $ref: '#/components/schemas/<Dto>' }` |
-| `@ZodResponse({ type: [Dto] })` | `{ type: 'array', items: { $ref: '...' } }` |
-| `@ZodResponse({ type: [A, B] })` | `{ type: 'array', prefixItems: [{ $ref: A }, { $ref: B }], items: false }` (OpenAPI 3.1 tuple) |
-| Wildcard `status: '2XX'` | emitted as `responses.2XX` per OpenAPI 3.1 |
+| Variant kind                     | What the doc gets                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `@ZodResponse({ type: Dto })`    | `responses.<status>.content['application/json'].schema = { $ref: '#/components/schemas/<Dto>' }` |
+| `@ZodResponse({ type: [Dto] })`  | `{ type: 'array', items: { $ref: '...' } }`                                                      |
+| `@ZodResponse({ type: [A, B] })` | `{ type: 'array', prefixItems: [{ $ref: A }, { $ref: B }], items: false }` (OpenAPI 3.1 tuple)   |
+| Wildcard `status: '2XX'`         | emitted as `responses.2XX` per OpenAPI 3.1                                                       |
 
 Tuple variants also apply `@ApiExtraModels(...slotDtos)` so each tuple-slot DTO is registered in `components.schemas`.
 
+The `application/json` media-type key above is the default. Pass `contentType` (or declare a stream-typed `@Header('Content-Type', …)`) to emit the response under a different media type — see [Streaming responses](#streaming-responses-contenttype--stream).
+
 ### Decorator ordering & the microtask trick
 
-TypeScript decorators apply **bottom-up**, so `@ZodResponse` — usually written above `@Get` / `@Post` / `@HttpCode` — runs its factory body *first*, before sibling decorators have written their metadata. That metadata (`HTTP_CODE_METADATA`, `METHOD_METADATA`) is what `resolveEffectiveStatus` reads to determine the response status when `@ZodResponse({ status })` is omitted.
+TypeScript decorators apply **bottom-up**, so `@ZodResponse` — usually written above `@Get` / `@Post` / `@HttpCode` / `@Header` — runs its factory body _first_, before sibling decorators have written their metadata. That metadata (`HTTP_CODE_METADATA`, `METHOD_METADATA`, `HEADERS_METADATA`) is what `@ZodResponse` reads to resolve the effective response **status** (when `status` is omitted) and the effective **content type** (when `contentType` is omitted but a `@Header('Content-Type', …)` is present).
 
-`@ZodResponse` handles this with two paths:
-
-- **Explicit `status` (numeric or `'NXX'` wildcard)** — `@ApiResponse(...)` is applied **synchronously**. There's nothing to wait for; the status is already known.
-- **Implicit `status` (omitted or `'default'`)** — `@ApiResponse(...)` is deferred via `queueMicrotask` so the sibling decorators have already settled their metadata by the time the microtask runs. `@nestjs/swagger`'s `SwaggerExplorer` reads response metadata at `SwaggerModule.createDocument(...)` time (app-bootstrap, well after all microtasks have flushed), so the deferred application lands in time.
+To make all of that readable, `@ZodResponse` **always defers** its `@ApiResponse(...)` application by one `queueMicrotask`. By the time the microtask runs, every sibling decorator has settled its metadata. `@nestjs/swagger`'s `SwaggerExplorer` reads response metadata at `SwaggerModule.createDocument(...)` time (app-bootstrap, long after all microtasks have flushed), so the deferred application always lands in time.
 
 **When does this matter to you?** Almost never. Two edge cases:
 
-1. **Custom wrappers** — if you build a decorator factory that wraps `@ZodResponse` (status-implicit form) and itself defers work past microtasks, the ordering can race. Workaround: pass `status` explicitly in the wrapper, which switches to the synchronous path.
-2. **Unit-testing decorators in isolation** — if you call `Reflect.getMetadata('swagger/apiResponse', handler)` synchronously after class definition, the metadata won't be there yet for implicit-status calls. `await new Promise((r) => setImmediate(r))` once before asserting; the microtask flushes during NestJS' own `app.init()` in integration tests.
+1. **Custom wrappers** — if you build a decorator factory that wraps `@ZodResponse` and itself defers work past microtasks, the ordering can race. Workaround: pass `status` / `contentType` explicitly in the wrapper so nothing has to be inferred from siblings.
+2. **Unit-testing decorators in isolation** — if you call `Reflect.getMetadata('swagger/apiResponse', handler)` synchronously after class definition, the metadata won't be there yet. `await new Promise((r) => setImmediate(r))` once before asserting; the microtask flushes during NestJS' own `app.init()` in integration tests.
 
 ```ts
-// ✅ implicit status — defers application by one microtask
-@Post()                                  // sets METHOD_METADATA later
-@HttpCode(204)                           // sets HTTP_CODE_METADATA later
-@ZodResponse({ type: AcceptedDto })      // runs first; resolves status via microtask → 204
-foo() {}
-
-// ✅ explicit status — applied synchronously
-@Post()
-@HttpCode(204)
-@ZodResponse({ status: 204, type: AcceptedDto })
-bar() {}
+// status + content type both resolved from siblings, after the microtask
+@Get('events')
+@Header('Content-Type', 'text/event-stream')   // sets HEADERS_METADATA later
+@ZodResponse({ type: EventDto })                // runs first; resolves ct via microtask → text/event-stream
+events() {}
 ```
+
+## Streaming responses (`contentType` + `stream`)
+
+Streamed and binary responses — Server-Sent Events (`text/event-stream`), newline-delimited JSON (`application/x-ndjson`), file downloads (`application/octet-stream`, `application/pdf`, `image/*`, …) — are written straight to the response buffer. There's no single body object to validate, and the OpenAPI media-type key must be the stream type, not `application/json`. Two options on `@ZodResponse` cover both needs:
+
+| Option        | Default              | Effect                                                                                   |
+| ------------- | -------------------- | ---------------------------------------------------------------------------------------- |
+| `contentType` | `'application/json'` | The OpenAPI media-type key. A non-JSON type emits `content[<contentType>].schema = $ref`. |
+| `stream`      | `false` (inferred)   | When `true`, `ZodSerializerInterceptor` **skips validation** — the body passes through verbatim. |
+
+The `type` DTO describes **one event / line / blob**, not the whole stream — exactly the shape you'd hand-write into `@ApiOkResponse({ content: { 'text/event-stream': { schema } } })`, now with the full `@ZodResponse` ergonomics (component registration, `$ref` rewriting, multi-status stacking).
+
+```ts
+@Sse('events')
+@ZodResponse({ type: NotificationEvent, contentType: 'text/event-stream' })
+streamEvents(): Observable<MessageEvent> {
+  /* … */
+}
+
+@Get('export')
+@Header('Content-Type', 'application/x-ndjson')
+@ZodResponse({ type: ExportRow })          // contentType inferred from @Header
+exportNdjson(): void {
+  /* writes rows directly to res */
+}
+```
+
+### How `stream` is inferred
+
+When `stream` is omitted, it's derived from the effective content type (the explicit `contentType`, or a stream-typed `@Header('Content-Type', …)`):
+
+- A **known stream content type** ⇒ `stream = true` (validation skipped).
+- Anything else ⇒ `stream = false` (validated as usual).
+
+The built-in stream set is [`DEFAULT_STREAM_CONTENT_TYPES`](module-options.md#streamcontenttypes): `text/event-stream`, `application/x-ndjson`, `application/octet-stream`, `application/pdf`, and the `image/*`, `audio/*`, `video/*` families. Extend it globally with [`ZodNestModuleOptions.streamContentTypes`](module-options.md#streamcontenttypes) (merged additively with the defaults).
+
+Set `stream` explicitly to override the inference either way — e.g. `stream: false` on a `text/event-stream` endpoint to keep validating, or `stream: true` on a custom content type you haven't added to the module set.
+
+For full SSE / NDJSON / binary patterns, see [`recipes/streaming-responses.md`](recipes/streaming-responses.md) and [`recipes/binary-downloads.md`](recipes/binary-downloads.md).
+
+> **`@Header` vs. the OpenAPI media type.** A stream-typed `@Header('Content-Type', …)` drives **both** the documented media type and the validation skip. A `@Header` whose value isn't a known stream type (e.g. `text/csv`) is ignored for the media-type key — set `contentType` explicitly to document an off-list type. The runtime skip still honours a module-configured `streamContentTypes` entry regardless.
 
 ## `passthroughOnError`
 
@@ -176,11 +210,13 @@ proxied(): unknown {
 ```
 
 On soft-mode failure:
+
 - The **original value** passes through to the response (not the validated/parsed value).
 - The output logger is invoked at `warn` severity (not `error`) — see [`logging.md`](logging.md).
 - `createSerializationException` is **not** called.
 
 Use cases:
+
 - Upstream-controlled response shapes you don't fully trust but don't want to break the request over.
 - Migration from a service you're slowly bringing under contract — log the deviations, ship the response anyway.
 - Backwards-compatibility windows during DTO changes.
@@ -194,7 +230,7 @@ The transformed shape (e.g. `email.toLowerCase()` from a `transform`) is **not**
 ```ts
 class Controller {
   @Get(':id')
-  @ZodResponse({              type: UserDto })                             // strict, success (200 inferred)
+  @ZodResponse({ type: UserDto }) // strict, success (200 inferred)
   @ZodResponse({ status: 500, type: FatalDto, passthroughOnError: true }) // soft
   getUser(): void {}
 }
@@ -273,7 +309,7 @@ Both are exported for use in custom interceptors or tests:
 ```ts
 import { defaultStatusFor, resolveEffectiveStatus } from 'zod-nest';
 
-defaultStatusFor(handler);             // @HttpCode → method default
+defaultStatusFor(handler); // @HttpCode → method default
 resolveEffectiveStatus(variant, handler); // variant.status → defaultStatusFor()
 ```
 

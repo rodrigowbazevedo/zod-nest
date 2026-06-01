@@ -10,12 +10,7 @@ module.exports = {
   // Per-area `src/*/index.ts` files are pure re-exports — Jest counts the
   // re-export expressions as uncalled "functions", which dragged the
   // function-coverage metric down to false negatives. Exclude them.
-  collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/index.ts',
-    '!src/**/index.ts',
-    '!src/**/*.types.ts',
-  ],
+  collectCoverageFrom: ['src/**/*.ts', '!src/index.ts', '!src/**/index.ts', '!src/**/*.types.ts'],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   // 90% global, 80% per-area. The per-area floor catches regressions in a

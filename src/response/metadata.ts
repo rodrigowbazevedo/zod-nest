@@ -56,6 +56,19 @@ export interface ResponseVariant {
   validationSchema: z.ZodType;
   description?: ZodResponseDescription;
   passthroughOnError: boolean;
+  /**
+   * Raw `contentType` option from `@ZodResponse`, if set. `undefined` means
+   * "resolve lazily" — `resolveContentType` falls back to a stream-typed
+   * `@Header('Content-Type', …)` or `application/json`. Drives the OpenAPI
+   * media-type key.
+   */
+  contentType?: string;
+  /**
+   * Raw `stream` option from `@ZodResponse`, if set. `undefined` means
+   * "infer" — `isStreamResponse` treats the response as a stream when the
+   * effective content type is a known stream type. Streams skip validation.
+   */
+  stream?: boolean;
 }
 
 export const getResponseVariants = (handler: object): readonly ResponseVariant[] | undefined => {

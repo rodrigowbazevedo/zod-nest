@@ -10,7 +10,7 @@ import { ZodNestModule } from 'zod-nest';
 @Module({
   imports: [
     ZodNestModule.forRoot({
-      validationLogs: true,                          // both sides
+      validationLogs: true, // both sides
       // validationLogs: { input: true },            // input only
       // validationLogs: { output: true },           // output only
       // validationLogs: { input: false, output: true }, // explicit form
@@ -24,11 +24,11 @@ Default is off on both sides. Disabling a side replaces its logger with a no-op 
 
 ## When does it fire?
 
-| Event | Severity | Logger context |
-|---|---|---|
-| Input validation failure (request body / query / param) | `error` | `'ZodValidationPipe'` |
-| Output validation failure on a **strict** variant (`passthroughOnError: false`, the default) | `error` | `'ZodSerializerInterceptor'` |
-| Output validation failure on a **soft** variant (`passthroughOnError: true`) | `warn` | `'ZodSerializerInterceptor'` |
+| Event                                                                                        | Severity | Logger context               |
+| -------------------------------------------------------------------------------------------- | -------- | ---------------------------- |
+| Input validation failure (request body / query / param)                                      | `error`  | `'ZodValidationPipe'`        |
+| Output validation failure on a **strict** variant (`passthroughOnError: false`, the default) | `error`  | `'ZodSerializerInterceptor'` |
+| Output validation failure on a **soft** variant (`passthroughOnError: true`)                 | `warn`   | `'ZodSerializerInterceptor'` |
 
 The severity is decided by `zod-nest`, not by the logger adapter — your `LoggerService.error(...)` vs `LoggerService.warn(...)` is called accordingly.
 
@@ -58,25 +58,29 @@ Every log entry passes a single payload object to the logger (positional `messag
 A typical strict-mode response-validation entry looks like:
 
 ```ts
-logger.error({
-  message: 'Response validation failed',
-  side: 'output',
-  dto: 'UserDto',
-  errors: { errors: [], properties: { email: { errors: ['Invalid email'] } } },
-  value: { id: 'u1', email: 'not-an-email' },
-  status: 200,
-  handler: 'UsersController.getUser',
-}, undefined, 'ZodSerializerInterceptor');
+logger.error(
+  {
+    message: 'Response validation failed',
+    side: 'output',
+    dto: 'UserDto',
+    errors: { errors: [], properties: { email: { errors: ['Invalid email'] } } },
+    value: { id: 'u1', email: 'not-an-email' },
+    status: 200,
+    handler: 'UsersController.getUser',
+  },
+  undefined,
+  'ZodSerializerInterceptor',
+);
 ```
 
 ### DTO label conventions
 
-| Variant kind | `dto` label |
-|---|---|
-| `@ZodResponse({ type: UserDto })` | `'UserDto'` |
-| `@ZodResponse({ type: [UserDto] })` | `'[UserDto]'` |
+| Variant kind                                | `dto` label           |
+| ------------------------------------------- | --------------------- |
+| `@ZodResponse({ type: UserDto })`           | `'UserDto'`           |
+| `@ZodResponse({ type: [UserDto] })`         | `'[UserDto]'`         |
 | `@ZodResponse({ type: [UserDto, TagDto] })` | `'[UserDto, TagDto]'` |
-| `@Body() body: UserDto` (input) | `'UserDto'` |
+| `@Body() body: UserDto` (input)             | `'UserDto'`           |
 
 For inputs, the label is whatever `argMetadata.metatype?.name` resolves to — typically the DTO class name.
 
@@ -107,11 +111,11 @@ Before logging, the `value` field is walked recursively and keys matching `redac
 
 The default redaction set is:
 
-| Category | Keys |
-|---|---|
-| Credentials | `password`, `secret`, `apiKey` |
+| Category              | Keys                                                                     |
+| --------------------- | ------------------------------------------------------------------------ |
+| Credentials           | `password`, `secret`, `apiKey`                                           |
 | Auth headers & tokens | `authorization`, `bearer`, `token`, `accessToken`, `refreshToken`, `jwt` |
-| Session cookies | `cookie`, `set-cookie` |
+| Session cookies       | `cookie`, `set-cookie`                                                   |
 
 Supplying `redactKeys` **replaces** this list — see [`module-options.md`](module-options.md#redactkeys) for the rationale and the spread pattern for adding keys without losing the defaults.
 
@@ -124,7 +128,9 @@ const a: { self?: unknown } = {};
 a.self = a;
 
 // logged as:
-{ self: '[CIRCULAR]' }
+{
+  self: '[CIRCULAR]';
+}
 ```
 
 This guard runs before truncation, so circular structures never blow up `JSON.stringify`.
@@ -159,16 +165,19 @@ NestJS' `LoggerService` interface is intentionally simple — five methods (`log
 
 ```ts
 import pino from 'pino';
+
 import type { LoggerService } from '@nestjs/common';
 
 const logger = pino();
 
 const pinoAdapter: LoggerService = {
-  log:     (msg, context)        => logger.info({ context }, typeof msg === 'string' ? msg : ''),
-  error:   (msg, trace, context) => logger.error({ context, trace, ...(typeof msg === 'object' ? msg : { msg }) }),
-  warn:    (msg, context)        => logger.warn({ context, ...(typeof msg === 'object' ? msg : { msg }) }),
-  debug:   (msg, context)        => logger.debug({ context, ...(typeof msg === 'object' ? msg : { msg }) }),
-  verbose: (msg, context)        => logger.trace({ context, ...(typeof msg === 'object' ? msg : { msg }) }),
+  log: (msg, context) => logger.info({ context }, typeof msg === 'string' ? msg : ''),
+  error: (msg, trace, context) =>
+    logger.error({ context, trace, ...(typeof msg === 'object' ? msg : { msg }) }),
+  warn: (msg, context) => logger.warn({ context, ...(typeof msg === 'object' ? msg : { msg }) }),
+  debug: (msg, context) => logger.debug({ context, ...(typeof msg === 'object' ? msg : { msg }) }),
+  verbose: (msg, context) =>
+    logger.trace({ context, ...(typeof msg === 'object' ? msg : { msg }) }),
 };
 
 ZodNestModule.forRoot({ logger: pinoAdapter, validationLogs: true });

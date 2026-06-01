@@ -15,8 +15,12 @@ description: >
   inline schema", "name this schema for OpenAPI", "missing @ZodResponse",
   "stack @ZodResponse", "leverage zod-nest", "override JSON schema for DTO",
   "unrepresentable type", "z.instanceof in DTO", "fix file upload schema",
-  "use FileSchema / BlobSchema / BufferSchema", or "best practices zod-nest".
-  Out of scope by design: `passthroughOnError`, custom exception factories,
+  "use FileSchema / BlobSchema / BufferSchema", "SSE / streaming response",
+  "text/event-stream or NDJSON in swagger", "@ZodResponse contentType / stream",
+  "my stream response is being validated / 500s", "document a streamed or
+  binary endpoint", or "best practices zod-nest". The `@ZodResponse`
+  `contentType` / `stream` options (streamed and binary responses) are in
+  scope. Out of scope by design: `passthroughOnError`, custom exception factories,
   `validationLogs` / `redactKeys` / logger config, per-call `Override`
   callbacks on `applyZodNest` (per-emission escape hatch, user-driven). The
   per-instance `overrideJSONSchema` *is* in scope.
@@ -57,7 +61,7 @@ covers both.
 - **Never on file edits in a non-`zod-nest` project** — if the project signal
   fails, the skill stays silent.
 - **`*.module.ts` / `main.ts`** stay slash-only — they reach the skill via
-  invocation rather than auto-trigger, but the skill *does* read them for the
+  invocation rather than auto-trigger, but the skill _does_ read them for the
   `strict`-flag probe described below.
 
 ### Per-section routing
@@ -90,7 +94,8 @@ Sections:
    and **unrepresentable schemas exposed via a DTO without
    `overrideJSONSchema`** (Rule 5 — new).
 2. **Handler ergonomics** — missing `@ZodResponse`, multi-status candidates,
-   redundant `@ApiResponse` next to a `@ZodResponse`.
+   redundant `@ApiResponse` next to a `@ZodResponse`, and hand-written
+   stream / binary responses that should use `@ZodResponse({ contentType })`.
 
 If nothing fires, output a single line: `✅ zod-nest usage looks healthy — no
 diagnostics for this change.` and stop.
@@ -135,9 +140,9 @@ the full rule catalog. The diagnostics:
    across multiple files. Suggest unifying.
 4. **Composition opportunity** — when two schemas share a field prefix,
    suggest `extend()` from `zod-nest`. **Carry the `@experimental` caveat
-   verbatim:** *"`@experimental` — output shape may change as edge cases
+   verbatim:** _"`@experimental` — output shape may change as edge cases
    surface. Pin a minor version if you build production tooling on top of
-   this surface."* See <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/composition.md>.
+   this surface."_ See <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/composition.md>.
 5. **Unrepresentable schema exposed via DTO without `overrideJSONSchema`** —
    a schema using `z.custom(...)`, `z.instanceof(...)`, or a bare
    `.transform(...)` flows into `createZodDto` / `@ZodResponse` / `@Body` /
@@ -163,12 +168,17 @@ for the full rule catalog. The diagnostics:
    applies `@ApiResponse(...)` internally. Any `@ApiResponse` /
    `@ApiOkResponse` / `@ApiCreatedResponse` (etc.) sitting alongside a
    `@ZodResponse` for the same status and same DTO is now redundant — drop
-   the manual `@Api*Response` call. Exception: if the manual call carries
-   additional info `@ZodResponse` can't express (e.g. `content:
-   'application/octet-stream'` for binary downloads pre-migration), surface
-   the [binary downloads recipe](https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md)
-   as the canonical replacement (`BlobSchema` from `zod-nest/helpers` +
-   `@ZodResponse({ type: BlobDto })`).
+   the manual `@Api*Response` call. (A manual call carrying a non-JSON
+   `content` map is a Rule 4 case, not a plain deletion.)
+4. **Hand-written stream / binary response** — a handler declaring a non-JSON
+   `@Api*Response({ content: { '<media type>': ... } })` (`text/event-stream`,
+   `application/x-ndjson`, `application/octet-stream`, `application/pdf`,
+   `image|audio|video/*`), or an `@Sse()` / stream-typed
+   `@Header('Content-Type', …)` handler with no `@ZodResponse`. Propose
+   `@ZodResponse({ type, contentType })` — the DTO documents one event/line/blob,
+   the media-type key is preserved, and validation is skipped. See the
+   [streaming responses](https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/responses.md#streaming-responses-contenttype--stream)
+   and [binary downloads](https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md) docs.
 
 ### Step 4 — emit the checklist
 
@@ -179,27 +189,32 @@ description, proposed edit. Example:
 ## Schema ergonomics
 
 🟡 `src/users/user.dto.ts:8` — `userSchema` is referenced by `UserDto` and
-   `AdminDto` but has no `.meta({ id })`.
-   Proposed: `.meta({ id: 'User' })` on the schema const.
+`AdminDto` but has no `.meta({ id })`.
+Proposed: `.meta({ id: 'User' })` on the schema const.
 
 🟢 `src/orders/order.dto.ts:12` — inline `z.object({ ... })` (4 fields) inside
-   `createZodDto`. Consider hoisting + naming.
+`createZodDto`. Consider hoisting + naming.
 
 🔴 `src/uploads/upload.dto.ts:5` — `z.instanceof(File)` inside `createZodDto`
-   with no `overrideJSONSchema` registration; project runs `strict: true`,
-   so this will throw `ZodNestUnrepresentableError` at `applyZodNest` time.
-   Proposed: import `FileSchema` from `zod-nest/helpers` and use it directly:
-   `class UploadDto extends createZodDto(z.object({ file: FileSchema })) {}`.
+with no `overrideJSONSchema` registration; project runs `strict: true`,
+so this will throw `ZodNestUnrepresentableError` at `applyZodNest` time.
+Proposed: import `FileSchema` from `zod-nest/helpers` and use it directly:
+`class UploadDto extends createZodDto(z.object({ file: FileSchema })) {}`.
 
 ## Handler ergonomics
 
 🔴 `src/users/users.controller.ts:24` — handler returns `UserDto` but no
-   `@ZodResponse` decorator. Response is not validated.
-   Proposed: `@ZodResponse({ type: UserDto })` above the method.
+`@ZodResponse` decorator. Response is not validated.
+Proposed: `@ZodResponse({ type: UserDto })` above the method.
 
 🟡 `src/users/users.controller.ts:30` — single `@ZodResponse({ type: UserDto })`
-   but `@ApiNotFoundResponse({ type: ErrorDto })` is also present. Suggest
-   stacking: `@ZodResponse({ status: 404, type: ErrorDto })`.
+but `@ApiNotFoundResponse({ type: ErrorDto })` is also present. Suggest
+stacking: `@ZodResponse({ status: 404, type: ErrorDto })`.
+
+🟡 `src/notifications/sse.controller.ts:18` — `@Sse('stream')` with a
+hand-written `@ApiOkResponse({ content: { 'text/event-stream': … } })` and no
+`@ZodResponse`. Proposed: `@ZodResponse({ type: NotificationEventDto, contentType: 'text/event-stream' })`
+(documents one event; validation skipped for the stream).
 ```
 
 If nothing fires, the `✅` line from the Output contract is the entire output.
@@ -215,13 +230,13 @@ If nothing fires, the `✅` line from the Output contract is the entire output.
   `maxLoggedValueBytes`. All policy decisions; out of scope.
 - **Per-call `Override` callback on `applyZodNest`** — the per-emission
   escape hatch is user-driven; the skill doesn't suggest writing or
-  modifying it. (The *per-instance* `overrideJSONSchema` registration is in
+  modifying it. (The _per-instance_ `overrideJSONSchema` registration is in
   scope via Rule 5.)
 - **Auto-applying edits** — diagnostic only. User owns the wording.
 
 ## Notes
 
-- This skill is for *consumers of* `zod-nest`. For contributing to the
+- This skill is for _consumers of_ `zod-nest`. For contributing to the
   library itself, see the contributor skills at
   <https://github.com/rodrigowbazevedo/zod-nest/tree/main/.claude/skills>.
 - Detection rules are conservative — false positives erode trust faster than

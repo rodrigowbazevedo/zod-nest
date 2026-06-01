@@ -12,47 +12,53 @@ A subpath shipping common JSON Schema fragments, typed sugar functions, a type-s
 
 ```ts
 import {
-  // Fragment catalog (frozen const objects)
-  uuidFragment, dateTimeFragment, binaryFragment, opaqueFragment, /* … */
   // Sugar functions
-  binary, opaque,
+  binary,
+  binaryFragment /* … */,
+  BlobSchema,
+  BufferSchema,
+  dateTimeFragment,
   // Generic, type-strict enrichment
   enrich,
   // Pre-registered Zod schemas
-  FileSchema, BlobSchema, BufferSchema,
+  FileSchema,
+  opaque,
+  opaqueFragment,
+  // Fragment catalog (frozen const objects)
+  uuidFragment,
 } from 'zod-nest/helpers';
 ```
 
 ### Fragment catalog
 
-| Fragment | Emits |
-| --- | --- |
-| `dateTimeFragment` | `{ type: 'string', format: 'date-time' }` |
-| `dateFragment` | `{ type: 'string', format: 'date' }` |
-| `timeFragment` | `{ type: 'string', format: 'time' }` |
-| `uuidFragment` | `{ type: 'string', format: 'uuid' }` |
-| `emailFragment` | `{ type: 'string', format: 'email' }` |
-| `uriFragment` | `{ type: 'string', format: 'uri' }` |
-| `hostnameFragment` | `{ type: 'string', format: 'hostname' }` |
-| `ipv4Fragment` / `ipv6Fragment` | `{ type: 'string', format: 'ipv4' / 'ipv6' }` |
-| `binaryFragment` | `{ type: 'string', format: 'binary' }` |
-| `byteFragment` | `{ type: 'string', format: 'byte' }` (base64) |
-| `int32Fragment` / `int64Fragment` | `{ type: 'integer', format: 'int32' / 'int64' }` |
+| Fragment                           | Emits                                            |
+| ---------------------------------- | ------------------------------------------------ |
+| `dateTimeFragment`                 | `{ type: 'string', format: 'date-time' }`        |
+| `dateFragment`                     | `{ type: 'string', format: 'date' }`             |
+| `timeFragment`                     | `{ type: 'string', format: 'time' }`             |
+| `uuidFragment`                     | `{ type: 'string', format: 'uuid' }`             |
+| `emailFragment`                    | `{ type: 'string', format: 'email' }`            |
+| `uriFragment`                      | `{ type: 'string', format: 'uri' }`              |
+| `hostnameFragment`                 | `{ type: 'string', format: 'hostname' }`         |
+| `ipv4Fragment` / `ipv6Fragment`    | `{ type: 'string', format: 'ipv4' / 'ipv6' }`    |
+| `binaryFragment`                   | `{ type: 'string', format: 'binary' }`           |
+| `byteFragment`                     | `{ type: 'string', format: 'byte' }` (base64)    |
+| `int32Fragment` / `int64Fragment`  | `{ type: 'integer', format: 'int32' / 'int64' }` |
 | `floatFragment` / `doubleFragment` | `{ type: 'number', format: 'float' / 'double' }` |
-| `opaqueFragment` | `{ type: 'object', additionalProperties: true }` |
+| `opaqueFragment`                   | `{ type: 'object', additionalProperties: true }` |
 
-Many of these mirror what Zod constructs already emit (`z.uuid()` → `uuidFragment` shape, `z.email()` → `emailFragment` shape, etc.). The helpers don't *replace* those constructs — they're a parallel catalog for programmatic fragment assembly: alongside `z.custom<T>()`, in `overrideJSONSchema` calls, in custom override callbacks, in tests that build expected fragments.
+Many of these mirror what Zod constructs already emit (`z.uuid()` → `uuidFragment` shape, `z.email()` → `emailFragment` shape, etc.). The helpers don't _replace_ those constructs — they're a parallel catalog for programmatic fragment assembly: alongside `z.custom<T>()`, in `overrideJSONSchema` calls, in custom override callbacks, in tests that build expected fragments.
 
 ### Type-strict `enrich`
 
 `enrich(base, extras)` merges a catalog fragment with extras whose shape is dictated by the base's family. Passing wrong-family extras is a compile-time error.
 
 ```ts
-enrich(uuidFragment, { description: 'User id', minLength: 36 });    // ok
-enrich(binaryFragment, { contentMediaType: 'application/pdf' });    // ok
-enrich(int64Fragment, { minimum: 0, multipleOf: 100 });             // ok
-enrich(uuidFragment, { contentMediaType: 'application/pdf' });      // TS error
-enrich(int32Fragment, { minLength: 1 });                            // TS error
+enrich(uuidFragment, { description: 'User id', minLength: 36 }); // ok
+enrich(binaryFragment, { contentMediaType: 'application/pdf' }); // ok
+enrich(int64Fragment, { minimum: 0, multipleOf: 100 }); // ok
+enrich(uuidFragment, { contentMediaType: 'application/pdf' }); // TS error
+enrich(int32Fragment, { minLength: 1 }); // TS error
 ```
 
 ### Sugar functions
@@ -60,9 +66,9 @@ enrich(int32Fragment, { minLength: 1 });                            // TS error
 `binary()` and `opaque()` are typed wrappers over `enrich(binaryFragment, …)` / `enrich(opaqueFragment, …)`. They exist because the `binary` option set (`contentMediaType` / `contentEncoding`) is nuanced enough to deserve a dedicated entry point, discoverable via auto-complete:
 
 ```ts
-binary();                                              // { type: 'string', format: 'binary' }
-binary({ contentMediaType: 'application/pdf' });       // … + contentMediaType
-opaque({ description: 'JWT passthrough' });            // { type: 'object', additionalProperties: true, description: '…' }
+binary(); // { type: 'string', format: 'binary' }
+binary({ contentMediaType: 'application/pdf' }); // … + contentMediaType
+opaque({ description: 'JWT passthrough' }); // { type: 'object', additionalProperties: true, description: '…' }
 ```
 
 ### Pre-registered Zod schemas
@@ -74,9 +80,7 @@ import { z } from 'zod';
 import { createZodDto } from 'zod-nest';
 import { FileSchema } from 'zod-nest/helpers';
 
-class UploadDto extends createZodDto(
-  z.object({ title: z.string(), file: FileSchema }),
-) {}
+class UploadDto extends createZodDto(z.object({ title: z.string(), file: FileSchema })) {}
 ```
 
 Each preset uses `z.instanceof(...)` at the runtime layer — `File`, `Blob`, `Buffer` are all globals under zod-nest's Node 22+ floor.
@@ -90,9 +94,7 @@ import { z } from 'zod';
 import { createZodDto } from 'zod-nest';
 import { FileSchema } from 'zod-nest/helpers';
 
-class UploadDto extends createZodDto(
-  z.object({ title: z.string(), file: FileSchema }),
-) {}
+class UploadDto extends createZodDto(z.object({ title: z.string(), file: FileSchema })) {}
 ```
 
 If you need a tighter content-type description, register your own schema with `binary({...})`:
@@ -106,9 +108,7 @@ const PdfUploadSchema = overrideJSONSchema(
   binary({ contentMediaType: 'application/pdf' }),
 );
 
-class PdfUploadDto extends createZodDto(
-  z.object({ title: z.string(), file: PdfUploadSchema }),
-) {}
+class PdfUploadDto extends createZodDto(z.object({ title: z.string(), file: PdfUploadSchema })) {}
 ```
 
 ## Per-instance registration with `overrideJSONSchema`
@@ -118,16 +118,14 @@ When the shipped presets don't fit — a runtime type other than `File`/`Blob`/`
 ```ts
 import { z } from 'zod';
 import { createZodDto, overrideJSONSchema } from 'zod-nest';
-import { uuidFragment, binaryFragment, opaque } from 'zod-nest/helpers';
+import { binaryFragment, opaque, uuidFragment } from 'zod-nest/helpers';
 
 // Branded id type emitted as a UUID string
 type UserId = string & { readonly __brand: 'UserId' };
 const UserIdSchema = overrideJSONSchema(z.custom<UserId>(), uuidFragment);
 
 // Inline composition — overrideJSONSchema returns the schema, so it chains
-class ProfileDto extends createZodDto(
-  z.object({ userId: UserIdSchema, name: z.string() }),
-) {}
+class ProfileDto extends createZodDto(z.object({ userId: UserIdSchema, name: z.string() })) {}
 
 // Opaque passthrough payload
 const PayloadSchema = overrideJSONSchema(z.unknown(), opaque({ description: 'JWT' }));
@@ -144,7 +142,7 @@ For the symmetric case on the response side (binary downloads / streaming export
 3. **`overrideJSONSchema` registration** (per-instance map lookup)
 4. Caller's per-call `override` (per-emission escape hatch)
 
-**Idempotent.** Subsequent `overrideJSONSchema(sameInstance, newFragment)` calls overwrite the prior registration (last-write-wins). The registration is keyed by schema *identity* — two separate `z.instanceof(File)` calls produce two separate schemas and would each need their own registration. If you want the same fragment everywhere, share the schema instance (or use the shipped preset).
+**Idempotent.** Subsequent `overrideJSONSchema(sameInstance, newFragment)` calls overwrite the prior registration (last-write-wins). The registration is keyed by schema _identity_ — two separate `z.instanceof(File)` calls produce two separate schemas and would each need their own registration. If you want the same fragment everywhere, share the schema instance (or use the shipped preset).
 
 **Description inheritance.** If the schema has a `description` (via `.describe(...)` or `.meta({ description })`) and the fragment doesn't supply one, the schema's description is captured at registration time and applied to the emitted JSON Schema. Fragment-supplied `description` still wins. `title` is not inherited.
 
@@ -162,7 +160,7 @@ Some schemas describe **different shapes** on the request side vs the response s
 
 ```ts
 overrideJSONSchema(coercedSchema, {
-  input:  { type: 'string', description: 'permissive — request side' },
+  input: { type: 'string', description: 'permissive — request side' },
   output: { type: 'string', description: 'normalized — response side' },
 });
 ```
@@ -180,10 +178,12 @@ The discriminator between the single-fragment form and the wrapper form is the p
 
 ```ts
 import { z } from 'zod';
-import { overrideJSONSchema, type SchemaObject } from 'zod-nest';
+import { overrideJSONSchema } from 'zod-nest';
+
+import type { SchemaObject } from 'zod-nest';
 
 const singleOrArray = <T extends z.ZodType>(item: T) => {
-  const itemFrag: SchemaObject = { type: 'string' };  // example: T = string
+  const itemFrag: SchemaObject = { type: 'string' }; // example: T = string
   const arrFrag: SchemaObject = { type: 'array', items: itemFrag };
 
   const pipe = item.transform((v) => [v]);
@@ -212,16 +212,14 @@ const PayloadSchema = overrideJSONSchema(
   opaque({ description: 'Opaque payload — shape not validated by this API.' }),
 );
 
-class MessageDto extends createZodDto(
-  z.object({ id: z.string(), payload: PayloadSchema }),
-) {}
+class MessageDto extends createZodDto(z.object({ id: z.string(), payload: PayloadSchema })) {}
 ```
 
 `z.unknown()` is already permissive at runtime — the override only changes how Swagger UI describes it.
 
 ## Date constructs
 
-`z.date()` is **already handled** by `primitiveOverride` — it emits as `{ type: 'string', format: 'date-time' }` without any registration. You only need an override when you want to *deviate* from that default (e.g. emit as a unix timestamp number). For most apps, prefer `z.iso.datetime()` over `z.date()` — it round-trips correctly through JSON.
+`z.date()` is **already handled** by `primitiveOverride` — it emits as `{ type: 'string', format: 'date-time' }` without any registration. You only need an override when you want to _deviate_ from that default (e.g. emit as a unix timestamp number). For most apps, prefer `z.iso.datetime()` over `z.date()` — it round-trips correctly through JSON.
 
 If you do want a custom `Date` representation:
 

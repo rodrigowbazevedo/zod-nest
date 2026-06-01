@@ -30,7 +30,7 @@ Both `requestBody` and response `$ref`s point at `#/components/schemas/User`.
 const userSchema = z
   .object({
     id: z.uuid(),
-    email: z.email().transform((v) => v.toLowerCase()),  // input string → output string (different shape upstream)
+    email: z.email().transform((v) => v.toLowerCase()), // input string → output string (different shape upstream)
   })
   .meta({ id: 'User' });
 
@@ -60,11 +60,9 @@ If you want the response side to advertise the same schema as the request side �
 const trimmedString = z
   .string()
   .transform((s) => s.trim())
-  .pipe(z.string());                  // post-pipe stage forces the output JSON Schema back to plain string
+  .pipe(z.string()); // post-pipe stage forces the output JSON Schema back to plain string
 
-const userSchema = z
-  .object({ name: trimmedString })
-  .meta({ id: 'User' });
+const userSchema = z.object({ name: trimmedString }).meta({ id: 'User' });
 ```
 
 Now input and output schemas are both `{ type: 'string' }` and the doc collapses to a single `User` entry. The trim still runs at validation time — the client just doesn't see two flavors of the same schema in Swagger UI.
@@ -92,13 +90,14 @@ This is rare. The default "collapse when equal, split when divergent" behaviour 
 `UserDto.Output` returns a sibling class that carries `io: 'output'`. The OpenAPI doc uses it automatically when emitting response schemas — you rarely need it directly.
 
 Reach for it only when:
+
 - You're building a custom interceptor that needs to introspect the output-side schema explicitly.
 - You're writing a custom doc generator and want to peek at the post-transform JSON Schema.
 - You're testing the I/O suffix truth table directly.
 
 ```ts
-const inputBody  = UserDto.schema;            // input JSON Schema source
-const outputBody = UserDto.Output.schema;     // output JSON Schema source — same Zod schema, different io tag
+const inputBody = UserDto.schema; // input JSON Schema source
+const outputBody = UserDto.Output.schema; // output JSON Schema source — same Zod schema, different io tag
 ```
 
 The Zod schema reference is identical — what differs is which side `applyZodNest` emits when introspecting the DTO class. See [`docs/dto.md → I/O sibling`](../dto.md#io-sibling).
@@ -108,10 +107,13 @@ The Zod schema reference is identical — what differs is which side `applyZodNe
 If you want to assert the split behavior in tests:
 
 ```ts
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { applyZodNest } from 'zod-nest';
 
-const raw = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle('t').setVersion('1').build());
+const raw = SwaggerModule.createDocument(
+  app,
+  new DocumentBuilder().setTitle('t').setVersion('1').build(),
+);
 const doc = applyZodNest(raw, { app });
 
 // Single entry — no divergence

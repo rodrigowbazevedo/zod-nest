@@ -42,15 +42,17 @@ class ZodValidationException extends BadRequestException {
 ### Custom filter example
 
 ```ts
-import { Catch, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
+import { Catch } from '@nestjs/common';
 import { ZodValidationException } from 'zod-nest';
+
+import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
 
 @Catch(ZodValidationException)
 class ValidationExceptionFilter implements ExceptionFilter {
   catch(exception: ZodValidationException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
-    const argType = exception.argMetadata?.type;            // 'body' | 'query' | 'param' | 'custom'
+    const argType = exception.argMetadata?.type; // 'body' | 'query' | 'param' | 'custom'
     const issueCount = exception.zodError.issues.length;
 
     response.status(400).json({
@@ -92,9 +94,9 @@ class ZodSerializationException extends InternalServerErrorException {
 
 A serialization failure is a **server-side** contract violation — your handler returned a value that doesn't match the schema you declared. Leaking the treeified Zod error to the client would disclose internal structure (field names, expected types, nesting depth) and would let an attacker probe your output contracts by deliberately tripping them.
 
-`ZodValidationException` (HTTP 400) *does* expose the tree because that's a **client-side** error — the client sent malformed input and needs to know what to fix. The principle is standard: 4xx errors are detailed (client's problem to fix), 5xx errors are opaque (server's problem to fix).
+`ZodValidationException` (HTTP 400) _does_ expose the tree because that's a **client-side** error — the client sent malformed input and needs to know what to fix. The principle is standard: 4xx errors are detailed (client's problem to fix), 5xx errors are opaque (server's problem to fix).
 
-The diagnostic information isn't lost — the full treeified error is logged via [`validation logging`](logging.md) (with redaction + truncation), and `error.zodError` is still available to custom exception filters for forwarding to your observability stack. The error is *visible to operators, opaque to clients*.
+The diagnostic information isn't lost — the full treeified error is logged via [`validation logging`](logging.md) (with redaction + truncation), and `error.zodError` is still available to custom exception filters for forwarding to your observability stack. The error is _visible to operators, opaque to clients_.
 
 Soft-mode variants (`passthroughOnError: true`) never throw this — they log at `warn` and let the original value pass through. See [`responses.md`](responses.md#passthroughonerror).
 
@@ -152,23 +154,24 @@ try {
    import { createZodDto } from 'zod-nest';
    import { FileSchema } from 'zod-nest/helpers';
 
-   class UploadDto extends createZodDto(
-     z.object({ file: FileSchema }),
-   ) {}
+   class UploadDto extends createZodDto(z.object({ file: FileSchema })) {}
    ```
 
-2. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema *instance*. Pair with the `zod-nest/helpers` fragment catalog (`binaryFragment`, `uuidFragment`, `opaqueFragment`, …) or the `binary()` / `opaque()` sugar functions so you don't have to hand-write the magic objects. Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes (coercion helpers). See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
+2. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema _instance_. Pair with the `zod-nest/helpers` fragment catalog (`binaryFragment`, `uuidFragment`, `opaqueFragment`, …) or the `binary()` / `opaque()` sugar functions so you don't have to hand-write the magic objects. Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes (coercion helpers). See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
 
    ```ts
    import { z } from 'zod';
    import { overrideJSONSchema } from 'zod-nest';
    import { binary, uuidFragment } from 'zod-nest/helpers';
 
-   const PdfUpload = overrideJSONSchema(z.instanceof(File), binary({ contentMediaType: 'application/pdf' }));
+   const PdfUpload = overrideJSONSchema(
+     z.instanceof(File),
+     binary({ contentMediaType: 'application/pdf' }),
+   );
    const UserId = overrideJSONSchema(z.custom<string>(), uuidFragment);
    ```
 
-3. **`override` callback** — pass a per-call `override` to `applyZodNest` / `toOpenApi` that mutates `ctx.jsonSchema` for matching types. Useful when the mapping should apply to *every* schema of a given Zod type. See [`swagger-integration.md`](swagger-integration.md#override-callback) for the pattern.
+3. **`override` callback** — pass a per-call `override` to `applyZodNest` / `toOpenApi` that mutates `ctx.jsonSchema` for matching types. Useful when the mapping should apply to _every_ schema of a given Zod type. See [`swagger-integration.md`](swagger-integration.md#override-callback) for the pattern.
 
 4. **`strict: false`** — globally relax the check; unrepresentable constructs emit `{}`. Reach for this only when you're knowingly trading schema fidelity for a clean boot.
 
@@ -191,7 +194,7 @@ Two distinct DTO classes target the same registry id with differing bodies. The 
 
 ```ts
 const userA = z.object({ id: z.string() }).meta({ id: 'User' });
-const userB = z.object({ uuid: z.uuid() }).meta({ id: 'User' });  // collision
+const userB = z.object({ uuid: z.uuid() }).meta({ id: 'User' }); // collision
 
 class UserDtoA extends createZodDto(userA) {}
 class UserDtoB extends createZodDto(userB) {}
@@ -206,10 +209,10 @@ Fix: give each schema a distinct id.
 
 A `$ref` in the doc points at a `components.schemas` key that no longer exists after the merge / rewrite passes. The `details` payload lists every offending ref with a per-ref hint inferred from collected usage:
 
-- *Seen on input side only* → input-only DTO not registered to the right `ZodNestRegistry`.
-- *Seen on output side only* → output-only DTO (e.g. only referenced in `@ZodResponse`) not registered.
-- *Seen on both sides* → registry mismatch despite usage.
-- *Unknown* → likely a `.meta({ id })` typo or an entirely unregistered DTO.
+- _Seen on input side only_ → input-only DTO not registered to the right `ZodNestRegistry`.
+- _Seen on output side only_ → output-only DTO (e.g. only referenced in `@ZodResponse`) not registered.
+- _Seen on both sides_ → registry mismatch despite usage.
+- _Unknown_ → likely a `.meta({ id })` typo or an entirely unregistered DTO.
 
 Fix: register the DTO via `createZodDto` to the correct registry, or correct the `.meta({ id })` typo.
 
@@ -218,13 +221,15 @@ Fix: register the DTO via `createZodDto` to the correct registry, or correct the
 A `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` argument resolved to a `createZodDto` whose underlying schema is not an object — there is no top-level `properties` record to iterate, so the marker parameter can't be expanded into individual parameters.
 
 ```ts
-const Tags = z.array(z.string());           // array — has no `properties`
+const Tags = z.array(z.string()); // array — has no `properties`
 class TagsDto extends createZodDto(Tags) {}
 
 @Controller()
 class TagsController {
   @Get()
-  list(@Query() tags: TagsDto): unknown { /* … */ }
+  list(@Query() tags: TagsDto): unknown {
+    /* … */
+  }
 }
 
 applyZodNest(raw, { app });
@@ -247,7 +252,7 @@ See [`docs/recipes/query-param-dtos.md`](recipes/query-param-dtos.md) for the pe
 NestJS' `@Catch` decorator accepts multiple exception classes — useful for routing zod-nest exceptions to a single handler:
 
 ```ts
-import { ZodValidationException, ZodSerializationException } from 'zod-nest';
+import { ZodSerializationException, ZodValidationException } from 'zod-nest';
 
 @Catch(ZodValidationException, ZodSerializationException)
 class ZodExceptionFilter implements ExceptionFilter {

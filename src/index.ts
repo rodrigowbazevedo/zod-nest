@@ -64,6 +64,7 @@ export type {
 export {
   DEFAULT_MAX_LOGGED_VALUE_BYTES,
   DEFAULT_REDACT_KEYS,
+  DEFAULT_STREAM_CONTENT_TYPES,
   ZOD_NEST_OPTIONS,
   ZodNestModule,
 } from './module/index.js';

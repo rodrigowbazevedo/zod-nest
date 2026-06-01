@@ -8,8 +8,8 @@ This is symmetric with the `nestjs-zod` predecessor library — it eliminates th
 
 ```ts
 import { Controller, Get, Query } from '@nestjs/common';
-import { createZodDto } from 'zod-nest';
 import { z } from 'zod';
+import { createZodDto } from 'zod-nest';
 
 const TemplatesQuery = z
   .object({

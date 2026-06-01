@@ -89,6 +89,11 @@ For each step the user confirms, the orchestration is identical:
    - Step 5 — call out the [`@HttpCode` rule](https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-5--rewrite-response-handlers):
      every `@ZodResponse({ status: X })` where X ≠ method default needs a
      matching `@HttpCode(X)`.
+   - Step 5 — for SSE / NDJSON / binary handlers that hand-wrote
+     `@ApiOkResponse({ content: { '<stream type>': … } })`, collapse to
+     `@ZodResponse({ type, contentType })` (the DTO is one event/line/blob;
+     validation is skipped). See
+     [streaming responses](https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/responses.md#streaming-responses-contenttype--stream).
    - Step 7 — call out the discriminator change (`.isZodDto` → `isZodDto(Dto)`)
      and `.Output` shape change.
    - Step 8 — call out the [500-body opacity change](https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#serialization-exception-body-changes):

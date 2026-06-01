@@ -18,7 +18,7 @@ new ZodValidationPipe(z.object({ id: z.string() }));
 
 // 4. An options object — schema + per-pipe exception factory.
 new ZodValidationPipe({
-  schema: UserDto,                                          // or a raw Zod schema
+  schema: UserDto, // or a raw Zod schema
   createValidationException: (err, meta) => new MyError(),
 });
 ```
@@ -139,7 +139,7 @@ The thrown `ZodValidationException` carries both `zodError` and `argMetadata` as
 class ValidationExceptionFilter implements ExceptionFilter {
   catch(exception: ZodValidationException, host: ArgumentsHost) {
     const issues = exception.zodError.issues;
-    const argType = exception.argMetadata?.type;  // 'body' | 'query' | 'param' | 'custom'
+    const argType = exception.argMetadata?.type; // 'body' | 'query' | 'param' | 'custom'
     // route based on argType, log issues, format custom response, etc.
   }
 }

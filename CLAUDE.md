@@ -2,7 +2,7 @@
 
 Modern **Zod v4** ↔ **NestJS** ↔ **OpenAPI 3.1** integration. Successor to `nestjs-zod`. This file is the contributor-facing orientation; the user-facing surface is in [`README.md`](README.md).
 
-If you're here to *use* `zod-nest` in your own NestJS app, the README is what you want. Stay here for working on the library itself.
+If you're here to _use_ `zod-nest` in your own NestJS app, the README is what you want. Stay here for working on the library itself.
 
 ## Directory map
 
@@ -41,17 +41,17 @@ NOTICE                        # attribution to nestjs-zod for lifted names
 
 Every command runs from the repo root with `npm`. The package manager is npm; please don't commit a different lockfile.
 
-| Command | What it does |
-|---|---|
-| `npm install` | Installs deps + sets up the husky pre-commit hook. |
-| `npm run build` | tsup build → `dist/` (CJS + ESM + `.d.ts`). |
-| `npm run build:watch` | tsup in watch mode. |
-| `npm test` | Jest, full suite. |
-| `npm run test:cov` | Jest with coverage report. |
-| `npm run lint` | ESLint over the tree. |
-| `npm run lint:fix` | ESLint with `--fix`. |
-| `npm run format` | Prettier write over the tree. |
-| `npm run typecheck` | `tsc --noEmit` against `tsconfig.json`. |
+| Command                  | What it does                                                      |
+| ------------------------ | ----------------------------------------------------------------- |
+| `npm install`            | Installs deps + sets up the husky pre-commit hook.                |
+| `npm run build`          | tsup build → `dist/` (CJS + ESM + `.d.ts`).                       |
+| `npm run build:watch`    | tsup in watch mode.                                               |
+| `npm test`               | Jest, full suite.                                                 |
+| `npm run test:cov`       | Jest with coverage report.                                        |
+| `npm run lint`           | ESLint over the tree.                                             |
+| `npm run lint:fix`       | ESLint with `--fix`.                                              |
+| `npm run format`         | Prettier write over the tree.                                     |
+| `npm run typecheck`      | `tsc --noEmit` against `tsconfig.json`.                           |
 | `npm run prepublishOnly` | Chains lint + typecheck + test + build. Runs as the release gate. |
 
 `npm run release` (semantic-release) is **CI-only** — never run locally. The release path is push-to-`main` → semantic-release reads conventional commits → CI publishes to npm. Running it locally would attempt to publish from your machine.
@@ -87,27 +87,27 @@ Every command runs from the repo root with `npm`. The package manager is npm; pl
 
 Areas → entry files for navigation:
 
-| Area | Entry | Public surface |
-|---|---|---|
-| Schema engine | `src/schema/index.ts` | `toOpenApi`, `createRegistry`, `defaultRegistry`, `Override`, `ZodNestError`, `ZodNestUnrepresentableError`, `extend`, `getLineage`, `LineageEntry` |
-| DTO | `src/dto/index.ts` | `createZodDto`, `isZodDto`, `ZodDto`, `Io` |
-| Validation | `src/pipes/index.ts` + `src/exceptions/index.ts` | `ZodValidationPipe`, `ZodValidationException`, `CreateValidationException` |
-| Response | `src/decorators/index.ts` + `src/interceptors/index.ts` + `src/response/index.ts` + `src/exceptions/index.ts` | `@ZodResponse`, `ZodSerializerInterceptor`, `ZodSerializationException`, `defaultStatusFor`, `resolveEffectiveStatus`, `ResponseVariant`, `ZOD_RESPONSES_METADATA_KEY` |
-| Document | `src/document/index.ts` | `applyZodNest`, `ApplyZodNestOptions`, `ZodNestDocumentError` |
-| Module | `src/module/index.ts` | `ZodNestModule`, `ZodNestModuleOptions`, `NormalizedZodNestOptions`, `DEFAULT_REDACT_KEYS`, `DEFAULT_MAX_LOGGED_VALUE_BYTES`, `ZOD_NEST_OPTIONS` |
+| Area          | Entry                                                                                                         | Public surface                                                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema engine | `src/schema/index.ts`                                                                                         | `toOpenApi`, `createRegistry`, `defaultRegistry`, `Override`, `ZodNestError`, `ZodNestUnrepresentableError`, `extend`, `getLineage`, `LineageEntry`                    |
+| DTO           | `src/dto/index.ts`                                                                                            | `createZodDto`, `isZodDto`, `ZodDto`, `Io`                                                                                                                             |
+| Validation    | `src/pipes/index.ts` + `src/exceptions/index.ts`                                                              | `ZodValidationPipe`, `ZodValidationException`, `CreateValidationException`                                                                                             |
+| Response      | `src/decorators/index.ts` + `src/interceptors/index.ts` + `src/response/index.ts` + `src/exceptions/index.ts` | `@ZodResponse`, `ZodSerializerInterceptor`, `ZodSerializationException`, `defaultStatusFor`, `resolveEffectiveStatus`, `ResponseVariant`, `ZOD_RESPONSES_METADATA_KEY` |
+| Document      | `src/document/index.ts`                                                                                       | `applyZodNest`, `ApplyZodNestOptions`, `ZodNestDocumentError`                                                                                                          |
+| Module        | `src/module/index.ts`                                                                                         | `ZodNestModule`, `ZodNestModuleOptions`, `NormalizedZodNestOptions`, `DEFAULT_REDACT_KEYS`, `DEFAULT_MAX_LOGGED_VALUE_BYTES`, `ZOD_NEST_OPTIONS`                       |
 
 ## Skills (`.claude/skills/`)
 
 Optional convenience for contributors using Claude Code. None are required — every workflow step works without them.
 
-| Skill | Purpose |
-|---|---|
-| `/sync-docs` | Diagnose drift between `src/` changes and user-facing docs on a branch. Surfaces a checklist; never auto-writes. Run before `gh pr create`. |
-| `/api-surface-audit` | Verify every export in `src/index.ts` resolves to a file, has a matching test, and follows naming conventions. Use before cutting a release. |
-| `/schema-fixture` | Add a Zod → OpenAPI fixture to the engine spec suite (`test/schema/engine.*.spec.ts`). |
+| Skill                     | Purpose                                                                                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/sync-docs`              | Diagnose drift between `src/` changes and user-facing docs on a branch. Surfaces a checklist; never auto-writes. Run before `gh pr create`.    |
+| `/api-surface-audit`      | Verify every export in `src/index.ts` resolves to a file, has a matching test, and follows naming conventions. Use before cutting a release.   |
+| `/schema-fixture`         | Add a Zod → OpenAPI fixture to the engine spec suite (`test/schema/engine.*.spec.ts`).                                                         |
 | `/check-upstream-updates` | Audit upstream dependencies (`zod`, `@nestjs/swagger`, `@nestjs/common`+`@nestjs/core`, `rxjs`); file one GitHub issue per actionable finding. |
-| `/scan-zod-features` | Surface scanner for Zod's `toJSONSchema` options; usually invoked via `/check-upstream-updates`. |
-| `/scan-nest-features` | Surface scanner for `@nestjs/swagger` + `@nestjs/common` + `@nestjs/core`; usually invoked via `/check-upstream-updates`. |
+| `/scan-zod-features`      | Surface scanner for Zod's `toJSONSchema` options; usually invoked via `/check-upstream-updates`.                                               |
+| `/scan-nest-features`     | Surface scanner for `@nestjs/swagger` + `@nestjs/common` + `@nestjs/core`; usually invoked via `/check-upstream-updates`.                      |
 
 ## Phase branching & PR workflow
 
@@ -123,11 +123,11 @@ Each phase ships as its own branch + PR targeting `main` (no direct commits to `
 
 Top failure modes and how we mitigate them:
 
-| Risk | Mitigation |
-|---|---|
-| **Zod v4 API churn** — `toJSONSchema` options, `.meta()` registry semantics, override hook shape | `/check-upstream-updates --target zod` invokes `/scan-zod-features`; type-level tests catch shape changes at install time; pinned floor in `peerDependencies`. |
-| **`@nestjs/swagger` internal refactor** — `SchemaObjectFactory`, `SwaggerExplorer`, plugin emit shape | `/scan-nest-features` flags shape divergence; integration tests assert the marker-placeholder contract end-to-end. |
-| **`_OPENAPI_METADATA_FACTORY` shape change** — specifically, if it becomes non-static or async | The DTO marker bridge in `src/dto/` breaks; mitigation = explicit assertion test (`test/dto/create-zod-dto.swagger-smoke.spec.ts`) + version-pinned compat-matrix cell. |
-| **Maintainer bandwidth** | `/check-upstream-updates` cadence is manual-only (no scheduled automation). Skill set scoped to library maintenance, not consumer scaffolding — keeps `.claude/skills/` small enough that one person can hold it. |
+| Risk                                                                                                  | Mitigation                                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Zod v4 API churn** — `toJSONSchema` options, `.meta()` registry semantics, override hook shape      | `/check-upstream-updates --target zod` invokes `/scan-zod-features`; type-level tests catch shape changes at install time; pinned floor in `peerDependencies`.                                                    |
+| **`@nestjs/swagger` internal refactor** — `SchemaObjectFactory`, `SwaggerExplorer`, plugin emit shape | `/scan-nest-features` flags shape divergence; integration tests assert the marker-placeholder contract end-to-end.                                                                                                |
+| **`_OPENAPI_METADATA_FACTORY` shape change** — specifically, if it becomes non-static or async        | The DTO marker bridge in `src/dto/` breaks; mitigation = explicit assertion test (`test/dto/create-zod-dto.swagger-smoke.spec.ts`) + version-pinned compat-matrix cell.                                           |
+| **Maintainer bandwidth**                                                                              | `/check-upstream-updates` cadence is manual-only (no scheduled automation). Skill set scoped to library maintenance, not consumer scaffolding — keeps `.claude/skills/` small enough that one person can hold it. |
 
 Findings from `/check-upstream-updates` become GitHub issues labelled `upstream-update` — the issue tracker is the audit trail.

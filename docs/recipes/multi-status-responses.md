@@ -9,15 +9,15 @@ import { Controller, Get, HttpStatus, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { createZodDto, ZodResponse } from 'zod-nest';
 
-class UserDto    extends createZodDto(z.object({ id: z.string() }),    { id: 'User' })  {}
-class ErrorDto   extends createZodDto(z.object({ code: z.number() }),  { id: 'Error' }) {}
-class FatalDto   extends createZodDto(z.object({ trace: z.string() }), { id: 'Fatal' }) {}
+class UserDto extends createZodDto(z.object({ id: z.string() }), { id: 'User' }) {}
+class ErrorDto extends createZodDto(z.object({ code: z.number() }), { id: 'Error' }) {}
+class FatalDto extends createZodDto(z.object({ trace: z.string() }), { id: 'Fatal' }) {}
 
 @Controller('users')
 class UsersController {
   @Get(':id')
-  @ZodResponse({                                           type: UserDto })  // success — 200 inferred from GET
-  @ZodResponse({ status: HttpStatus.NOT_FOUND,             type: ErrorDto })
+  @ZodResponse({ type: UserDto }) // success — 200 inferred from GET
+  @ZodResponse({ status: HttpStatus.NOT_FOUND, type: ErrorDto })
   @ZodResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, type: FatalDto })
   async getUser(): Promise<UserDto> {
     const user = await this.repo.find();
@@ -44,9 +44,7 @@ For thrown exceptions (`NotFoundException`, `InternalServerErrorException`), Nes
 When the 404 path throws `new NotFoundException({ code: 404 })`, the response body is `{ statusCode: 404, message: 'Not Found', code: 404 }`. To validate that against `ErrorDto`, your schema needs to match the **full** Nest exception body — or use a `.passthrough()` / `.loose()` shape:
 
 ```ts
-const errorSchema = z
-  .object({ code: z.number() })
-  .loose();                          // tolerate Nest's `statusCode` + `message`
+const errorSchema = z.object({ code: z.number() }).loose(); // tolerate Nest's `statusCode` + `message`
 
 class ErrorDto extends createZodDto(errorSchema, { id: 'Error' }) {}
 ```

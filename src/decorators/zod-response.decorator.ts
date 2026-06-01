@@ -11,6 +11,7 @@ import type {
 import { isZodDto } from '../dto/predicates.js';
 import { resolveEffectiveStatus } from '../response/default-status.js';
 import { appendResponseVariant } from '../response/metadata.js';
+import { DEFAULT_STREAM_MATCHER, resolveContentType } from '../response/stream.js';
 import { applySwaggerResponseDecorator } from './zod-response.swagger-bridge.js';
 
 /**
@@ -47,6 +48,20 @@ export interface ZodResponseOptions {
   type: ZodResponseType;
   description?: ZodResponseDescription;
   passthroughOnError?: boolean;
+  /**
+   * Response content type, used as the OpenAPI media-type key (`@ApiResponse`
+   * `content`). Defaults to `'application/json'`. Set a stream type
+   * (`'text/event-stream'`, `'application/x-ndjson'`, …) to document a streamed
+   * body; combined with `stream` it also turns off response validation.
+   */
+  contentType?: string;
+  /**
+   * When `true`, the response is written directly to the buffer and
+   * `ZodSerializerInterceptor` skips validation. When unset, it is inferred:
+   * a stream-typed `contentType` (or a stream-typed `@Header('Content-Type', …)`)
+   * implies `true`. See `DEFAULT_STREAM_CONTENT_TYPES`.
+   */
+  stream?: boolean;
 }
 
 interface BuiltKind {
@@ -121,21 +136,20 @@ const normaliseStatus = (
  * `'NXX'` wildcard). The wrapped Zod schema (array / tuple) is built once
  * at decoration time — no per-request schema construction.
  *
- * **Decorator-ordering note (implicit `status` only).** TypeScript decorators
- * apply bottom-up, so `@ZodResponse` (typically written above `@Get` /
- * `@HttpCode`) executes its factory body *first* — before sibling
- * decorators have written their `HTTP_CODE_METADATA` / `METHOD_METADATA`.
- * When `opts.status` is explicit, the `@ApiResponse(...)` call is applied
- * synchronously — there's nothing to wait for. When `opts.status` is
- * implicit (resolves to `@HttpCode` or the HTTP-method default), the
- * `@ApiResponse(...)` call is deferred via `queueMicrotask` so the sibling
- * metadata has settled by the time we read it. See `docs/responses.md →
- * "Decorator ordering & the microtask trick"`.
+ * **Decorator-ordering note.** TypeScript decorators apply bottom-up, so
+ * `@ZodResponse` (typically written above `@Get` / `@HttpCode` /
+ * `@Header(...)`) runs *before* those siblings have written their
+ * `HTTP_CODE_METADATA` / `METHOD_METADATA` / `HEADERS_METADATA`. The
+ * `@ApiResponse(...)` call is therefore always deferred via `queueMicrotask`,
+ * so by the time it reads sibling metadata — the effective status *and* the
+ * effective content type (including `@Header('Content-Type', …)` inference) —
+ * everything has settled. The document is built much later
+ * (`SwaggerModule.createDocument`), so the deferral is invisible to output.
+ * See `docs/responses.md → "Decorator ordering & the microtask trick"`.
  */
 export const ZodResponse = (opts: ZodResponseOptions): MethodDecorator => {
   const built = buildKind(opts.type);
   const status = normaliseStatus(opts.status);
-  const statusExplicit = status !== undefined;
   return (target, propertyKey, descriptor) => {
     const handler = descriptor.value;
     if (typeof handler !== 'function') {
@@ -148,6 +162,8 @@ export const ZodResponse = (opts: ZodResponseOptions): MethodDecorator => {
       validationSchema: built.validationSchema,
       description: opts.description,
       passthroughOnError: opts.passthroughOnError ?? false,
+      contentType: opts.contentType,
+      stream: opts.stream,
     };
     appendResponseVariant(handler, variant);
 
@@ -155,15 +171,21 @@ export const ZodResponse = (opts: ZodResponseOptions): MethodDecorator => {
     // expects; `MethodDecorator`'s descriptor parameter is `TypedPropertyDescriptor<T>`
     // for the inferred return type, structurally compatible at runtime.
     const swaggerDescriptor = descriptor as TypedPropertyDescriptor<unknown>;
-    if (statusExplicit) {
-      applySwaggerResponseDecorator(variant, status, target, propertyKey, swaggerDescriptor);
-      return;
-    }
-    // Implicit status — defer so `@HttpCode` / `METHOD_METADATA` from
-    // sibling decorators are readable by `resolveEffectiveStatus`.
+    // Always defer: sibling `@HttpCode` / route method / `@Header` metadata is
+    // not yet written when this decorator applies. The default stream matcher
+    // is used here — module options (`streamContentTypes`) don't exist at
+    // decoration time; they extend only the interceptor's runtime check.
     queueMicrotask(() => {
-      const effective = resolveEffectiveStatus(variant, handler);
-      applySwaggerResponseDecorator(variant, effective, target, propertyKey, swaggerDescriptor);
+      const effectiveStatus = resolveEffectiveStatus(variant, handler);
+      const contentType = resolveContentType(variant, handler, DEFAULT_STREAM_MATCHER);
+      applySwaggerResponseDecorator(
+        variant,
+        effectiveStatus,
+        contentType,
+        target,
+        propertyKey,
+        swaggerDescriptor,
+      );
     });
   };
 };

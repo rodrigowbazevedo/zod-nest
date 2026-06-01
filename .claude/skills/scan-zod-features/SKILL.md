@@ -17,6 +17,7 @@ Source-aware scanner for the Zod surface zod-nest depends on. Narrower than `/ch
 ## Inputs
 
 Optional:
+
 - `--baseline <version>` — compare the installed version to a specific older version. Useful for "what changed since 4.4.0?". Default: scan only the installed version (no comparison).
 
 ## Workflow
@@ -80,12 +81,15 @@ Output findings in markdown, one section per category. Format consistent with `/
 ## /scan-zod-features (zod 4.4.2 → 4.5.0)
 
 ✅ Aligned
+
 - `target`, `metadata`, `override`, `uri`, `cycles`, `reused`, `io`, `unrepresentable` — all still accepted.
 
 💡 Opportunities
+
 - New option `target: 'openapi-3.2'` (Zod 4.5.0). Not relevant — we pin to 3.1.
 
 ⚠️ Needs investigation
+
 - `OverrideContext` gained a new `path` field. Our overrides destructure as `{ zodSchema, jsonSchema }`; adding `path` is backwards-compatible at the type level but enables a feature (composition by path) we could exploit.
 
 🚫 Blocked
@@ -96,7 +100,7 @@ Hand off this report to the caller. If invoked by `/check-upstream-updates`, it'
 
 ## Out of scope
 
-- **Schema-level emission semantics.** That's the engine's job; if Zod changes how `z.string()` emits, that's a different concern. The scanner watches the *options* and *plug-points*, not every Zod construct.
+- **Schema-level emission semantics.** That's the engine's job; if Zod changes how `z.string()` emits, that's a different concern. The scanner watches the _options_ and _plug-points_, not every Zod construct.
 - **Other Zod modules.** Validation behaviour (`safeParseAsync`, refinements) lives in Zod's parsing core, not the JSON-schema surface. Out of scope here.
 
 ## Notes

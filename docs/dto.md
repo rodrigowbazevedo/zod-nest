@@ -12,14 +12,14 @@ class UserDto extends createZodDto(userSchema) {}
 
 ## What the class carries
 
-| Static member | Type | Notes |
-|---|---|---|
-| `schema` | `TSchema` | The original Zod schema, untouched. |
-| `id` | `string` | OpenAPI schema name. Resolved lazily on first read. |
-| `io` | `'input' \| 'output'` | Always `'input'` on the parent class. The `.Output` sibling carries `'output'`. |
-| `Output` | `ZodDto<TSchema>` | Lazy sibling class for output-side emission. See [I/O sibling](#io-sibling). |
-| `parse(input)` | `(input: unknown) => z.infer<TSchema>` | `schema.parse(input)` — throws Zod's native error on failure. |
-| `safeParse(input)` | `(input: unknown) => z.ZodSafeParseResult<...>` | `schema.safeParse(input)` — never throws. |
+| Static member      | Type                                            | Notes                                                                           |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------- |
+| `schema`           | `TSchema`                                       | The original Zod schema, untouched.                                             |
+| `id`               | `string`                                        | OpenAPI schema name. Resolved lazily on first read.                             |
+| `io`               | `'input' \| 'output'`                           | Always `'input'` on the parent class. The `.Output` sibling carries `'output'`. |
+| `Output`           | `ZodDto<TSchema>`                               | Lazy sibling class for output-side emission. See [I/O sibling](#io-sibling).    |
+| `parse(input)`     | `(input: unknown) => z.infer<TSchema>`          | `schema.parse(input)` — throws Zod's native error on failure.                   |
+| `safeParse(input)` | `(input: unknown) => z.ZodSafeParseResult<...>` | `schema.safeParse(input)` — never throws.                                       |
 
 The class is tagged with `Symbol.for('zod-nest.dto')`, which `ZodValidationPipe`, `ZodSerializerInterceptor`, and `applyZodNest` use to discriminate it from plain constructors.
 
@@ -29,11 +29,20 @@ Two equivalent forms — pick the one that fits the call site:
 
 ```ts
 // Preferred — id on the schema via Zod's metadata.
-const userSchema = z.object({ /* ... */ }).meta({ id: 'User' });
+const userSchema = z
+  .object({
+    /* ... */
+  })
+  .meta({ id: 'User' });
 class UserDto extends createZodDto(userSchema) {}
 
 // Also valid — id as createZodDto's second argument.
-class UserDto extends createZodDto(z.object({ /* ... */ }), { id: 'User' }) {}
+class UserDto extends createZodDto(
+  z.object({
+    /* ... */
+  }),
+  { id: 'User' },
+) {}
 ```
 
 Resolution order, applied lazily on the first read of `Dto.id`:
@@ -86,12 +95,12 @@ class UserDto extends createZodDto(userSchema) {}
 
 The fields you'll most often reach for:
 
-| Field | Where it shows up |
-|---|---|
-| `title` | Schema heading in Swagger UI (above the property table) |
-| `description` | Schema-level description block. On a field schema, the field's description column. |
-| `examples` | Pre-filled value in the "Try it out" panel; rendered as an `examples` array in the spec. |
-| `deprecated` | Strike-through styling + a "Deprecated" badge in Swagger UI. |
+| Field         | Where it shows up                                                                        |
+| ------------- | ---------------------------------------------------------------------------------------- |
+| `title`       | Schema heading in Swagger UI (above the property table)                                  |
+| `description` | Schema-level description block. On a field schema, the field's description column.       |
+| `examples`    | Pre-filled value in the "Try it out" panel; rendered as an `examples` array in the spec. |
+| `deprecated`  | Strike-through styling + a "Deprecated" badge in Swagger UI.                             |
 
 Attach `.meta()` at any nesting depth — schema-level annotations (the outermost `.meta()`) describe the type as a whole; field-level `.meta()` annotations describe individual properties. The two compose without conflict.
 
@@ -109,12 +118,12 @@ You rarely need `.Output` directly — `@ZodResponse({ type: UserDto })` resolve
 
 `applyZodNest` compares the emitted input and output JSON Schemas for each DTO and decides whether to emit one or two `components.schemas` entries:
 
-| Schema shape | OpenAPI emission |
-|---|---|
-| `z.object({ id: z.string() })` (no I/O divergence) | `User` only |
+| Schema shape                                                                   | OpenAPI emission                       |
+| ------------------------------------------------------------------------------ | -------------------------------------- |
+| `z.object({ id: z.string() })` (no I/O divergence)                             | `User` only                            |
 | `z.object({ email: z.email().transform((v) => v.toLowerCase()) })` (transform) | `User` (input) + `UserOutput` (output) |
-| `z.object({ x: z.string().optional().default('y') })` (default) | `User` (input) + `UserOutput` (output) |
-| `z.object({ /* identical input + output */ }).meta({ id })` | `User` only |
+| `z.object({ x: z.string().optional().default('y') })` (default)                | `User` (input) + `UserOutput` (output) |
+| `z.object({ /* identical input + output */ }).meta({ id })`                    | `User` only                            |
 
 The split is **per byte-equality of the emitted body**, not per Zod type. `z.string().transform(x => x)` produces a schema whose input and output JSON Schemas are byte-equal — it does not split. Only divergent emissions split.
 
@@ -125,9 +134,9 @@ Response refs are rewritten to `<Id>Output` automatically when the split fires; 
 `nestjs-zod` had a `{ codec: true }` flag. `zod-nest` doesn't. Express the codec in the schema itself with `z.pipe` or `z.transform`:
 
 ```ts
-const dateSchema = z
-  .iso.date()                              // input: 'YYYY-MM-DD' string
-  .transform((s) => new Date(s))           // runtime: Date instance
+const dateSchema = z.iso
+  .date() // input: 'YYYY-MM-DD' string
+  .transform((s) => new Date(s)) // runtime: Date instance
   .meta({ id: 'IsoDate' });
 
 class IsoDateDto extends createZodDto(dateSchema) {}

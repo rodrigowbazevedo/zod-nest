@@ -63,7 +63,7 @@ For each doc identified in Step 3:
 
 1. **Broken references** — grep the doc for every symbol name removed or renamed in the changeset. Each match is a ⚠️ item. **Removals and renames of public exports also feed Step 5.**
 2. **Drifted defaults** — find sentences describing default behaviour (e.g. "default is `4096`", "redacts `password`, `secret`, `apiKey`", "returns 400 with body `{ ... }`"). Cross-reference the actual default in code. Each mismatch is a 🔄 item. **Default-shape changes also feed Step 5.**
-3. **Missing coverage** — for each new export or behavior, search the doc for its name. If absent and the doc is one where it *should* appear (e.g. a new exception class missing from `docs/exceptions.md`), emit a 📝 item with a proposed paragraph or table row.
+3. **Missing coverage** — for each new export or behavior, search the doc for its name. If absent and the doc is one where it _should_ appear (e.g. a new exception class missing from `docs/exceptions.md`), emit a 📝 item with a proposed paragraph or table row.
 4. **Comparison-table staleness** — README's "Differences from `nestjs-zod`" section and MIGRATION.md's breaking-changes table have rows. If a behaviour described there has changed, flag the row.
 
 ### Step 5: Classify each change's version-bump impact
@@ -98,21 +98,25 @@ Two sections — the drift checklist followed by the version-bump implications. 
 ## Drift report
 
 📝 **Missing**
+
 - `docs/exceptions.md:13` — `ZodNestDocumentError` not in the class hierarchy diagram.
   Proposed: add `└── ZodNestDocumentError (applyZodNest post-processing failures)` to the tree.
 
 ⚠️ **Broken reference**
+
 - `MIGRATION.md:142` — references removed export `createZodGuard`. Drop the row or note it's intentionally gone.
 
 🔄 **Behavior drift**
+
 - `docs/module-options.md:118` — `DEFAULT_REDACT_KEYS` lists 8 entries; code now ships 11.
   Proposed: refresh the table from `src/module/options.ts:68-83`.
 
-✅ **In sync** — docs/composition.md, docs/recipes/*, CONTRIBUTING.md
+✅ **In sync** — docs/composition.md, docs/recipes/\*, CONTRIBUTING.md
 
 ## Version-bump implications
 
 This branch contains **breaking** changes to the public surface:
+
 - Removed export: `createZodGuard` (was in `src/index.ts`).
 - Response body shape: `ZodSerializationException` no longer includes `errors`.
 
@@ -134,4 +138,4 @@ Stop after emitting the report. Do not apply edits — the user reviews, decides
 ## Notes
 
 - The doc layout convention is in [`references/doc-layout.md`](references/doc-layout.md). Update it when phases add or rename companion docs.
-- The skill exists because contributor-driven src/ changes routinely outpace doc updates — by surfacing the gap *before* `gh pr create`, the docs stay honest as part of the same change.
+- The skill exists because contributor-driven src/ changes routinely outpace doc updates — by surfacing the gap _before_ `gh pr create`, the docs stay honest as part of the same change.

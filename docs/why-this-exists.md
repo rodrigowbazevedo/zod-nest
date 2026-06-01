@@ -22,7 +22,7 @@ If you're on v3, [Zod's v3-to-v4 migration guide](https://zod.dev/v4) is the pat
 
 `@nestjs/swagger` emits OpenAPI 3.1 by default in modern versions. The 3.0 fallback path required emitting `nullable: true` instead of `type: [..., 'null']`, rewriting `examples` to `example`, downgrading `prefixItems` tuples, and post-processing `$ref` paths. We drop all of it.
 
-If you need to serve OpenAPI 3.0 to a client that can't speak 3.1, run a downgrade pass *after* `applyZodNest` — there are good standalone tools for it. `zod-nest` itself emits 3.1 only.
+If you need to serve OpenAPI 3.0 to a client that can't speak 3.1, run a downgrade pass _after_ `applyZodNest` — there are good standalone tools for it. `zod-nest` itself emits 3.1 only.
 
 ### `cleanupOpenApiDoc` as a separate post-process
 

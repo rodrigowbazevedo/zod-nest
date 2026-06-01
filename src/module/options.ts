@@ -3,12 +3,14 @@ import { Logger } from '@nestjs/common';
 import type { ArgumentMetadata, ExecutionContext, LoggerService } from '@nestjs/common';
 import type { z } from 'zod';
 import type { LogValidationFailure } from '../logging/validation-logger.js';
+import type { StreamContentTypeMatcher } from '../response/stream.js';
 
 import {
   createValidationLogger,
   DEFAULT_LOGGER_CONTEXT,
   noopLogValidationFailure,
 } from '../logging/validation-logger.js';
+import { DEFAULT_STREAM_CONTENT_TYPES, normalizeStreamMatcher } from '../response/stream.js';
 
 /**
  * Module-scope factory for the exception thrown by `ZodValidationPipe` on
@@ -49,6 +51,14 @@ export interface ZodNestModuleOptions {
    * values become `{ _truncated: true, _originalBytes, _preview }`.
    */
   maxLoggedValueBytes?: number;
+  /**
+   * Additional response content types treated as streams — written directly
+   * to the response buffer and never validated by `ZodSerializerInterceptor`.
+   * MERGED with the built-in `DEFAULT_STREAM_CONTENT_TYPES` (SSE, NDJSON,
+   * octet-stream, pdf, `image/*`, `audio/*`, `video/*`), so the defaults are
+   * always retained. A trailing `/*` entry matches a media-type family.
+   */
+  streamContentTypes?: readonly string[];
 }
 
 /**
@@ -63,6 +73,8 @@ export interface NormalizedZodNestOptions {
   logInputFailure: LogValidationFailure;
   /** No-op when `validationLogs.output` resolved to false. */
   logOutputFailure: LogValidationFailure;
+  /** Built-in defaults ∪ `streamContentTypes`, used by the interceptor's stream check. */
+  streamMatcher: StreamContentTypeMatcher;
 }
 
 export const DEFAULT_REDACT_KEYS: readonly string[] = [
@@ -108,11 +120,16 @@ export const normalizeZodNestOptions = (opts?: ZodNestModuleOptions): Normalized
   const maxLoggedValueBytes = opts?.maxLoggedValueBytes ?? DEFAULT_MAX_LOGGED_VALUE_BYTES;
   const logger: LoggerService = opts?.logger ?? new Logger(DEFAULT_LOGGER_CONTEXT);
   const loggerOpts = { logger, redactKeys, maxLoggedValueBytes };
+  const streamMatcher = normalizeStreamMatcher([
+    ...DEFAULT_STREAM_CONTENT_TYPES,
+    ...(opts?.streamContentTypes ?? []),
+  ]);
 
   return {
     createValidationException: opts?.createValidationException,
     createSerializationException: opts?.createSerializationException,
     logInputFailure: flags.input ? createValidationLogger(loggerOpts) : noopLogValidationFailure,
     logOutputFailure: flags.output ? createValidationLogger(loggerOpts) : noopLogValidationFailure,
+    streamMatcher,
   };
 };

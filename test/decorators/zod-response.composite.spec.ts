@@ -97,11 +97,13 @@ const apiResponseMeta = (handler: object): ApiResponseMeta | undefined =>
 
 describe('@ZodResponse — composite swagger application', () => {
   beforeAll(async () => {
-    // Flush microtasks queued by implicit-status decorations.
+    // Flush microtasks queued by all decorations — `@ApiResponse` application
+    // is always deferred so `@Header('Content-Type', …)` / `@HttpCode` / route
+    // metadata is readable for content-type and status resolution.
     await flushMicrotasks();
   });
 
-  it('applies @ApiResponse synchronously for explicit numeric status', () => {
+  it('applies @ApiResponse for explicit numeric status (after microtask flush)', () => {
     const meta = apiResponseMeta(Controller.prototype.explicitStatus);
     expect(meta).toBeDefined();
     expect(meta?.['200']).toBeDefined();

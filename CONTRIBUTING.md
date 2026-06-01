@@ -25,15 +25,15 @@ That sets up the `husky` git hooks too. The pre-commit hook runs `prettier --wri
 
 ## Useful scripts
 
-| Script | What it does |
-|---|---|
-| `npm test` | Jest, full suite. |
-| `npm run test:cov` | Jest with coverage report. |
-| `npm run typecheck` | `tsc --noEmit` against `tsconfig.json`. |
-| `npm run lint` | ESLint on the whole tree. |
-| `npm run lint:fix` | ESLint with `--fix`. |
-| `npm run format` | Prettier write over the whole tree. |
-| `npm run build` | tsup build to `dist/` (CJS + ESM + .d.ts). |
+| Script              | What it does                               |
+| ------------------- | ------------------------------------------ |
+| `npm test`          | Jest, full suite.                          |
+| `npm run test:cov`  | Jest with coverage report.                 |
+| `npm run typecheck` | `tsc --noEmit` against `tsconfig.json`.    |
+| `npm run lint`      | ESLint on the whole tree.                  |
+| `npm run lint:fix`  | ESLint with `--fix`.                       |
+| `npm run format`    | Prettier write over the whole tree.        |
+| `npm run build`     | tsup build to `dist/` (CJS + ESM + .d.ts). |
 
 `npm run prepublishOnly` chains lint + typecheck + test + build — that's the gate semantic-release uses, so running it locally is a good last check before pushing.
 
@@ -47,6 +47,7 @@ If you happen to use [Claude Code](https://claude.com/claude-code), the repo shi
   - `src/index.ts` or any `src/*/index.ts` has changed → run `/api-surface-audit`.
 
   Skip with `ZOD_NEST_SKIP_PRE_PR_CHECKS=1` for refactors that genuinely don't need either. Only fires inside Claude Code sessions.
+
 - **Skills** under `.claude/skills/`:
   - `/sync-docs` — surface docs that need updating against the branch's `src/` diff.
   - `/api-surface-audit` — verify every public export has a test + follows naming conventions. Use before cutting a release.

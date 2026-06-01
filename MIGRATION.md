@@ -34,31 +34,31 @@ Peer dependencies (`@nestjs/common`, `@nestjs/core`, `@nestjs/swagger`, `rxjs`, 
 
 ## Breaking changes (side-by-side)
 
-| Concern | `nestjs-zod` | `zod-nest` |
-|---|---|---|
-| Zod version | v3 + v4 | v4 only |
-| Doc entry point | `cleanupOpenApiDoc(SwaggerModule.createDocument(...))` | `applyZodNest(rawDoc, { app })` (mutates + returns) |
-| Single-status response | `@ZodResponse({ type: Dto })` (composite of `@ZodSerializerDto` + `@ApiResponse` + `@HttpCode`) | `@ZodResponse({ type: Dto })` (composite of variant registration + `@ApiResponse`; **no internal `@HttpCode`** — caller controls status via `@HttpCode(n)`) |
-| Older single-status pattern | `@ZodSerializerDto(Dto) + @ApiOkResponse({ type: Dto })` | `@ZodResponse({ type: Dto })` |
-| Multi-status responses | not stackable (`@ZodResponse` validates type-consistency at decoration time) | stack `@ZodResponse` calls; status inferred for the default variant |
-| Internal `@HttpCode` | `@ZodResponse({ status })` calls `@HttpCode(status)` internally | not applied — caller controls actual status via `@HttpCode(n)` |
-| I/O suffix | always `_Output` | only when input and output JSON Schemas actually differ |
-| DTO discriminator | `MyDto.isZodDto === true` | `Symbol.for('zod-nest.dto') in MyDto` |
-| `io` representation | symbol | string (`'input' \| 'output'`) |
-| Codec mode | `createZodDto(s, { codec: true })` flag | express in schema (`z.pipe`, `z.transform`); no flag |
-| Validation exception customization | input-side only | both pipe **and** interceptor; factory on each |
-| Serialization exception response body | exposes the zod error tree | opaque (`{ statusCode, message }`) — tree goes to logs only |
-| Validation-failure logging | none | `validationLogs: boolean \| { input?, output? }` |
-| Logger override | none | `logger: LoggerService` |
-| Log redaction | n/a | `redactKeys: readonly string[]` (replaces default list, no merge) |
-| Log truncation | n/a | `maxLoggedValueBytes: number` (default 4096) |
-| Doc-build errors | silent / dangling refs at runtime | `ZodNestDocumentError` (`AMBIGUOUS_RENAME` / `DANGLING_REF` / `UNEXPANDABLE_PARAM_DTO`) — fails fast |
-| `@Query()` / `@Param()` / `@Headers()` DTO expansion | exploded by `cleanupOpenApiDoc` based on `PREFIX` placeholder | exploded by `applyZodNest`'s `expandParamMarkers` pass — symmetric output, one parameter per top-level field |
-| OpenAPI version on emitted doc | derived from `DocumentBuilder.setOpenAPIVersion(...)` (defaults to `'3.0.0'`) | forced to `'3.1.0'` by `applyZodNest` regardless of `DocumentBuilder` config |
-| Composition (experimental) | not a feature | `extend()` + `getLineage()` — `@experimental` |
-| Internal extension keys in spec | ~10 `x-nestjs_zod-*` keys remain | 0 (stripped at exit) |
-| `$ref` paths | post-process rewrite | emitted correctly by Zod's `uri` callback |
-| `createZodGuard` / `validate()` | exported | dropped (use `schema.parse` / `schema.safeParse`) |
+| Concern                                              | `nestjs-zod`                                                                                    | `zod-nest`                                                                                                                                                  |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Zod version                                          | v3 + v4                                                                                         | v4 only                                                                                                                                                     |
+| Doc entry point                                      | `cleanupOpenApiDoc(SwaggerModule.createDocument(...))`                                          | `applyZodNest(rawDoc, { app })` (mutates + returns)                                                                                                         |
+| Single-status response                               | `@ZodResponse({ type: Dto })` (composite of `@ZodSerializerDto` + `@ApiResponse` + `@HttpCode`) | `@ZodResponse({ type: Dto })` (composite of variant registration + `@ApiResponse`; **no internal `@HttpCode`** — caller controls status via `@HttpCode(n)`) |
+| Older single-status pattern                          | `@ZodSerializerDto(Dto) + @ApiOkResponse({ type: Dto })`                                        | `@ZodResponse({ type: Dto })`                                                                                                                               |
+| Multi-status responses                               | not stackable (`@ZodResponse` validates type-consistency at decoration time)                    | stack `@ZodResponse` calls; status inferred for the default variant                                                                                         |
+| Internal `@HttpCode`                                 | `@ZodResponse({ status })` calls `@HttpCode(status)` internally                                 | not applied — caller controls actual status via `@HttpCode(n)`                                                                                              |
+| I/O suffix                                           | always `_Output`                                                                                | only when input and output JSON Schemas actually differ                                                                                                     |
+| DTO discriminator                                    | `MyDto.isZodDto === true`                                                                       | `Symbol.for('zod-nest.dto') in MyDto`                                                                                                                       |
+| `io` representation                                  | symbol                                                                                          | string (`'input' \| 'output'`)                                                                                                                              |
+| Codec mode                                           | `createZodDto(s, { codec: true })` flag                                                         | express in schema (`z.pipe`, `z.transform`); no flag                                                                                                        |
+| Validation exception customization                   | input-side only                                                                                 | both pipe **and** interceptor; factory on each                                                                                                              |
+| Serialization exception response body                | exposes the zod error tree                                                                      | opaque (`{ statusCode, message }`) — tree goes to logs only                                                                                                 |
+| Validation-failure logging                           | none                                                                                            | `validationLogs: boolean \| { input?, output? }`                                                                                                            |
+| Logger override                                      | none                                                                                            | `logger: LoggerService`                                                                                                                                     |
+| Log redaction                                        | n/a                                                                                             | `redactKeys: readonly string[]` (replaces default list, no merge)                                                                                           |
+| Log truncation                                       | n/a                                                                                             | `maxLoggedValueBytes: number` (default 4096)                                                                                                                |
+| Doc-build errors                                     | silent / dangling refs at runtime                                                               | `ZodNestDocumentError` (`AMBIGUOUS_RENAME` / `DANGLING_REF` / `UNEXPANDABLE_PARAM_DTO`) — fails fast                                                        |
+| `@Query()` / `@Param()` / `@Headers()` DTO expansion | exploded by `cleanupOpenApiDoc` based on `PREFIX` placeholder                                   | exploded by `applyZodNest`'s `expandParamMarkers` pass — symmetric output, one parameter per top-level field                                                |
+| OpenAPI version on emitted doc                       | derived from `DocumentBuilder.setOpenAPIVersion(...)` (defaults to `'3.0.0'`)                   | forced to `'3.1.0'` by `applyZodNest` regardless of `DocumentBuilder` config                                                                                |
+| Composition (experimental)                           | not a feature                                                                                   | `extend()` + `getLineage()` — `@experimental`                                                                                                               |
+| Internal extension keys in spec                      | ~10 `x-nestjs_zod-*` keys remain                                                                | 0 (stripped at exit)                                                                                                                                        |
+| `$ref` paths                                         | post-process rewrite                                                                            | emitted correctly by Zod's `uri` callback                                                                                                                   |
+| `createZodGuard` / `validate()`                      | exported                                                                                        | dropped (use `schema.parse` / `schema.safeParse`)                                                                                                           |
 
 ## Step-by-step migration
 
@@ -74,6 +74,7 @@ Peer dependencies (`@nestjs/common`, `@nestjs/core`, `@nestjs/swagger`, `rxjs`, 
 ```
 
 If your codebase still uses Zod v3 APIs, work through Zod's own [v3-to-v4 migration](https://zod.dev/v4) first. The big behavioural changes:
+
 - `z.string().email()` → `z.email()` (similar for `url`, `uuid`, `cuid`, `iso.datetime()`, etc.)
 - `z.string().refine(async ...)` requires `safeParseAsync` (the pipe already uses async parse).
 - Metadata now lives on `.meta({ ... })` instead of `.describe(...)` / `.openapi(...)`.
@@ -119,7 +120,7 @@ If your codebase still uses Zod v3 APIs, work through Zod's own [v3-to-v4 migrat
 
 `applyZodNest` always emits OpenAPI 3.1 — there's no version flag. The `{ app }` argument is required (used to walk controllers via `DiscoveryService` for output-side DTO discovery).
 
-If you served OpenAPI 3.0 from `nestjs-zod`, you'll need a downgrade pass *after* `applyZodNest`. There are good standalone tools (e.g. `openapi-down-convert`) for this.
+If you served OpenAPI 3.0 from `nestjs-zod`, you'll need a downgrade pass _after_ `applyZodNest`. There are good standalone tools (e.g. `openapi-down-convert`) for this.
 
 ### Step 5 — rewrite response handlers
 
@@ -166,7 +167,7 @@ The success variant can omit `status` — the precedence chain (`@HttpCode` → 
 
 Without the `@HttpCode(...)`, NestJS returns the method default (`201` for POST, `200` for everything else) and the `@ZodResponse({ status: 202 })` variant never matches — your response goes out unvalidated. **Rule of thumb during migration: every `@ZodResponse({ status: X, ... })` whose `X` differs from the method default needs a matching `@HttpCode(X)` next to it.**
 
-Statuses set by *thrown* exceptions (e.g. `throw new NotFoundException()` → 404) don't need `@HttpCode` — Nest's exception filter sets the response status itself, and `@ZodResponse({ status: 404, ... })` matches against the resolved status at request time.
+Statuses set by _thrown_ exceptions (e.g. `throw new NotFoundException()` → 404) don't need `@HttpCode` — Nest's exception filter sets the response status itself, and `@ZodResponse({ status: 404, ... })` matches against the resolved status at request time.
 
 ### Step 6 — register `ZodNestModule.forRoot()` (recommended)
 
@@ -176,8 +177,8 @@ Statuses set by *thrown* exceptions (e.g. `throw new NotFoundException()` → 40
 @Module({
   imports: [
     ZodNestModule.forRoot({
-      validationLogs: { output: true },         // log response-validation failures
-      redactKeys: ['password', 'sessionId'],    // replaces default list, no merge
+      validationLogs: { output: true }, // log response-validation failures
+      redactKeys: ['password', 'sessionId'], // replaces default list, no merge
     }),
   ],
 })
@@ -277,19 +278,21 @@ If you had a client relying on the 500 body's `errors` field for diagnostics, sw
 Before — a `nestjs-zod` handler. The 404 variant has to live as a separate `@ApiNotFoundResponse` because `nestjs-zod`'s `@ZodResponse` doesn't stack:
 
 ```ts
-import { createZodDto, ZodResponse, cleanupOpenApiDoc } from 'nestjs-zod';
 import { ApiNotFoundResponse } from '@nestjs/swagger';
+import { cleanupOpenApiDoc, createZodDto, ZodResponse } from 'nestjs-zod';
 import { z } from 'zod';
 
-class UserDto  extends createZodDto(z.object({ id: z.string().uuid(), name: z.string() })) {}
+class UserDto extends createZodDto(z.object({ id: z.string().uuid(), name: z.string() })) {}
 class ErrorDto extends createZodDto(z.object({ code: z.number(), message: z.string() })) {}
 
 @Controller('users')
 class UsersController {
   @Get(':id')
   @ZodResponse({ type: UserDto })
-  @ApiNotFoundResponse({ type: ErrorDto })                  // doc-only, not validated
-  async getUser(@Param('id') id: string): Promise<UserDto> { /* ... */ }
+  @ApiNotFoundResponse({ type: ErrorDto }) // doc-only, not validated
+  async getUser(@Param('id') id: string): Promise<UserDto> {
+    /* ... */
+  }
 }
 
 // main.ts
@@ -301,21 +304,23 @@ SwaggerModule.setup('docs', app, doc);
 After — same handler with `zod-nest`. The 404 variant becomes a real validated `@ZodResponse`:
 
 ```ts
-import { createZodDto, ZodResponse, applyZodNest } from 'zod-nest';
 import { z } from 'zod';
+import { applyZodNest, createZodDto, ZodResponse } from 'zod-nest';
 
-const userSchema  = z.object({ id: z.uuid(), name: z.string() }).meta({ id: 'User' });
+const userSchema = z.object({ id: z.uuid(), name: z.string() }).meta({ id: 'User' });
 const errorSchema = z.object({ code: z.number(), message: z.string() }).meta({ id: 'Error' });
 
-class UserDto  extends createZodDto(userSchema)  {}
+class UserDto extends createZodDto(userSchema) {}
 class ErrorDto extends createZodDto(errorSchema) {}
 
 @Controller('users')
 class UsersController {
   @Get(':id')
-  @ZodResponse({              type: UserDto })            // 200 inferred
-  @ZodResponse({ status: 404, type: ErrorDto })           // validated, not just declared
-  async getUser(@Param('id') id: string): Promise<UserDto> { /* ... */ }
+  @ZodResponse({ type: UserDto }) // 200 inferred
+  @ZodResponse({ status: 404, type: ErrorDto }) // validated, not just declared
+  async getUser(@Param('id') id: string): Promise<UserDto> {
+    /* ... */
+  }
 }
 
 // main.ts
@@ -338,7 +343,10 @@ Intentional. The output entry is only emitted when input and output JSON Schemas
 Intentional (and a security improvement) — see [Serialization exception body changes](#serialization-exception-body-changes) above. Move client-side diagnostics to log-based observability or a custom factory.
 
 **"After migration, my response shapes are gone from the OpenAPI doc — `responses.<status>` is empty even though `@ZodResponse({ type })` is on the handler."**
-Fixed since `zod-nest@1.4.0`. `@ZodResponse` is now a composite decorator: it applies the equivalent `@ApiResponse(...)` automatically, so the doc carries the response shape without a manual `@ApiResponse` next to it. If you're on an earlier `zod-nest` version, either upgrade or pair every `@ZodResponse({ type })` with `@ApiResponse({ status, type })`. See [`docs/responses.md → "OpenAPI emission"`](docs/responses.md#openapi-emission). For binary downloads where you previously hand-wrote `@ApiOkResponse({ content: { 'application/octet-stream' } })`: register the binary fragment via `overrideJSONSchema(BlobSchema, { type: 'string', format: 'binary' })` once, then use `@ZodResponse({ type: BlobDto })` — see [`docs/recipes/binary-downloads.md`](docs/recipes/binary-downloads.md).
+Fixed since `zod-nest@1.4.0`. `@ZodResponse` is now a composite decorator: it applies the equivalent `@ApiResponse(...)` automatically, so the doc carries the response shape without a manual `@ApiResponse` next to it. If you're on an earlier `zod-nest` version, either upgrade or pair every `@ZodResponse({ type })` with `@ApiResponse({ status, type })`. See [`docs/responses.md → "OpenAPI emission"`](docs/responses.md#openapi-emission). For binary downloads where you previously hand-wrote `@ApiOkResponse({ content: { 'application/octet-stream' } })`: use `@ZodResponse({ type: BlobDto, contentType: 'application/octet-stream' })` — the doc surfaces the real media type and validation is skipped. See [`docs/recipes/binary-downloads.md`](docs/recipes/binary-downloads.md).
+
+**"I hand-wrote `@ApiOkResponse({ content: { 'text/event-stream' | 'application/x-ndjson': { schema } } })` for my SSE / NDJSON endpoints — can `@ZodResponse` do that now?"**
+Yes. Pass `contentType` (e.g. `@ZodResponse({ type: EventDto, contentType: 'text/event-stream' })`), or just declare `@Header('Content-Type', 'text/event-stream')` and let it infer. The DTO describes one event / line; the media-type key matches, and validation is skipped automatically for stream content types (`stream` defaults to `true`). Override with `stream: false` to keep validating, and extend the recognised set globally via `ZodNestModuleOptions.streamContentTypes`. See [`docs/recipes/streaming-responses.md`](docs/recipes/streaming-responses.md).
 
 **"I get `ZodNestDocumentError: DANGLING_REF` at boot."**
 `applyZodNest` validates the final `$ref` graph. A dangling ref means a DTO is referenced from the doc but the registry doesn't know about it — typically a typo'd `.meta({ id })`, two `ZodNestRegistry` instances being used in the same app, or a user-supplied pre-pass that injected a ref to a non-existent component. The error message lists every offending ref with a hint from the collected-usage table. Schemas used only as `extend()` parents auto-register since 1.6 (`extend()` calls `registerSchema` on parent + result); for other named-but-DTO-less references, register the schema directly with `registerSchema(schema)` or wrap it in `createZodDto`.
@@ -357,6 +365,7 @@ JSON Schema can't represent `z.custom` / `z.instanceof` shapes — Zod emits `{}
 
 ```ts
 import { FileSchema } from 'zod-nest/helpers';
+
 class UploadDto extends createZodDto(z.object({ file: FileSchema })) {}
 ```
 
@@ -366,7 +375,10 @@ For everything else, register a JSON Schema fragment yourself using the `zod-nes
 import { overrideJSONSchema } from 'zod-nest';
 import { binary, uuidFragment } from 'zod-nest/helpers';
 
-const PdfUpload = overrideJSONSchema(z.instanceof(File), binary({ contentMediaType: 'application/pdf' }));
+const PdfUpload = overrideJSONSchema(
+  z.instanceof(File),
+  binary({ contentMediaType: 'application/pdf' }),
+);
 const UserId = overrideJSONSchema(z.custom<string>(), uuidFragment);
 ```
 

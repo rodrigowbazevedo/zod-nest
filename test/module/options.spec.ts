@@ -9,6 +9,7 @@ import {
   normalizeZodNestOptions,
   ZOD_NEST_OPTIONS,
 } from '../../src/module/options.js';
+import { matchesStream } from '../../src/response/stream.js';
 
 const failingError = (): z.ZodError => {
   const schema = z.object({ name: z.string() });
@@ -173,5 +174,22 @@ describe('normalizeZodNestOptions', () => {
 
   it('ZOD_NEST_OPTIONS is a Symbol DI token', () => {
     expect(typeof ZOD_NEST_OPTIONS).toBe('symbol');
+  });
+
+  it('builds a streamMatcher from the built-in defaults when none configured', () => {
+    const opts = normalizeZodNestOptions();
+    expect(matchesStream('text/event-stream', opts.streamMatcher)).toBe(true);
+    expect(matchesStream('image/png', opts.streamMatcher)).toBe(true);
+    expect(matchesStream('application/json', opts.streamMatcher)).toBe(false);
+  });
+
+  it('merges streamContentTypes additively with the defaults', () => {
+    const opts = normalizeZodNestOptions({ streamContentTypes: ['text/csv', 'font/*'] });
+    // User extras are recognised...
+    expect(matchesStream('text/csv', opts.streamMatcher)).toBe(true);
+    expect(matchesStream('font/woff2', opts.streamMatcher)).toBe(true);
+    // ...and the built-in defaults are never dropped.
+    expect(matchesStream('text/event-stream', opts.streamMatcher)).toBe(true);
+    expect(matchesStream('application/x-ndjson', opts.streamMatcher)).toBe(true);
   });
 });

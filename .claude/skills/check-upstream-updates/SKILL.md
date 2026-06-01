@@ -57,11 +57,11 @@ Record the gap: `installed → latest` (patch / minor / major).
 
 For each target that has a dedicated scanner skill, invoke it with the installed and latest versions. The scanners do the source-aware diff against our consumption:
 
-| Target | Scanner | Hands off |
-|---|---|---|
-| `zod` | `/scan-zod-features` | Options-type diff for `z.toJSONSchema`, watched APIs (`.meta()`, registry, override hook). |
+| Target                                              | Scanner               | Hands off                                                                                                    |
+| --------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `zod`                                               | `/scan-zod-features`  | Options-type diff for `z.toJSONSchema`, watched APIs (`.meta()`, registry, override hook).                   |
 | `@nestjs/swagger`, `@nestjs/common`, `@nestjs/core` | `/scan-nest-features` | Shape diff of `_OPENAPI_METADATA_FACTORY`, `SchemaObjectFactory`, `Reflector`, pipe / interceptor contracts. |
-| `rxjs` | — (no scanner) | Falls through to Step 4. |
+| `rxjs`                                              | — (no scanner)        | Falls through to Step 4.                                                                                     |
 
 Capture the scanner's findings inline in the report.
 
@@ -94,12 +94,12 @@ Findings live in GitHub, not in committed files. Each finding gets its own issue
 
 **Per-finding rules:**
 
-| Category | Issue created? | Label(s) |
-|---|---|---|
-| ✅ **Safe bump** | No — reported inline in the chat summary only. | n/a |
-| 💡 **Opportunity** | No by default. **Ask the user** in the chat summary whether to file one; create only if confirmed. | `upstream-update`, `enhancement` (if confirmed) |
-| ⚠️ **Needs investigation** | Yes — one issue per finding. | `upstream-update` |
-| 🚫 **Blocked** | Yes — one issue per finding. | `upstream-update`, `blocked` |
+| Category                   | Issue created?                                                                                     | Label(s)                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| ✅ **Safe bump**           | No — reported inline in the chat summary only.                                                     | n/a                                             |
+| 💡 **Opportunity**         | No by default. **Ask the user** in the chat summary whether to file one; create only if confirmed. | `upstream-update`, `enhancement` (if confirmed) |
+| ⚠️ **Needs investigation** | Yes — one issue per finding.                                                                       | `upstream-update`                               |
+| 🚫 **Blocked**             | Yes — one issue per finding.                                                                       | `upstream-update`, `blocked`                    |
 
 **One-time label seeding** (idempotent):
 
@@ -128,7 +128,7 @@ gh label create blocked --color "b60205" --description "Cannot ship until resolv
 
 ---
 
-*Created automatically by the `/check-upstream-updates` skill.*
+_Created automatically by the `/check-upstream-updates` skill._
 ```
 
 Create with `gh issue create` and capture the URL:
@@ -149,24 +149,27 @@ After all issues are created, output a single chat-friendly summary so the user 
 
 Targets audited: zod, @nestjs/swagger, @nestjs/common, @nestjs/core, rxjs
 
-| Target | Installed | Latest | Verdict |
-|---|---|---|---|
-| zod | 4.4.2 | 4.5.0 | ⚠️ 1 issue filed |
-| @nestjs/swagger | 11.0.3 | 11.0.5 | ✅ safe bump |
-| @nestjs/common | 11.0.0 | 11.0.2 | ✅ safe bump |
-| @nestjs/core | 11.0.0 | 11.0.2 | ✅ safe bump |
-| rxjs | 7.8.1 | 7.8.2 | ✅ safe bump |
+| Target          | Installed | Latest | Verdict          |
+| --------------- | --------- | ------ | ---------------- |
+| zod             | 4.4.2     | 4.5.0  | ⚠️ 1 issue filed |
+| @nestjs/swagger | 11.0.3    | 11.0.5 | ✅ safe bump     |
+| @nestjs/common  | 11.0.0    | 11.0.2 | ✅ safe bump     |
+| @nestjs/core    | 11.0.0    | 11.0.2 | ✅ safe bump     |
+| rxjs            | 7.8.1     | 7.8.2  | ✅ safe bump     |
 
 **Issues filed:**
-- #N — `upstream(zod): thread the new `cycles` option through `buildToJsonSchemaOptions``
+
+- #N — `upstream(zod): thread the new `cycles`option through`buildToJsonSchemaOptions``
 
 **Safe bumps (apply in the next release, no issue needed):**
+
 - `@nestjs/swagger` 11.0.3 → 11.0.5
 - `@nestjs/common` 11.0.0 → 11.0.2
 - `@nestjs/core` 11.0.0 → 11.0.2
 - `rxjs` 7.8.1 → 7.8.2
 
 **Opportunities (not filed — ask if you want issues):**
+
 - `zod` 4.5.0 — `unionStrategy: 'oneOf-strict'` could simplify `src/schema/override.ts`.
 ```
 
@@ -174,7 +177,7 @@ The summary is the only artifact left in the chat. No files are written to the r
 
 ## Out of scope
 
-- **Applying the bumps.** This skill *audits*; it doesn't update `package.json` or run `npm install`.
+- **Applying the bumps.** This skill _audits_; it doesn't update `package.json` or run `npm install`.
 - **Scheduling.** Manual invocation only — no cron, no scheduled action.
 - **Non-npm dependencies.** Only the packages listed in `package.json`. Repo-shared tooling (eslint, prettier, jest) isn't audited unless explicitly in scope via `--target`.
 - **Security advisory triage.** Findings get flagged; remediation is a separate concern.
