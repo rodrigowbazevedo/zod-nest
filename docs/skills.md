@@ -4,10 +4,10 @@
 
 ## What's shipped
 
-| Skill | Use it when… |
-|---|---|
+| Skill                                   | Use it when…                                                                                                                                       |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`zod-nest-migrate`](#zod-nest-migrate) | You have a project on [`nestjs-zod`](https://github.com/BenLorantfy/nestjs-zod) and want an agent to walk you through the migration to `zod-nest`. |
-| [`zod-nest`](#zod-nest) | You already use `zod-nest` and want an agent to surface schema-naming and `@ZodResponse` improvements as you edit controllers and DTOs. |
+| [`zod-nest`](#zod-nest)                 | You already use `zod-nest` and want an agent to surface schema-naming and `@ZodResponse` improvements as you edit controllers and DTOs.            |
 
 ## Install
 

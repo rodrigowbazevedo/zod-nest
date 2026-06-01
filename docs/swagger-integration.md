@@ -3,8 +3,8 @@
 `applyZodNest(rawDoc, options)` is the single post-processor that runs after `SwaggerModule.createDocument(...)`. It walks the doc, replaces every `x-zod-nest-dto` marker with the real Zod-derived JSON Schema, expands every `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` DTO marker into individual parameter entries, applies the I/O suffix truth table, strips the markers, validates the ref graph, sets `openapi: '3.1.0'`, and returns the same (mutated) document for compositional convenience.
 
 ```ts
-import { applyZodNest } from 'zod-nest';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { applyZodNest } from 'zod-nest';
 
 const raw = SwaggerModule.createDocument(
   app,
@@ -27,12 +27,12 @@ interface ApplyZodNestOptions {
 }
 ```
 
-| Option | Required | Default | What it does |
-|---|---|---|---|
-| `app` | yes | — | The NestJS app instance. Used to walk controllers via `DiscoveryService` to pick up `@ZodResponse` output-side DTO usage. |
-| `registry` | no | `defaultRegistry` | Pass an explicit registry for multi-app isolation. |
-| `override` | no | `undefined` | User-supplied emission override applied on top of the built-in overrides (composition, primitives). |
-| `strict` | no | `true` | Strict mode throws `ZodNestUnrepresentableError` on unrepresentable Zod constructs (bigint / date / symbol / transform / …). |
+| Option     | Required | Default           | What it does                                                                                                                 |
+| ---------- | -------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `app`      | yes      | —                 | The NestJS app instance. Used to walk controllers via `DiscoveryService` to pick up `@ZodResponse` output-side DTO usage.    |
+| `registry` | no       | `defaultRegistry` | Pass an explicit registry for multi-app isolation.                                                                           |
+| `override` | no       | `undefined`       | User-supplied emission override applied on top of the built-in overrides (composition, primitives).                          |
+| `strict`   | no       | `true`            | Strict mode throws `ZodNestUnrepresentableError` on unrepresentable Zod constructs (bigint / date / symbol / transform / …). |
 
 **Why `app` is required.** `@nestjs/swagger` is anemic on response shapes — it materializes `requestBody` and `parameters` `$ref`s back to `components.schemas`, but response types live on controller-method metadata that the raw doc doesn't surface. `applyZodNest` uses `DiscoveryService` to walk the controller graph and pick up `@ZodResponse` output-side DTO usage.
 
@@ -96,12 +96,12 @@ The error `details` carry `{ dtoId, in, io }` so the offending decorator is easy
 
 `createZodDto` requires the schema's `z.infer<>` to resolve to a single object type, since TS rejects unions as class bases (TS2509). For schemas where that doesn't hold — `z.intersection(obj, union)`, `z.discriminatedUnion`, or bare `z.union` — use the parameter-level decorators instead. They share the same registry + emission pipeline as `createZodDto` but skip the class step entirely:
 
-| Decorator | OpenAPI target | Schema requirement |
-|---|---|---|
-| `@ZodBody(schema, opts?)` | request body — `requestBody.content[...].schema` | any |
-| `@ZodQuery(schema, opts?)` | one query parameter per top-level property | must be `z.object` |
-| `@ZodHeaders(schema, opts?)` | one header parameter per top-level property | must be `z.object` |
-| `@ZodCookies(schema, opts?)` | one cookie parameter per top-level property | must be `z.object` |
+| Decorator                    | OpenAPI target                                   | Schema requirement |
+| ---------------------------- | ------------------------------------------------ | ------------------ |
+| `@ZodBody(schema, opts?)`    | request body — `requestBody.content[...].schema` | any                |
+| `@ZodQuery(schema, opts?)`   | one query parameter per top-level property       | must be `z.object` |
+| `@ZodHeaders(schema, opts?)` | one header parameter per top-level property      | must be `z.object` |
+| `@ZodCookies(schema, opts?)` | one cookie parameter per top-level property      | must be `z.object` |
 
 All decorators are method-level (applied next to `@Get` / `@Post` / etc.). Validation stays a separate concern — pair with `@Body(new ZodValidationPipe(schema))` (or `@Query(...)`, etc.) at the parameter so the handler arg keeps a precise `z.infer<>` type.
 
@@ -114,6 +114,7 @@ For the full pattern with code, see [`recipes/intersection-with-union.md`](recip
 ### `DANGLING_REF`
 
 A `$ref` in the doc points at a `components.schemas` key that no longer exists after `applyZodNest`. Usually means:
+
 - A marker was stripped but its rename target wasn't populated — typically a registry mismatch where the DTO is referenced via `@Body() body: UserDto` but `UserDto` wasn't registered to the right `ZodNestRegistry`.
 - A user-supplied pre-pass left a stale ref behind.
 - A `.meta({ id })` typo — the schema is registered under `User`, but the consumer refers to `Users`.
@@ -135,7 +136,7 @@ The error message lists every offending ref with a hint from the collected-usage
 
 Mitigation — three options, most-targeted first:
 
-1. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema *instance*. Best for `z.custom` / `z.instanceof` (e.g. multipart `File` fields). Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes. See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
+1. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema _instance_. Best for `z.custom` / `z.instanceof` (e.g. multipart `File` fields). Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes. See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
 2. **`override` callback** — per-call hook that fires for every schema of a matching Zod type. Useful when one rule should cover all `z.bigint()` / all `z.date()`. See [`override` callback](#override-callback) below.
 3. **`strict: false`** — globally relax the check; unrepresentable constructs emit as empty schemas. The spec validates, but the OpenAPI contract loses information. Use this when you have a small number of unrepresentable constructs you intentionally want to model as opaque.
 
@@ -195,7 +196,7 @@ The registries are independent — `appARegistry.ids()` won't see `appBRegistry`
 
 ```ts
 const doc = applyZodNest(raw, { app });
-console.log(doc === raw);  // → true
+console.log(doc === raw); // → true
 ```
 
 Most callers won't care. If you need the original unmodified, deep-clone before calling:

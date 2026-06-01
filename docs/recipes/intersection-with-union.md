@@ -17,8 +17,8 @@ The fix is to skip class wrapping entirely. Use the schema directly for validati
 
 ```ts
 import { Body, Controller, Post } from '@nestjs/common';
-import { ZodBody, ZodValidationPipe } from 'zod-nest';
 import { z } from 'zod';
+import { ZodBody, ZodValidationPipe } from 'zod-nest';
 
 const IntersectionWithUnion = z
   .intersection(
@@ -97,10 +97,7 @@ Optionality on each property maps to OpenAPI `required: false`. Named property s
 Opt into flattening with `flatten: true`:
 
 ```ts
-const CreateTaxonomyTranslation = z.intersection(
-  CandidateInputSchema,
-  ReferenceInputSchema,
-);
+const CreateTaxonomyTranslation = z.intersection(CandidateInputSchema, ReferenceInputSchema);
 
 @Controller('taxonomy-translations')
 export class TaxonomyTranslationController {
@@ -118,9 +115,9 @@ export class TaxonomyTranslationController {
 What it does:
 
 - Walks the schema, collecting every `z.object` leaf reachable through intersections and/or unions. Merges all collected shapes into a single anonymous `z.object` and emits it **inline** into the operation's request body — no `$ref`, no `allOf`, no `oneOf` at the operation level.
-- Per-property `.meta({ id })` schemas keep their normal `$ref` emission (e.g. `candidate_trafficking: FileSchema` still refs `#/components/schemas/File`). Only the *root* is flattened.
+- Per-property `.meta({ id })` schemas keep their normal `$ref` emission (e.g. `candidate_trafficking: FileSchema` still refs `#/components/schemas/File`). Only the _root_ is flattened.
 - Property collisions resolve right-arm-wins, mirroring `z.object({ ...Left.shape, ...Right.shape })`.
-- If the root itself has a `.meta({ id })`, the schema is **also** registered with its id and lands in `components.schemas[id]` in its *natural* (non-flattened) form (`allOf` / `oneOf`). The operation body stays flat; the schema catalog gets the structural composition. Both forms coexist.
+- If the root itself has a `.meta({ id })`, the schema is **also** registered with its id and lands in `components.schemas[id]` in its _natural_ (non-flattened) form (`allOf` / `oneOf`). The operation body stays flat; the schema catalog gets the structural composition. Both forms coexist.
 
 Supported shapes:
 
@@ -130,7 +127,7 @@ Supported shapes:
 - `z.union([obj, obj, ...])` / `z.discriminatedUnion(...)` — all variant shapes merged. **Every property becomes optional** in the emitted spec because no single field is guaranteed across the original variants.
 - `z.intersection(union(...), union(...))` — the user's canonical case (taxonomy translation, e.g.). Combines the above; anything reachable through a union is optional in the result.
 
-Trade-off when union arms are present: the emitted spec is *less precise* than the original schema. "Must supply variant A or variant B" becomes "any subset of A's and B's fields is allowed at the spec level." Runtime validation via `@Body(new ZodValidationPipe(originalSchema))` still enforces the precise variant shape — the precision loss is doc-only.
+Trade-off when union arms are present: the emitted spec is _less precise_ than the original schema. "Must supply variant A or variant B" becomes "any subset of A's and B's fields is allowed at the spec level." Runtime validation via `@Body(new ZodValidationPipe(originalSchema))` still enforces the precise variant shape — the precision loss is doc-only.
 
 Rejected shapes: any non-object leaf at any depth (primitives, tuples, transforms, nullable wrappers around non-objects). `flatten: true` throws `ZodNestError` with a clear remediation pointer.
 
@@ -148,12 +145,12 @@ This is a Swagger-UI compatibility escape hatch, not a general recommendation. T
 
 ## When to use `createZodDto` vs. these decorators
 
-| Schema shape | Recommended approach |
-|---|---|
-| `z.object({…})` (no inner unions) | `createZodDto(schema)` — full class ergonomics, sibling `Output` class, `parse`/`safeParse` statics |
-| `z.intersection(obj1, obj2)` (no unions) | `createZodDto(schema)` — collapses to a single object intersection, class extension works |
-| `z.intersection(obj, union)` | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>` |
-| `z.discriminatedUnion(...)` | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>` |
-| `z.union([...])` | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>` |
+| Schema shape                             | Recommended approach                                                                                |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `z.object({…})` (no inner unions)        | `createZodDto(schema)` — full class ergonomics, sibling `Output` class, `parse`/`safeParse` statics |
+| `z.intersection(obj1, obj2)` (no unions) | `createZodDto(schema)` — collapses to a single object intersection, class extension works           |
+| `z.intersection(obj, union)`             | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>`                                              |
+| `z.discriminatedUnion(...)`              | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>`                                              |
+| `z.union([...])`                         | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>`                                              |
 
 If you're unsure, try `createZodDto` first — when it fails with TS2509, fall back to the decorator pattern.

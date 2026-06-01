@@ -6,16 +6,16 @@ the 8-step migration documented at
 skill walks the steps in order, fetching the canonical section content at the
 URL when it's time to propose the diff.
 
-| # | Title | Canonical URL |
-|---|---|---|
-| 1 | Bump Zod to v4 | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-1--bump-zod> |
-| 2 | Swap the package (`nestjs-zod` → `zod-nest`) | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-2--swap-the-package> |
-| 3 | Swap imports | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-3--swap-imports> |
-| 4 | Rewrite Swagger setup (`cleanupOpenApiDoc` → `applyZodNest`) | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-4--rewrite-swagger-setup> |
-| 5 | Rewrite response handlers (`@ZodResponse`, multi-status stacking) | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-5--rewrite-response-handlers> |
-| 6 | Register `ZodNestModule.forRoot()` (optional) | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-6--register-zodnestmoduleforroot-recommended> |
-| 7 | Fix reflections + `.Output` consumers | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-7--fix-reflections--output-consumers> |
-| 8 | Verify the migration | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-8--verify-the-migration> |
+| #   | Title                                                             | Canonical URL                                                                                                           |
+| --- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 1   | Bump Zod to v4                                                    | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-1--bump-zod>                                  |
+| 2   | Swap the package (`nestjs-zod` → `zod-nest`)                      | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-2--swap-the-package>                          |
+| 3   | Swap imports                                                      | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-3--swap-imports>                              |
+| 4   | Rewrite Swagger setup (`cleanupOpenApiDoc` → `applyZodNest`)      | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-4--rewrite-swagger-setup>                     |
+| 5   | Rewrite response handlers (`@ZodResponse`, multi-status stacking) | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-5--rewrite-response-handlers>                 |
+| 6   | Register `ZodNestModule.forRoot()` (optional)                     | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-6--register-zodnestmoduleforroot-recommended> |
+| 7   | Fix reflections + `.Output` consumers                             | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-7--fix-reflections--output-consumers>         |
+| 8   | Verify the migration                                              | <https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md#step-8--verify-the-migration>                      |
 
 ## Applicability hints
 

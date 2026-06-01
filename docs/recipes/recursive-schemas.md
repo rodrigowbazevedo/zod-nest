@@ -16,13 +16,15 @@ interface CommentShape {
   replies: CommentShape[];
 }
 
-const commentSchema: z.ZodType<CommentShape> = z.lazy(() =>
-  z.object({
-    id: z.string(),
-    body: z.string(),
-    replies: z.array(commentSchema),
-  }),
-).meta({ id: 'Comment' });
+const commentSchema: z.ZodType<CommentShape> = z
+  .lazy(() =>
+    z.object({
+      id: z.string(),
+      body: z.string(),
+      replies: z.array(commentSchema),
+    }),
+  )
+  .meta({ id: 'Comment' });
 
 class CommentDto extends createZodDto(commentSchema) {}
 ```
@@ -55,22 +57,32 @@ The `items` ref points back to the schema's own `components.schemas` entry — a
 Two schemas that reference each other (A contains B, B contains A) follow the same pattern:
 
 ```ts
-interface AShape { name: string; bs: BShape[] }
-interface BShape { code: number; a: AShape }
+interface AShape {
+  name: string;
+  bs: BShape[];
+}
+interface BShape {
+  code: number;
+  a: AShape;
+}
 
-const aSchema: z.ZodType<AShape> = z.lazy(() =>
-  z.object({
-    name: z.string(),
-    bs: z.array(bSchema),
-  }),
-).meta({ id: 'A' });
+const aSchema: z.ZodType<AShape> = z
+  .lazy(() =>
+    z.object({
+      name: z.string(),
+      bs: z.array(bSchema),
+    }),
+  )
+  .meta({ id: 'A' });
 
-const bSchema: z.ZodType<BShape> = z.lazy(() =>
-  z.object({
-    code: z.number(),
-    a: aSchema,
-  }),
-).meta({ id: 'B' });
+const bSchema: z.ZodType<BShape> = z
+  .lazy(() =>
+    z.object({
+      code: z.number(),
+      a: aSchema,
+    }),
+  )
+  .meta({ id: 'B' });
 
 class ADto extends createZodDto(aSchema) {}
 class BDto extends createZodDto(bSchema) {}
@@ -88,12 +100,14 @@ interface TreeNode<T> {
   children: TreeNode<T>[];
 }
 
-const userTreeSchema: z.ZodType<TreeNode<string>> = z.lazy(() =>
-  z.object({
-    value: z.string(),
-    children: z.array(userTreeSchema),
-  }),
-).meta({ id: 'UserTree' });
+const userTreeSchema: z.ZodType<TreeNode<string>> = z
+  .lazy(() =>
+    z.object({
+      value: z.string(),
+      children: z.array(userTreeSchema),
+    }),
+  )
+  .meta({ id: 'UserTree' });
 ```
 
 Generic recursive shapes work in TS but only one concrete instantiation can register under a given id — `UserTree` here. If you need both `TreeNode<string>` and `TreeNode<number>` in the same OpenAPI doc, register them under separate ids (`UserTree` + `RatingTree`).
@@ -109,13 +123,15 @@ Generic recursive shapes work in TS but only one concrete instantiation can regi
 Validation works with `safeParseAsync`, so a recursive schema with an async refinement on a sub-node is fine at request time:
 
 ```ts
-const commentSchema: z.ZodType<CommentShape> = z.lazy(() =>
-  z.object({
-    id: z.string().refine(async (id) => await isValidId(id)),
-    body: z.string(),
-    replies: z.array(commentSchema),
-  }),
-).meta({ id: 'Comment' });
+const commentSchema: z.ZodType<CommentShape> = z
+  .lazy(() =>
+    z.object({
+      id: z.string().refine(async (id) => await isValidId(id)),
+      body: z.string(),
+      replies: z.array(commentSchema),
+    }),
+  )
+  .meta({ id: 'Comment' });
 ```
 
 The pipe uses `safeParseAsync`, so the chain of async refinements through the recursive structure runs naturally. Watch your refinement cost — a deep tree multiplies the per-request validation budget.

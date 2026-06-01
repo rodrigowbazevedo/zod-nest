@@ -6,9 +6,10 @@ Default behaviour: `ZodSerializerInterceptor` in strict mode throws `ZodSerializ
 
 ```ts
 import { Module } from '@nestjs/common';
-import type { ExecutionContext, InternalServerErrorException } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodNestModule, ZodSerializationException } from 'zod-nest';
+
+import type { ExecutionContext, InternalServerErrorException } from '@nestjs/common';
 
 @Module({
   imports: [
@@ -44,7 +45,7 @@ ZodNestModule.forRoot({
   createSerializationException: (zodError, ctx) =>
     new InternalServerErrorException({
       statusCode: 500,
-      message: 'Internal Server Error',     // strip any zod-nest-specific message
+      message: 'Internal Server Error', // strip any zod-nest-specific message
     }),
 });
 ```
@@ -61,12 +62,12 @@ In each of those cases, the factory is not invoked because validation didn't run
 
 ## Comparing to validation exceptions
 
-| | `createValidationException` | `createSerializationException` |
-|---|---|---|
-| HTTP status | 400 (default) | 500 (default) |
-| Body envelope | Includes `errors: z.treeifyError(err)` | Excludes the error tree |
-| Factory args | `(err, argMetadata)` | `(err, executionContext)` |
-| Per-pipe override | yes — pass to `new ZodValidationPipe({ createValidationException })` | no — module-scope only |
-| When it runs | every input validation failure | strict-mode output failures only |
+|                   | `createValidationException`                                          | `createSerializationException`   |
+| ----------------- | -------------------------------------------------------------------- | -------------------------------- |
+| HTTP status       | 400 (default)                                                        | 500 (default)                    |
+| Body envelope     | Includes `errors: z.treeifyError(err)`                               | Excludes the error tree          |
+| Factory args      | `(err, argMetadata)`                                                 | `(err, executionContext)`        |
+| Per-pipe override | yes — pass to `new ZodValidationPipe({ createValidationException })` | no — module-scope only           |
+| When it runs      | every input validation failure                                       | strict-mode output failures only |
 
 The two factories are independent — set one, both, or neither. See [`docs/module-options.md`](../module-options.md) for the option references.

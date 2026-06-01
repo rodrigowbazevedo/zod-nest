@@ -28,8 +28,7 @@ const Child = extend(Base, (s) => s.extend({ role: z.string() }).meta({ id: 'Chi
 
 // ❌ Wrong — `.meta({ id })` runs on the return value of `extend(...)`.
 //             Watch the closing `)` — it moves left of `.meta(...)`.
-const Child = extend(Base, (s) => s.extend({ role: z.string() }))
-  .meta({ id: 'Child' });
+const Child = extend(Base, (s) => s.extend({ role: z.string() })).meta({ id: 'Child' });
 ```
 
 The TypeScript types accept both. The runtime difference is that the wrong form emits `Child` as a flat schema (parent's `id` field inlined) instead of `allOf: [{ $ref: 'Base' }, { delta }]`. `getLineage(Child)` returns `undefined` for the wrong form.
@@ -39,7 +38,8 @@ The same applies to every other operator. If you want refinements, descriptions,
 ```ts
 // ✅ Right — refinements + meta all inside the builder.
 const Child = extend(Base, (s) =>
-  s.extend({ role: z.string() })
+  s
+    .extend({ role: z.string() })
     .refine((v) => v.role.length > 0, 'role must be non-empty')
     .meta({ id: 'Child', description: 'An employee.' }),
 );
@@ -77,6 +77,7 @@ For a registered parent (one with `.meta({ id })` or registered via `createZodDt
 ```
 
 The delta is computed structurally:
+
 - **Properties** that exist on the parent are stripped from the delta — they're already in the `$ref`.
 - **Required** entries that exist on the parent are stripped from the delta's `required` array.
 - **`unevaluatedProperties: false`** is set on the outer schema, not on the delta, so the strictness applies to the merged shape.
@@ -101,10 +102,8 @@ getLineage(Base);
 `extend` accepts any `z.ZodObject` as a parent, but the `allOf` emission only fires when the parent has a registered id. If the parent is anonymous:
 
 ```ts
-const Base = z.object({ id: z.string() });        // no .meta({ id }), not a DTO
-const Child = extend(Base, (s) =>
-  s.extend({ role: z.string() }).meta({ id: 'Child' }),
-);
+const Base = z.object({ id: z.string() }); // no .meta({ id }), not a DTO
+const Child = extend(Base, (s) => s.extend({ role: z.string() }).meta({ id: 'Child' }));
 ```
 
 The emission falls back to a flat body — the parent's keys are inlined into `Child` and no `allOf` is produced. This is a feature, not a bug: an anonymous parent can't be `$ref`-ed, so the only correct emission is the flat shape Zod would produce naturally.
@@ -119,14 +118,14 @@ A **named** parent (`.meta({ id })`) used only as an `extend()` parent — i.e. 
 
 ```ts
 const Base = z.object({ id: z.string() }).meta({ id: 'Base' });
-const Mid  = extend(Base, (s) => s.extend({ name: z.string() }).meta({ id: 'Mid' }));
-const Leaf = extend(Mid,  (s) => s.extend({ role: z.string() }).meta({ id: 'Leaf' }));
+const Mid = extend(Base, (s) => s.extend({ name: z.string() }).meta({ id: 'Mid' }));
+const Leaf = extend(Mid, (s) => s.extend({ role: z.string() }).meta({ id: 'Leaf' }));
 ```
 
 The three DTOs emit as three independent `components.schemas` entries:
 
 - `Base` — flat schema with `{ id }`.
-- `Mid`  — `allOf: [{ $ref: 'Base' }, { name-only delta }]`.
+- `Mid` — `allOf: [{ $ref: 'Base' }, { name-only delta }]`.
 - `Leaf` — `allOf: [{ $ref: 'Mid'  }, { role-only delta }]`.
 
 Swagger UI and JSON Schema validators follow the `$ref` chain transitively, so the effective schema for `Leaf` resolves to the full union of fields from `Base` + `Mid` + `Leaf`. This is how `allOf` composition is designed to work — chained `$ref`s, not a flattened multi-parent list.
@@ -159,10 +158,10 @@ If any of these blocks you, open an issue with the use case.
 
 The composition override runs in both modes (`toOpenApi` for single-schema, `bulkEmit` for `applyZodNest`'s registry pass). The `$ref` path differs:
 
-| Mode | Parent `$ref` shape |
-|---|---|
+| Mode                        | Parent `$ref` shape                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
 | Single-schema (`toOpenApi`) | `#/$defs/<parentId>` (then `post-process` rewrites to `#/components/schemas/<parentId>`) |
-| Bulk (via `applyZodNest`) | `#/components/schemas/<parentId>` directly |
+| Bulk (via `applyZodNest`)   | `#/components/schemas/<parentId>` directly                                               |
 
 This is internal — the OpenAPI document you read always has the final `#/components/schemas/` path. The distinction matters only if you're calling `toOpenApi` directly (e.g. from a custom doc generator).
 
@@ -180,7 +179,7 @@ None of these breaks the basic API (`extend(parent, build)` + `getLineage(schema
 
 ```ts
 import { z } from 'zod';
-import { createZodDto, extend, applyZodNest, ZodResponse } from 'zod-nest';
+import { applyZodNest, createZodDto, extend, ZodResponse } from 'zod-nest';
 
 const personSchema = z
   .object({ id: z.string(), name: z.string() })
@@ -192,13 +191,17 @@ const employeeSchema = extend(personSchema, (s) =>
     .meta({ id: 'Employee', description: 'A person with a job.' }),
 );
 
-class PersonDto   extends createZodDto(personSchema) {}
+class PersonDto extends createZodDto(personSchema) {}
 class EmployeeDto extends createZodDto(employeeSchema) {}
 
 @Controller('hr')
 class HrController {
-  @Get('people')   @ZodResponse({ type: [PersonDto] })   listPeople()   { /* ... */ }
-  @Get('employees') @ZodResponse({ type: [EmployeeDto] }) listEmployees() { /* ... */ }
+  @Get('people') @ZodResponse({ type: [PersonDto] }) listPeople() {
+    /* ... */
+  }
+  @Get('employees') @ZodResponse({ type: [EmployeeDto] }) listEmployees() {
+    /* ... */
+  }
 }
 ```
 

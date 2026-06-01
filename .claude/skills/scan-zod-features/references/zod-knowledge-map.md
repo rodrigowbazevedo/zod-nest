@@ -15,16 +15,16 @@ Both paths share option construction via `buildToJsonSchemaOptions` (`src/schema
 
 ### Options we pass
 
-| Key | Value we pass | Why |
-|---|---|---|
-| `target` | `'openapi-3.1'` | OpenAPI 3.1 emission rules. Locked. |
-| `metadata` | `registry.zodRegistry` | Use our registry's underlying `z.registry` for `.meta()` lookups. |
-| `io` | `'input'` or `'output'` | Drives the I/O suffix decision. Bulk mode runs both. |
-| `override` | composition + primitive chain | `createCompositionOverride` + `primitiveOverride` composed user override. |
-| `uri` | bulk mode only | Shapes registered-schema `$ref`s to `#/components/schemas/<id>` directly, skipping post-process rewrite. |
-| `cycles` | `'ref'` | Self-recursive schemas resolve via `$ref` cycle back to root. |
-| `reused` | `'inline'` | Anonymous reused branches inline rather than extracting to a virtual `__shared/$defs`. |
-| `unrepresentable` | strict mode → `'throw'`; else → `'any'` | Maps to `ZodNestUnrepresentableError` vs emit-as-`{}`. |
+| Key               | Value we pass                           | Why                                                                                                      |
+| ----------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `target`          | `'openapi-3.1'`                         | OpenAPI 3.1 emission rules. Locked.                                                                      |
+| `metadata`        | `registry.zodRegistry`                  | Use our registry's underlying `z.registry` for `.meta()` lookups.                                        |
+| `io`              | `'input'` or `'output'`                 | Drives the I/O suffix decision. Bulk mode runs both.                                                     |
+| `override`        | composition + primitive chain           | `createCompositionOverride` + `primitiveOverride` composed user override.                                |
+| `uri`             | bulk mode only                          | Shapes registered-schema `$ref`s to `#/components/schemas/<id>` directly, skipping post-process rewrite. |
+| `cycles`          | `'ref'`                                 | Self-recursive schemas resolve via `$ref` cycle back to root.                                            |
+| `reused`          | `'inline'`                              | Anonymous reused branches inline rather than extracting to a virtual `__shared/$defs`.                   |
+| `unrepresentable` | strict mode → `'throw'`; else → `'any'` | Maps to `ZodNestUnrepresentableError` vs emit-as-`{}`.                                                   |
 
 ### `.meta({ ... })`
 
@@ -51,11 +51,11 @@ Both destructure `{ zodSchema, jsonSchema }` from `OverrideContext`. Mutate `jso
 
 Inside `node_modules/zod/dist/types/v4/core/`:
 
-| Concern | File |
-|---|---|
-| `toJSONSchema` function + options type | `to-json-schema.d.ts` |
-| `z.registry()` + global registry shape | `registries.d.ts` |
-| `.meta()` semantics + type | `meta.d.ts` |
+| Concern                                               | File                          |
+| ----------------------------------------------------- | ----------------------------- |
+| `toJSONSchema` function + options type                | `to-json-schema.d.ts`         |
+| `z.registry()` + global registry shape                | `registries.d.ts`             |
+| `.meta()` semantics + type                            | `meta.d.ts`                   |
 | Internal processors the override hook integrates with | `json-schema-processors.d.ts` |
 
 If the layout shifts (Zod has restructured `dist/` in past minors), fall back to globbing: `grep -rln "function toJSONSchema" node_modules/zod/`.

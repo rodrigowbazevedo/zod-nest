@@ -31,7 +31,7 @@ Canonical: <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/response
 - One `@ZodResponse(...)` (success variant), **and**
 - At least one `@ApiResponse(...)` / `@ApiOkResponse(...)` /
   `@ApiNotFoundResponse(...)` / `@ApiBadRequestResponse(...)` etc. for a
-  *different* status.
+  _different_ status.
 
 **Severity** — 🟡 (likely improvement). The non-success variants are
 doc-only — not validated. Stacking `@ZodResponse` per status gets runtime
@@ -78,8 +78,9 @@ out of sync with the validated DTO.
 alone can't express — historically `@ApiOkResponse({ content: { 'application/octet-stream': ... } })`
 for binary downloads — propose the canonical replacement instead of a plain
 deletion: `overrideJSONSchema(BlobSchema, { type: 'string', format: 'binary' })`
-+ `@ZodResponse({ type: BlobDto })`. See
-<https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md>.
+
+- `@ZodResponse({ type: BlobDto })`. See
+  <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md>.
 
 Canonical: <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/responses.md>.
 

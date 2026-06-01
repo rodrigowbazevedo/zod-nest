@@ -17,6 +17,7 @@ Source-aware scanner for the NestJS surfaces zod-nest depends on. Three packages
 ## Inputs
 
 Optional:
+
 - `--package swagger|common|core|all` — narrow the scan. Default `all`.
 
 ## Workflow
@@ -25,11 +26,11 @@ Optional:
 
 For each package in scope:
 
-| Package | Key `.d.ts` files |
-|---|---|
-| `@nestjs/swagger` | `node_modules/@nestjs/swagger/dist/services/schema-object-factory.d.ts`, `swagger-explorer.d.ts`, `lib/plugin/visitors/model-class.visitor.d.ts`, `document-builder.d.ts` |
-| `@nestjs/common` | `node_modules/@nestjs/common/dist/services/reflector.service.d.ts`, `pipes/pipe-transform.interface.d.ts`, `interceptors/nest-interceptor.interface.d.ts`, `decorators/http/route-params.decorator.d.ts`, `@nestjs/common/constants.d.ts` |
-| `@nestjs/core` | `node_modules/@nestjs/core/dist/discovery/discovery-service.d.ts`, `metadata-scanner.d.ts` |
+| Package           | Key `.d.ts` files                                                                                                                                                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/swagger` | `node_modules/@nestjs/swagger/dist/services/schema-object-factory.d.ts`, `swagger-explorer.d.ts`, `lib/plugin/visitors/model-class.visitor.d.ts`, `document-builder.d.ts`                                                                 |
+| `@nestjs/common`  | `node_modules/@nestjs/common/dist/services/reflector.service.d.ts`, `pipes/pipe-transform.interface.d.ts`, `interceptors/nest-interceptor.interface.d.ts`, `decorators/http/route-params.decorator.d.ts`, `@nestjs/common/constants.d.ts` |
+| `@nestjs/core`    | `node_modules/@nestjs/core/dist/discovery/discovery-service.d.ts`, `metadata-scanner.d.ts`                                                                                                                                                |
 
 If a layout has shifted, fall back to globbing for the symbol: `grep -rln "<symbol>" node_modules/@nestjs/<pkg>/`.
 
@@ -50,6 +51,7 @@ Read [`references/nest-knowledge-map.md`](references/nest-knowledge-map.md) for 
 The DTO bridge relies on `_OPENAPI_METADATA_FACTORY` being a **static method** on the DTO class. If Nest's plugin emit changes this (e.g. to an instance method, async, or another shape), our `createZodDto` output stops being introspected by `SchemaObjectFactory`.
 
 Steps:
+
 1. Find `_OPENAPI_METADATA_FACTORY` references in `node_modules/@nestjs/swagger/dist/`.
 2. Verify the signature is still: `() => Record<string, unknown>` (synchronous, no `this`).
 3. Cross-reference our emit in `src/dto/create-zod-dto.ts:82-84` (the `static _OPENAPI_METADATA_FACTORY()` method on the DTO class).
@@ -61,6 +63,7 @@ A mismatch here is the highest-severity finding the scanner can produce.
 We rely on `METHOD_METADATA` and `HTTP_CODE_METADATA` from `@nestjs/common/constants` to compute the default response status. If these constants are renamed or moved, `defaultStatusFor` (`src/response/default-status.ts:21-31`) silently returns the wrong default for POST handlers without `@HttpCode`.
 
 Steps:
+
 1. Read `node_modules/@nestjs/common/dist/constants.d.ts` (or `.js`).
 2. Confirm `METHOD_METADATA` and `HTTP_CODE_METADATA` exist with the same string values.
 3. Cross-reference `src/response/default-status.ts:2`.
@@ -72,6 +75,7 @@ This is asserted by tests at boot time (see `test/response/default-status.spec.t
 `applyZodNest` uses `DiscoveryService` to walk controllers and pick up `@ZodResponse` metadata. If the methods we call (`getControllers`, `getProviders`, or the controller-walker patterns) change shape, our doc post-processing breaks silently — the doc still builds but response variants disappear.
 
 Steps:
+
 1. Read `node_modules/@nestjs/core/dist/discovery/discovery-service.d.ts`.
 2. Confirm `getControllers()` still returns instance wrappers and the prototype-walking pattern still works.
 3. Cross-reference `src/document/collect-usage.ts` (the consumer).
@@ -84,12 +88,14 @@ Output findings in markdown, one section per category, mirroring `/scan-zod-feat
 ## /scan-nest-features (@nestjs/swagger 11.0.3 → 11.0.5, @nestjs/common 11.0.0 → 11.0.2, @nestjs/core 11.0.0 → 11.0.2)
 
 ✅ Aligned
+
 - `_OPENAPI_METADATA_FACTORY` shape unchanged.
 - `Reflector` API stable.
 - `METHOD_METADATA`, `HTTP_CODE_METADATA` constants unchanged.
 - `DiscoveryService.getControllers()` signature unchanged.
 
 💡 Opportunities
+
 - `@nestjs/swagger` 11.0.5 added a `readonly-mode` plugin option that could replace our marker bridge in a future major. Not actionable now.
 
 ⚠️ Needs investigation

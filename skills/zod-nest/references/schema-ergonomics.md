@@ -26,7 +26,7 @@ Canonical: <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/dto.md>.
 ## 2. Inline `z.object(...)` inside `createZodDto`
 
 **Detection** — a `createZodDto(z.object({ ... }))` callsite where the inline
-object literal has **more than 2 fields**, *or* is the same shape as one in
+object literal has **more than 2 fields**, _or_ is the same shape as one in
 another file.
 
 **Severity** — 🟢 (nice-to-have) for the >2-fields case; 🟡 when shared.
@@ -115,8 +115,8 @@ the unrepresentable Zod constructs:
 - **High-signal**: `z.custom(...)`, `z.instanceof(...)`. These always emit
   `{}` to JSON Schema and trip `ZodNestUnrepresentableError` under
   `strict: true`.
-- **Medium-signal**: `.transform(...)` *not wrapped by an outer `.pipe()`
-  covering it* — i.e. the transform's output reaches the DTO boundary
+- **Medium-signal**: `.transform(...)` _not wrapped by an outer `.pipe()`
+  covering it_ — i.e. the transform's output reaches the DTO boundary
   directly. A `z.string().transform(...).pipe(z.number())` is fine because
   the outer `.pipe()` covers it; a bare `.transform()` inside `createZodDto`
   is not.
@@ -135,14 +135,14 @@ scope for it, AND the schema is not one of the shipped presets (`FileSchema`
 **Severity** — depends on the project's `applyZodNest({ strict })` setting
 (probe `main.ts` / `bootstrap.ts` once and cache):
 
-- `strict: false` → 🟡. *"Schema emits `{}` to OpenAPI; consumers can't
-  introspect the shape."*
+- `strict: false` → 🟡. _"Schema emits `{}` to OpenAPI; consumers can't
+  introspect the shape."_
 - `strict: true` (or unknown — **fallback**):
-  - `z.custom` / `z.instanceof` → 🔴. *"Will throw
-    `ZodNestUnrepresentableError` at `applyZodNest` time."*
-  - `.transform` / lower-signal types → 🟡. *"May throw
+  - `z.custom` / `z.instanceof` → 🔴. _"Will throw
+    `ZodNestUnrepresentableError` at `applyZodNest` time."_
+  - `.transform` / lower-signal types → 🟡. _"May throw
     `ZodNestUnrepresentableError` at `applyZodNest` time if not covered by
-    an outer pipe."*
+    an outer pipe."_
 
 **Proposed edit** — show **one** concrete form per case, not a ladder of
 variations. Leave enrichment (`contentMediaType`, descriptions, etc.) to the
@@ -154,9 +154,7 @@ user.
   ```ts
   import { FileSchema } from 'zod-nest/helpers';
 
-  class UploadDto extends createZodDto(
-    z.object({ file: FileSchema }),
-  ) {}
+  class UploadDto extends createZodDto(z.object({ file: FileSchema })) {}
   ```
 
 - **Other `z.custom<T>()` / `z.instanceof(Other)`** → suggest a bare

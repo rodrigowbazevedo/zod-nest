@@ -25,8 +25,7 @@ class UnprocessableEntityValidationException extends HttpException {
 @Module({
   imports: [
     ZodNestModule.forRoot({
-      createValidationException: (err) =>
-        new UnprocessableEntityValidationException(err),
+      createValidationException: (err) => new UnprocessableEntityValidationException(err),
     }),
   ],
 })
@@ -69,10 +68,7 @@ ZodNestModule.forRoot({
       return new HttpException({ where: 'path', issues: err.issues }, 404);
     }
     // Default — body / custom
-    return new HttpException(
-      { message: 'Validation failed', errors: z.treeifyError(err) },
-      400,
-    );
+    return new HttpException({ message: 'Validation failed', errors: z.treeifyError(err) }, 400);
   },
 });
 ```
@@ -87,10 +83,7 @@ class CorrelatedValidationException extends HttpException {
     zodError: z.ZodError,
     public readonly traceId: string,
   ) {
-    super(
-      { traceId, errors: z.treeifyError(zodError) },
-      HttpStatus.BAD_REQUEST,
-    );
+    super({ traceId, errors: z.treeifyError(zodError) }, HttpStatus.BAD_REQUEST);
   }
 }
 

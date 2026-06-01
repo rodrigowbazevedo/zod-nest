@@ -18,6 +18,7 @@ Adds one new test case to the engine spec suite. Designed for the common path: a
 ## Inputs
 
 Required:
+
 - **Case name** — the title for the `it()` block. Should describe the invariant, not the procedure (`'optional + default emits required: false and a JSON Schema default'`, not `'test optional with default'`).
 - **Zod snippet** — the schema construction. A single expression (`z.string().optional()`) or a small `const`-bound block.
 - **Expected** — one of:
@@ -26,6 +27,7 @@ Required:
   - A `Promise.rejects.toThrow(<ErrorCtor>)`-shaped expectation for unrepresentable cases (`engine.strict.spec.ts`).
 
 Optional:
+
 - **Target spec** — override the auto-selection. Useful when the case spans multiple categories.
 - **`io`** — `'input'` or `'output'`. Defaults to `'output'`. For divergence cases, two `it()` blocks (one per side).
 
@@ -35,7 +37,7 @@ Optional:
 
 If the user didn't pass an explicit target, infer from the schema shape using [`references/engine-specs.md`](references/engine-specs.md). The reference doc lists every `engine.*.spec.ts` and the shape signature that maps to it.
 
-The auto-selection is best-effort. If the schema spans categories (e.g. an `z.object()` with `.optional()` fields and a `.transform()`), surface a one-line decision: *"This case has both modifier and io-divergence signals — placing it in `engine.io-divergence.spec.ts` because the divergence is the load-bearing behaviour. Pass an explicit target to override."*
+The auto-selection is best-effort. If the schema spans categories (e.g. an `z.object()` with `.optional()` fields and a `.transform()`), surface a one-line decision: _"This case has both modifier and io-divergence signals — placing it in `engine.io-divergence.spec.ts` because the divergence is the load-bearing behaviour. Pass an explicit target to override."_
 
 ### Step 2: Verify the case isn't already covered
 
