@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.10.0...v1.11.0) (2026-06-01)
+
+
+### Features
+
+* **response:** accept a raw Zod schema in @ZodResponse ([#88](https://github.com/rodrigowbazevedo/zod-nest/issues/88)) ([eed6eab](https://github.com/rodrigowbazevedo/zod-nest/commit/eed6eabe7c9945e02945de87b781f2ae6678d7a9)), closes [#87](https://github.com/rodrigowbazevedo/zod-nest/issues/87)
+
 # [1.10.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.9.0...v1.10.0) (2026-06-01)
 
 ### Features
