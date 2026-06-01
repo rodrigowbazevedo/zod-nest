@@ -6,7 +6,11 @@
 import { ZodNestModule } from 'zod-nest';
 
 @Module({
-  imports: [ZodNestModule.forRoot({ /* options */ })],
+  imports: [
+    ZodNestModule.forRoot({
+      /* options */
+    }),
+  ],
 })
 class AppModule {}
 ```
@@ -18,10 +22,7 @@ The module is marked `global` so the `ZOD_NEST_OPTIONS` token is injectable from
 ## `createValidationException`
 
 ```ts
-type CreateValidationException = (
-  err: z.ZodError,
-  argMetadata: ArgumentMetadata,
-) => unknown;
+type CreateValidationException = (err: z.ZodError, argMetadata: ArgumentMetadata) => unknown;
 ```
 
 Factory for the exception thrown by `ZodValidationPipe` on input validation failure. The default factory builds a `ZodValidationException` (HTTP 400, body `{ statusCode, message: 'Validation failed', errors: z.treeifyError(zodError) }`).
@@ -75,8 +76,8 @@ Default: `false` on both sides.
 Failure-only logging — successful validations do not log. The boolean form is shorthand for `{ input: true, output: true }`. The granular form lets you toggle each side independently:
 
 ```ts
-ZodNestModule.forRoot({ validationLogs: true });                    // both
-ZodNestModule.forRoot({ validationLogs: { output: true } });        // output only
+ZodNestModule.forRoot({ validationLogs: true }); // both
+ZodNestModule.forRoot({ validationLogs: { output: true } }); // output only
 ZodNestModule.forRoot({ validationLogs: { input: false, output: true } });
 ```
 
@@ -96,10 +97,10 @@ Override with any object implementing the NestJS `LoggerService` interface (`log
 import type { LoggerService } from '@nestjs/common';
 
 const pinoAdapter: LoggerService = {
-  log:     (msg, ctx) => pino.info({ ctx }, msg),
-  error:   (msg, trace, ctx) => pino.error({ ctx, trace }, msg),
-  warn:    (msg, ctx) => pino.warn({ ctx }, msg),
-  debug:   (msg, ctx) => pino.debug({ ctx }, msg),
+  log: (msg, ctx) => pino.info({ ctx }, msg),
+  error: (msg, trace, ctx) => pino.error({ ctx, trace }, msg),
+  warn: (msg, ctx) => pino.warn({ ctx }, msg),
+  debug: (msg, ctx) => pino.debug({ ctx }, msg),
   verbose: (msg, ctx) => pino.trace({ ctx }, msg),
 };
 
@@ -133,11 +134,11 @@ ZodNestModule.forRoot({
 
 ### `DEFAULT_REDACT_KEYS`
 
-| Category | Keys |
-|---|---|
-| Credentials | `password`, `secret`, `apiKey` |
+| Category              | Keys                                                                     |
+| --------------------- | ------------------------------------------------------------------------ |
+| Credentials           | `password`, `secret`, `apiKey`                                           |
 | Auth headers & tokens | `authorization`, `bearer`, `token`, `accessToken`, `refreshToken`, `jwt` |
-| Session cookies | `cookie`, `set-cookie` |
+| Session cookies       | `cookie`, `set-cookie`                                                   |
 
 The constant is exported so you can introspect, extend, or replace it programmatically.
 
@@ -167,32 +168,66 @@ The 100-byte reserve in the preview budget leaves space for the envelope's own k
 
 Tune this based on your logger's per-line cost. The default trades some debuggability for safety against runaway payload sizes.
 
+## `streamContentTypes`
+
+```ts
+streamContentTypes?: readonly string[];
+```
+
+Default: `DEFAULT_STREAM_CONTENT_TYPES` (see below).
+
+Response content types that [`@ZodResponse`](responses.md#streaming-responses-contenttype--stream) treats as **streams** — written straight to the response buffer, so `ZodSerializerInterceptor` skips validation. This option is consumed at runtime by the interceptor; a response whose effective content type matches the set (and has no explicit `stream` override) passes through unvalidated.
+
+**Supplying `streamContentTypes` merges with the defaults — they are never dropped.** Unlike `redactKeys`, this list is additive: SSE / NDJSON / binary detection always stays on, and you only list your extras.
+
+```ts
+import { ZodNestModule } from 'zod-nest';
+
+ZodNestModule.forRoot({
+  // text/csv now skips validation too; all built-in stream types still apply.
+  streamContentTypes: ['text/csv', 'application/zip'],
+});
+```
+
+A trailing `/*` entry matches a media-type family (`font/*` → `font/woff2`, `font/ttf`, …). Comparison is case-insensitive and ignores `;`-parameters (`text/event-stream; charset=utf-8` matches `text/event-stream`).
+
+> This affects the **runtime validation skip** only. The OpenAPI media-type key still comes from the per-response `contentType` option (or a built-in stream-typed `@Header`) — module options aren't available at decoration time. To document an off-list type, set `contentType` on `@ZodResponse`.
+
+### `DEFAULT_STREAM_CONTENT_TYPES`
+
+| Category        | Entries                                                       |
+| --------------- | ------------------------------------------------------------- |
+| Streaming       | `text/event-stream`, `application/x-ndjson`                   |
+| Binary / files  | `application/octet-stream`, `application/pdf`                  |
+| Media families  | `image/*`, `audio/*`, `video/*`                               |
+
+The constant is exported so you can introspect, extend, or replace it programmatically.
+
 ## `ZOD_NEST_OPTIONS` token
 
 ```ts
 import { Inject } from '@nestjs/common';
-import type { NormalizedZodNestOptions } from 'zod-nest';
 import { ZOD_NEST_OPTIONS } from 'zod-nest';
+
+import type { NormalizedZodNestOptions } from 'zod-nest';
 
 @Injectable()
 class MyPipe {
-  constructor(
-    @Inject(ZOD_NEST_OPTIONS) private readonly opts: NormalizedZodNestOptions,
-  ) {}
+  constructor(@Inject(ZOD_NEST_OPTIONS) private readonly opts: NormalizedZodNestOptions) {}
 }
 ```
 
-`NormalizedZodNestOptions` is the resolved option shape — `validationLogs` has been collapsed into `logInputFailure` / `logOutputFailure` no-op-when-disabled functions, the logger is materialized, and the redaction set is interned. Downstream consumers should depend on this shape, not on the raw `ZodNestModuleOptions`.
+`NormalizedZodNestOptions` is the resolved option shape — `validationLogs` has been collapsed into `logInputFailure` / `logOutputFailure` no-op-when-disabled functions, the logger is materialized, the redaction set is interned, and `streamContentTypes` is compiled into a `streamMatcher` (built-in defaults ∪ your extras). Downstream consumers should depend on this shape, not on the raw `ZodNestModuleOptions`.
 
 ## Option-precedence summary
 
-| Concern | Module option | Per-pipe / per-decorator override |
-|---|---|---|
-| Input exception | `createValidationException` | `new ZodValidationPipe({ createValidationException })` |
-| Output exception | `createSerializationException` | none — module-scope only |
-| Logging on / off | `validationLogs` | none — module-scope only |
-| Logger instance | `logger` | none — module-scope only |
-| Redaction set | `redactKeys` | none — module-scope only |
-| Truncation cap | `maxLoggedValueBytes` | none — module-scope only |
+| Concern          | Module option                  | Per-pipe / per-decorator override                      |
+| ---------------- | ------------------------------ | ------------------------------------------------------ |
+| Input exception  | `createValidationException`    | `new ZodValidationPipe({ createValidationException })` |
+| Output exception | `createSerializationException` | none — module-scope only                               |
+| Logging on / off | `validationLogs`               | none — module-scope only                               |
+| Logger instance  | `logger`                       | none — module-scope only                               |
+| Redaction set    | `redactKeys`                   | none — module-scope only                               |
+| Truncation cap   | `maxLoggedValueBytes`          | none — module-scope only                               |
 
 Only the input exception has a per-pipe override; everything else is module-scope by design — logging, redaction, and truncation are cross-cutting concerns whose value comes from being consistent across the app.

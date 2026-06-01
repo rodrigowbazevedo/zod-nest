@@ -9,6 +9,8 @@ import type {
   ZodResponseDescription,
 } from '../response/metadata.js';
 
+import { DEFAULT_CONTENT_TYPE } from '../response/stream.js';
+
 /**
  * Minimal shape for an OpenAPI 3.1 tuple schema. `@nestjs/swagger`'s
  * `SchemaObject` is modelled against OpenAPI 3.0 and doesn't declare
@@ -70,6 +72,90 @@ const buildApiResponseOptions = (
   return { ...base, ...body } as any;
 };
 
+const buildTupleSchema = (dtos: readonly ZodDto[]): TupleSchema => ({
+  type: 'array',
+  prefixItems: dtos.map((d) => ({ $ref: getSchemaPath(asDtoFunction(d)) })),
+  items: false,
+});
+
+/**
+ * OpenAPI schema for a non-JSON response body, keyed by `ResponseVariant.kind`:
+ * single → a bare `$ref`; array → an `array` of `$ref`; tuple → a 3.1
+ * `prefixItems` tuple. Each `$ref` targets the class name `@nestjs/swagger`
+ * registers via `ApiExtraModels`; `applyZodNest` later rewrites it to the real
+ * DTO id and replaces the placeholder body with the Zod-derived schema.
+ */
+type ContentSchema = { $ref: string } | { type: 'array'; items: { $ref: string } } | TupleSchema;
+
+/**
+ * Build an `ApiResponseOptions` payload that pins a custom media-type key via
+ * `content` (rather than `type` / `isArray`, which `@nestjs/swagger` always
+ * wraps in `application/json`). Used for streamed / binary responses.
+ */
+const buildContentResponseOptions = (
+  base: { status: number | ResponseStatusWildcard } & DescriptionFields,
+  contentType: string,
+  schema: ContentSchema,
+): ApiResponseOptions => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 3.1 schema shapes (prefixItems) + the headers shape don't fit @nestjs/swagger's 3.0 types; see comments above
+  return { ...base, content: { [contentType]: { schema } } } as any;
+};
+
+/**
+ * Emit `@ApiResponse(...)` for a non-`application/json` content type. Registers
+ * the variant's DTO(s) with `ApiExtraModels` so they land in
+ * `components.schemas`, then references them by `$ref` under the custom media
+ * type — the same placeholder-then-rewrite contract the tuple path relies on.
+ */
+const applyCustomContentResponse = (
+  variant: ResponseVariant,
+  base: { status: number | ResponseStatusWildcard } & DescriptionFields,
+  contentType: string,
+  target: object,
+  propertyKey: string | symbol,
+  descriptor: TypedPropertyDescriptor<unknown>,
+): void => {
+  if (variant.kind === 'single') {
+    const dto = variant.dto as ZodDto;
+    ApiExtraModels(asDtoFunction(dto))(target, propertyKey, descriptor);
+    const schema: ContentSchema = { $ref: getSchemaPath(asDtoFunction(dto)) };
+    ApiResponse(buildContentResponseOptions(base, contentType, schema))(
+      target,
+      propertyKey,
+      descriptor,
+    );
+    return;
+  }
+
+  const dtos = variant.dto as readonly ZodDto[];
+  ApiExtraModels(...dtos.map(asDtoFunction))(target, propertyKey, descriptor);
+
+  if (variant.kind === 'array') {
+    // `buildArrayKind` guarantees `dtos.length === 1` for `array` kind.
+    const [dto] = dtos;
+    if (dto === undefined) {
+      throw new TypeError('[zod-nest] array response variant has no DTO.');
+    }
+    const schema: ContentSchema = {
+      type: 'array',
+      items: { $ref: getSchemaPath(asDtoFunction(dto)) },
+    };
+    ApiResponse(buildContentResponseOptions(base, contentType, schema))(
+      target,
+      propertyKey,
+      descriptor,
+    );
+    return;
+  }
+
+  // tuple
+  ApiResponse(buildContentResponseOptions(base, contentType, buildTupleSchema(dtos)))(
+    target,
+    propertyKey,
+    descriptor,
+  );
+};
+
 /**
  * Build an `ApiResponseOptions` payload for a `ResponseVariant` and apply
  * `@ApiResponse(...)` (plus `@ApiExtraModels(...)` for tuples) to the
@@ -85,11 +171,24 @@ const buildApiResponseOptions = (
 export const applySwaggerResponseDecorator = (
   variant: ResponseVariant,
   effectiveStatus: number | ResponseStatusWildcard,
+  effectiveContentType: string,
   target: object,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<unknown>,
 ): void => {
   const base = { status: effectiveStatus, ...extractDescriptionFields(variant.description) };
+
+  if (effectiveContentType !== DEFAULT_CONTENT_TYPE) {
+    applyCustomContentResponse(
+      variant,
+      base,
+      effectiveContentType,
+      target,
+      propertyKey,
+      descriptor,
+    );
+    return;
+  }
 
   if (variant.kind === 'single') {
     const dto = variant.dto as ZodDto;
@@ -116,10 +215,9 @@ export const applySwaggerResponseDecorator = (
   // tuple
   const dtos = variant.dto as readonly ZodDto[];
   ApiExtraModels(...dtos.map(asDtoFunction))(target, propertyKey, descriptor);
-  const schema: TupleSchema = {
-    type: 'array',
-    prefixItems: dtos.map((d) => ({ $ref: getSchemaPath(asDtoFunction(d)) })),
-    items: false,
-  };
-  ApiResponse(buildApiResponseOptions(base, { schema }))(target, propertyKey, descriptor);
+  ApiResponse(buildApiResponseOptions(base, { schema: buildTupleSchema(dtos) }))(
+    target,
+    propertyKey,
+    descriptor,
+  );
 };

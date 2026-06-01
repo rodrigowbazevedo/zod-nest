@@ -9,12 +9,14 @@ import type { ZodDto } from '../dto/dto.types.js';
 import type { LogValidationFailure } from '../logging/validation-logger.js';
 import type { CreateSerializationException, NormalizedZodNestOptions } from '../module/options.js';
 import type { ResponseStatusWildcard, ResponseVariant } from '../response/metadata.js';
+import type { StreamContentTypeMatcher } from '../response/stream.js';
 
 import { ZodSerializationException } from '../exceptions/serialization.exception.js';
 import { noopLogValidationFailure } from '../logging/validation-logger.js';
 import { ZOD_NEST_OPTIONS } from '../module/options.js';
 import { resolveEffectiveStatus } from '../response/default-status.js';
 import { ZOD_RESPONSES_METADATA_KEY } from '../response/metadata.js';
+import { DEFAULT_STREAM_MATCHER, isStreamResponse } from '../response/stream.js';
 
 const defaultSerializationFactory: CreateSerializationException = (err, ctx) =>
   new ZodSerializationException(err, ctx);
@@ -66,6 +68,7 @@ const selectVariant = (
 export class ZodSerializerInterceptor implements NestInterceptor {
   private readonly logOutputFailure: LogValidationFailure;
   private readonly createSerializationException: CreateSerializationException;
+  private readonly streamMatcher: StreamContentTypeMatcher;
 
   constructor(
     private readonly reflector: Reflector,
@@ -74,6 +77,9 @@ export class ZodSerializerInterceptor implements NestInterceptor {
     this.logOutputFailure = options?.logOutputFailure ?? noopLogValidationFailure;
     this.createSerializationException =
       options?.createSerializationException ?? defaultSerializationFactory;
+    // Falls back to built-in defaults when the module isn't configured
+    // (`ZodSerializerInterceptor` used standalone, without `ZodNestModule`).
+    this.streamMatcher = options?.streamMatcher ?? DEFAULT_STREAM_MATCHER;
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -106,6 +112,11 @@ export class ZodSerializerInterceptor implements NestInterceptor {
     }
     const variant = selectVariant(variants, status, handler);
     if (variant === undefined) {
+      return value;
+    }
+    // Streams (SSE / NDJSON / binary) are written straight to the response
+    // buffer — there's no single body to validate, so pass it through as-is.
+    if (isStreamResponse(variant, handler, this.streamMatcher)) {
       return value;
     }
     const result = await variant.validationSchema.safeParseAsync(value);

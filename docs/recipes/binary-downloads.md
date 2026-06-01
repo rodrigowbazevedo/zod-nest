@@ -1,6 +1,8 @@
 # Recipe: Binary file downloads
 
-Handlers that stream binary content (CSVs, PDFs, octet-stream exports) need the OpenAPI response to declare `format: 'binary'`. Pre-`zod-nest` migrations typically wrote a manual `@ApiOkResponse({ content: { 'application/octet-stream': ... } })` because `@ZodResponse` couldn't model a non-JSON content type. **You don't need that workaround anymore.** The canonical pattern is `overrideJSONSchema(BlobSchema, { type: 'string', format: 'binary' })` + `@ZodResponse({ type: BlobDto })`.
+Handlers that stream binary content (CSVs, PDFs, octet-stream exports) are written straight to the response buffer — there's no JSON body to validate, and the OpenAPI response should surface under the real media type. `@ZodResponse` models this directly with [`contentType` + `stream`](../responses.md#streaming-responses-contenttype--stream): set `contentType: 'application/octet-stream'` (or let it infer from a `@Header('Content-Type', …)`) and the response card uses that media type, with validation skipped automatically.
+
+Pair it with `overrideJSONSchema(BlobSchema, { type: 'string', format: 'binary' })` so the referenced schema body reads as a binary string for codegen.
 
 ## Pattern
 
@@ -19,12 +21,13 @@ Use it on every binary-returning handler:
 
 ```ts
 import { Controller, Get, Res, StreamableFile } from '@nestjs/common';
+
 import type { Response } from 'express';
 
 @Controller('exports')
 export class ExportsController {
   @Get(':id/csv')
-  @ZodResponse({ type: BlobDto })
+  @ZodResponse({ type: BlobDto, contentType: 'application/octet-stream' })
   download(@Res({ passthrough: true }) res: Response): StreamableFile {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="export.csv"');
@@ -33,14 +36,14 @@ export class ExportsController {
 }
 ```
 
-The emitted doc has `responses.200.content['application/json'].schema = { $ref: '#/components/schemas/Blob' }`, and `components.schemas.Blob` resolves to `{ type: 'string', format: 'binary' }` — which Swagger UI, OpenAPI clients, and `swagger-typescript-api` codegen all understand as a binary download.
+The emitted doc has `responses.200.content['application/octet-stream'].schema = { $ref: '#/components/schemas/Blob' }`, and `components.schemas.Blob` resolves to `{ type: 'string', format: 'binary' }` — which Swagger UI, OpenAPI clients, and `swagger-typescript-api` codegen all understand as a binary download. Because `application/octet-stream` is a built-in stream type, `stream` defaults to `true` and `ZodSerializerInterceptor` never tries to validate the `StreamableFile` against `BlobSchema`.
 
 ## Removing the manual `@ApiOkResponse` workaround during migration
 
 If your existing handler looks like this:
 
 ```ts
-// ❌ Pre-fix workaround — remove during migration to zod-nest@1.4+
+// ❌ Pre-fix workaround — remove during migration to zod-nest
 @Get(':id/csv')
 @ApiOkResponse({
   content: {
@@ -52,12 +55,9 @@ If your existing handler looks like this:
 download(@Res({ passthrough: true }) res: Response) { ... }
 ```
 
-Replace with the `@ZodResponse` form above. Two things change:
+Replace it with the `@ZodResponse({ type: BlobDto, contentType: 'application/octet-stream' })` form above. The bespoke `content` object collapses into the decorator, the doc still surfaces the real `application/octet-stream` media type, and validation is skipped (no need for `passthroughOnError` to tolerate a `StreamableFile` that wouldn't pass `BlobSchema`).
 
-1. The decorator drops to a single `@ZodResponse({ type: BlobDto })` — no more bespoke `content` object.
-2. Your runtime validation now applies (the handler's return shape is checked against the DTO schema). If the validator should be a no-op for an already-binary response, set `passthroughOnError: true` so the handler doesn't fail in production when `BlobSchema` rejects a `StreamableFile`.
-
-The content type declared in the doc is `application/json` (because `@ZodResponse` is JSON-oriented), but the schema body is the binary-string shape — clients that key off `format: 'binary'` (the OpenAPI-correct discriminator) will handle the response as a file regardless of the media-type label. If you need the response to literally surface as `application/octet-stream` in the doc — e.g. because a downstream consumer keys off the media type rather than the format — keep the manual `@ApiOkResponse({ content: { 'application/octet-stream': ... } })` alongside `@ZodResponse`, and `@nestjs/swagger` will merge both content types on the same response card.
+If you'd rather keep the JSON-labelled card (a `$ref` under `application/json` whose body is `format: 'binary'`), simply omit `contentType` — `@ZodResponse({ type: BlobDto })` still works, and clients that key off `format: 'binary'` handle it as a file. Set `contentType` only when a consumer keys off the media-type label itself.
 
 ## See also
 
