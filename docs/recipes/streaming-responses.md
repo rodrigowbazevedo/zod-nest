@@ -58,6 +58,7 @@ The `ExportRow` DTO documents the shape of **one line**, mirroring the paginated
 
 ## Notes
 
+- **Union-shaped events.** When each event is one of several shapes — `z.discriminatedUnion('event', […])` — you can't wrap it in `createZodDto` (TS2509). Pass the schema straight to `@ZodResponse({ type: EventSchema, contentType: 'text/event-stream' })`; it's normalised to an output DTO internally. See [responses.md → "Passing a raw schema"](../responses.md).
 - **Keep validating?** Set `stream: false` to force validation back on for a stream content type (rare — usually only if you buffer the whole stream and return it as one value).
 - **Custom stream types.** To treat an off-list content type (e.g. `text/csv`) as a stream globally, add it to [`ZodNestModuleOptions.streamContentTypes`](../module-options.md#streamcontenttypes) — it merges with the built-in defaults. For a one-off, just pass `stream: true` on that `@ZodResponse`.
 - **Binary downloads** (`application/octet-stream`, files) follow the same model — see [`binary-downloads.md`](binary-downloads.md).

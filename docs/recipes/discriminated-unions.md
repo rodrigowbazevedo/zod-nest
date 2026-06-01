@@ -6,7 +6,6 @@ For sum types where each branch has a distinguishing literal field — `z.discri
 
 ```ts
 import { z } from 'zod';
-import { createZodDto } from 'zod-nest';
 
 const successSchema = z
   .object({
@@ -25,9 +24,9 @@ const failureSchema = z
 const eventSchema = z
   .discriminatedUnion('kind', [successSchema, failureSchema])
   .meta({ id: 'Event' });
-
-class EventDto extends createZodDto(eventSchema) {}
 ```
+
+Note there's **no `createZodDto(eventSchema)`** — a discriminated union's `z.infer<>` is a TS union, which can't be a class base (`class … extends createZodDto(eventSchema)` fails with TS2509). Use the schema directly: a raw schema in `@ZodResponse` for responses (below), or `@ZodBody` + `ZodValidationPipe` for request bodies (see [intersection-with-union.md](./intersection-with-union.md)).
 
 ## OpenAPI emission
 
@@ -69,14 +68,14 @@ Without the discriminator, the spec is just `oneOf` — a generic OpenAPI client
 
 ## With `@ZodResponse`
 
-The union DTO works as a normal response type:
+Pass the union schema directly as the response type — `@ZodResponse` normalises it to an output DTO internally, so there's no class to extend and no TS2509:
 
 ```ts
 @Controller('events')
 class EventsController {
   @Get('latest')
-  @ZodResponse({ type: EventDto })
-  latest(): unknown {
+  @ZodResponse({ type: eventSchema })
+  latest(): z.infer<typeof eventSchema> {
     return { kind: 'success', data: { id: 'e1' } };
   }
 }

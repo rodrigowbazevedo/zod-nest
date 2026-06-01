@@ -1,6 +1,7 @@
 import { expectTypeOf } from 'expect-type';
+import { z } from 'zod';
 
-import type { ZodResponseOptions, ZodResponseType } from '../../src';
+import type { ZodDto, ZodResponseEntry, ZodResponseOptions, ZodResponseType } from '../../src';
 
 import { ZodResponse } from '../../src';
 
@@ -22,6 +23,19 @@ describe('@ZodResponse — type identity (compile-only)', () => {
     type Tuple = Exclude<ZodResponseType, { schema: unknown }>;
     expectTypeOf<Single>().not.toBeNever();
     expectTypeOf<Tuple>().not.toBeNever();
+    expect(true).toBe(true);
+  });
+
+  it('`ZodResponseEntry` admits both a ZodDto and a raw Zod schema', () => {
+    expectTypeOf<ZodDto>().toMatchTypeOf<ZodResponseEntry>();
+    expectTypeOf<z.ZodType>().toMatchTypeOf<ZodResponseEntry>();
+    expect(true).toBe(true);
+  });
+
+  it('a raw schema, and arrays mixing schemas and DTOs, are assignable to `ZodResponseType`', () => {
+    expectTypeOf<z.ZodObject>().toMatchTypeOf<ZodResponseType>();
+    expectTypeOf<readonly [z.ZodType]>().toMatchTypeOf<ZodResponseType>();
+    expectTypeOf<readonly [ZodDto, z.ZodType]>().toMatchTypeOf<ZodResponseType>();
     expect(true).toBe(true);
   });
 });

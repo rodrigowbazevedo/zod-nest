@@ -50,6 +50,13 @@ const buildSiblingClass = <TSchema extends z.ZodType>(
       return { [ZOD_NEST_DTO_EXTENSION]: makeZodDtoMarker(parent.id, 'output') };
     }
   };
+  // `@nestjs/swagger` keys `components.schemas` by the class's `.name`. Every
+  // sibling produced here is the same anonymous `class` expression, so they all
+  // report `"SiblingClass"` and would collapse into one component when more than
+  // one `.Output` DTO is used across responses. Pin the name to the parent id so
+  // distinct DTOs register distinctly. A getter keeps id resolution lazy (the
+  // parent id may not be resolvable until the schema is first registered).
+  Object.defineProperty(SiblingClass, 'name', { get: () => parent.id, configurable: true });
   return SiblingClass as unknown as ZodDto<TSchema>;
 };
 

@@ -28,6 +28,7 @@ export {
   createZodDto,
   isZodDto,
   isZodDtoMarker,
+  isZodSchema,
   makeZodDtoMarker,
   ZOD_DTO_SYMBOL,
 } from './dto/index.js';
@@ -46,6 +47,7 @@ export type {
   ZodCookiesOptions,
   ZodHeadersOptions,
   ZodQueryOptions,
+  ZodResponseEntry,
   ZodResponseOptions,
   ZodResponseType,
 } from './decorators/index.js';

@@ -8,25 +8,36 @@ import type {
   ZodResponseDescription,
 } from '../response/metadata.js';
 
-import { isZodDto } from '../dto/predicates.js';
 import { resolveEffectiveStatus } from '../response/default-status.js';
 import { appendResponseVariant } from '../response/metadata.js';
+import { toResponseDto } from '../response/normalize-type.js';
 import { DEFAULT_STREAM_MATCHER, resolveContentType } from '../response/stream.js';
 import { applySwaggerResponseDecorator } from './zod-response.swagger-bridge.js';
 
 /**
- * Accepted shapes for `@ZodResponse({ type })`:
- * - `Dto` → validates as `Dto.schema` (single-DTO response).
- * - `[Dto]` (length 1) → validates as `z.array(Dto.schema)`; matches Nest's
+ * One entry in `@ZodResponse({ type })` — either a zod-nest DTO or a raw Zod
+ * schema. A raw schema is normalised internally to `createZodDto(schema).Output`
+ * (output IO, since a response body is output-only), so schemas that can't be
+ * wrapped with `createZodDto` — `z.discriminatedUnion` / `z.union` /
+ * `z.intersection`, whose `z.infer` is a union and so trip TS2509 in an
+ * `extends` clause — can be passed straight to a response. See `toResponseDto`.
+ */
+export type ZodResponseEntry = ZodDto | z.ZodType;
+
+/**
+ * Accepted shapes for `@ZodResponse({ type })`. Each slot is a `ZodResponseEntry`
+ * (DTO or raw schema), and the two may be mixed within an array:
+ * - `Dto` / `Schema` → validates as the entry's schema (single response).
+ * - `[Entry]` (length 1) → validates as `z.array(entry.schema)`; matches Nest's
  *   `@ApiResponse({ isArray: true })` convention without minting a separate
  *   `*sDto` id.
  * - `[A, B, ...]` (length ≥ 2) → validates as `z.tuple([A.schema, B.schema, ...])`;
  *   surfaces as an OpenAPI 3.1 `prefixItems` tuple via `applyZodNest`.
  *
- * Empty arrays and non-DTO elements throw `TypeError` at decoration time
- * so typos surface at module load, not the first request.
+ * Empty arrays and entries that are neither a DTO nor a schema throw `TypeError`
+ * at decoration time so typos surface at module load, not the first request.
  */
-export type ZodResponseType = ZodDto | readonly [ZodDto, ...ZodDto[]];
+export type ZodResponseType = ZodResponseEntry | readonly [ZodResponseEntry, ...ZodResponseEntry[]];
 
 /**
  * Accepted shapes for `@ZodResponse({ status })`:
@@ -70,44 +81,36 @@ interface BuiltKind {
   validationSchema: z.ZodType;
 }
 
-type NonEmptyDtoArray = readonly [ZodDto, ...ZodDto[]];
+type NonEmptyEntryArray = readonly [ZodResponseEntry, ...ZodResponseEntry[]];
 
-const buildArrayKind = (dtos: NonEmptyDtoArray): BuiltKind => {
-  for (const [index, element] of dtos.entries()) {
-    if (!isZodDto(element)) {
-      throw new TypeError(
-        `[zod-nest] @ZodResponse({ type }) element [${index}] is not a zod-nest DTO ` +
-          '(class returned by createZodDto). Wrap raw schemas with createZodDto first.',
-      );
-    }
-  }
-  const [head, ...rest] = dtos;
+const buildArrayKind = (entries: NonEmptyEntryArray): BuiltKind => {
+  // Destructure the entry tuple first (so `head` stays non-optional), then
+  // normalise each through `toResponseDto` — which rejects non-DTO / non-schema
+  // entries with a `TypeError` carrying the offending index.
+  const [headEntry, ...restEntries] = entries;
+  const head = toResponseDto(headEntry, 0);
+  const rest = restEntries.map((entry, index) => toResponseDto(entry, index + 1));
   if (rest.length === 0) {
     return { kind: 'array', dto: [head], validationSchema: z.array(head.schema) };
   }
   const tupleSchemas: [z.ZodType, ...z.ZodType[]] = [head.schema, ...rest.map((d) => d.schema)];
-  return { kind: 'tuple', dto: dtos, validationSchema: z.tuple(tupleSchemas) };
+  return { kind: 'tuple', dto: [head, ...rest], validationSchema: z.tuple(tupleSchemas) };
 };
 
 const buildKind = (type: ZodResponseType): BuiltKind => {
   if (Array.isArray(type)) {
     if (type.length === 0) {
       throw new TypeError(
-        '[zod-nest] @ZodResponse({ type: [] }) is invalid — provide at least one DTO.',
+        '[zod-nest] @ZodResponse({ type: [] }) is invalid — provide at least one DTO or schema.',
       );
     }
     // After the length check, `type` is guaranteed non-empty; the static
-    // `readonly [ZodDto, ...ZodDto[]]` annotation reflects this so the
-    // destructure in `buildArrayKind` doesn't need a runtime undefined guard.
-    return buildArrayKind(type as NonEmptyDtoArray);
+    // `readonly [ZodResponseEntry, ...ZodResponseEntry[]]` annotation reflects
+    // this so the destructure in `buildArrayKind` doesn't need a runtime guard.
+    return buildArrayKind(type as NonEmptyEntryArray);
   }
-  if (!isZodDto(type)) {
-    throw new TypeError(
-      '[zod-nest] @ZodResponse({ type }) must be a zod-nest DTO class (from createZodDto) ' +
-        'or an array of such classes.',
-    );
-  }
-  return { kind: 'single', dto: type, validationSchema: type.schema };
+  const dto = toResponseDto(type);
+  return { kind: 'single', dto, validationSchema: dto.schema };
 };
 
 /**

@@ -21,12 +21,16 @@ import { DEFAULT_STREAM_MATCHER, isStreamResponse } from '../response/stream.js'
 const defaultSerializationFactory: CreateSerializationException = (err, ctx) =>
   new ZodSerializationException(err, ctx);
 
+// Label by `.id` (the OpenAPI component name) rather than `.name` (the class
+// name): a DTO synthesised from a raw schema is an anonymous output sibling
+// whose class name is the unhelpful `"SiblingClass"`, while its `.id` is the
+// meaningful component id (from `.meta({ id })` or the anonymous fallback).
 const formatDtoLabel = (variant: ResponseVariant): string => {
   if (variant.kind === 'single') {
-    return (variant.dto as ZodDto).name;
+    return (variant.dto as ZodDto).id;
   }
   const dtos = variant.dto as readonly ZodDto[];
-  return `[${dtos.map((d) => d.name).join(', ')}]`;
+  return `[${dtos.map((d) => d.id).join(', ')}]`;
 };
 
 const formatHandlerLabel = (context: ExecutionContext): string =>

@@ -51,6 +51,30 @@ What each piece does:
 
 The schema is named once (the `const` declaration), and referenced at the decorator, the pipe, and the type position. There's no class to extend — no TS2509.
 
+## Responses — pass the schema straight to `@ZodResponse`
+
+The request side needs `@ZodBody` + `ZodValidationPipe` because NestJS binds the body to a parameter. A **response** is output-only, so `@ZodResponse` accepts the bare schema directly — no DTO, no separate pipe:
+
+```ts
+const Event = z
+  .discriminatedUnion('event', [
+    z.object({ event: z.literal('progress'), pct: z.number() }),
+    z.object({ event: z.literal('done'), id: z.string() }),
+  ])
+  .meta({ id: 'Event' });
+
+@Controller()
+export class Controller {
+  @Get('latest')
+  @ZodResponse({ type: Event })
+  latest(): z.infer<typeof Event> {
+    return { event: 'done', id: 'x' };
+  }
+}
+```
+
+`@ZodResponse` normalises the schema to `createZodDto(schema).Output` internally (output IO), registers it under its `.meta({ id })`, and emits the `$ref` — replacing the old `registerSchema(schema)` + hand-written `@ApiResponse({ content: { … { schema: { $ref } } } })` workaround. See [responses.md → "Passing a raw schema"](../responses.md). Raw schemas also work inside the array (`[Event]`) and tuple (`[Event, ErrorSchema]`) forms, and can be mixed with DTOs.
+
 ## Anonymous schemas (no `.meta({ id })`)
 
 If you don't give the schema an id, `@ZodBody` inlines the JSON Schema body directly into the operation's `requestBody.content.application/json.schema`. The schema is not added to `components.schemas` (nothing to ref). This is fine for one-off bodies but means the schema isn't reusable across operations.
@@ -145,12 +169,12 @@ This is a Swagger-UI compatibility escape hatch, not a general recommendation. T
 
 ## When to use `createZodDto` vs. these decorators
 
-| Schema shape                             | Recommended approach                                                                                |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `z.object({…})` (no inner unions)        | `createZodDto(schema)` — full class ergonomics, sibling `Output` class, `parse`/`safeParse` statics |
-| `z.intersection(obj1, obj2)` (no unions) | `createZodDto(schema)` — collapses to a single object intersection, class extension works           |
-| `z.intersection(obj, union)`             | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>`                                              |
-| `z.discriminatedUnion(...)`              | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>`                                              |
-| `z.union([...])`                         | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>`                                              |
+| Schema shape                             | Request body                                           | Response                         |
+| ---------------------------------------- | ------------------------------------------------------ | -------------------------------- |
+| `z.object({…})` (no inner unions)        | `createZodDto(schema)` — full class ergonomics         | `@ZodResponse({ type: Dto })`    |
+| `z.intersection(obj1, obj2)` (no unions) | `createZodDto(schema)` — collapses to a single object  | `@ZodResponse({ type: Dto })`    |
+| `z.intersection(obj, union)`             | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>` | `@ZodResponse({ type: schema })` |
+| `z.discriminatedUnion(...)`              | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>` | `@ZodResponse({ type: schema })` |
+| `z.union([...])`                         | `@ZodBody(schema)` + `ZodValidationPipe` + `z.infer<>` | `@ZodResponse({ type: schema })` |
 
-If you're unsure, try `createZodDto` first — when it fails with TS2509, fall back to the decorator pattern.
+If you're unsure, try `createZodDto` first — when it fails with TS2509, fall back to the decorator pattern (`@ZodBody` for request bodies, a raw schema in `@ZodResponse` for responses).

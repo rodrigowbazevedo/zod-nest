@@ -12,22 +12,45 @@ getUser(): UserDto {
 
 ## The `type` argument
 
-`@ZodResponse({ type })` accepts three shapes — discriminated at decoration time, not at request time:
+Each slot in `@ZodResponse({ type })` is an **entry** — either a `ZodDto` (from `createZodDto`) or a **raw Zod schema**. The slot shapes are discriminated at decoration time, not at request time:
 
 | `type` shape               | Variant kind | Runtime validation                                         |
 | -------------------------- | ------------ | ---------------------------------------------------------- |
-| `Dto`                      | `'single'`   | `Dto.schema.safeParseAsync(value)`                         |
-| `[Dto]` (length 1)         | `'array'`    | `z.array(Dto.schema).safeParseAsync(value)`                |
+| `Entry`                    | `'single'`   | `entry.schema.safeParseAsync(value)`                       |
+| `[Entry]` (length 1)       | `'array'`    | `z.array(entry.schema).safeParseAsync(value)`              |
 | `[A, B, ...]` (length ≥ 2) | `'tuple'`    | `z.tuple([A.schema, B.schema, ...]).safeParseAsync(value)` |
 
-Empty arrays (`[]`) and non-DTO elements throw `TypeError` at decoration time — typos surface at module load, not the first request:
+DTOs and raw schemas can be mixed within one array (`type: [UserDto, EventSchema]`). Empty arrays (`[]`) and entries that are neither a DTO nor a schema throw `TypeError` at decoration time — typos surface at module load, not the first request:
 
 ```ts
-@ZodResponse({ type: [] })       // throws: "provide at least one DTO"
-@ZodResponse({ type: [User] })   // throws: "element [0] is not a zod-nest DTO"
+@ZodResponse({ type: [] })            // throws: "provide at least one DTO or schema"
+@ZodResponse({ type: [NotADto] })     // throws: "element [0] must be a zod-nest DTO class …"
 ```
 
 The wrapped Zod schema (array / tuple) is built **once at decoration time** and stored on the variant record. There is no per-request schema construction.
+
+### Passing a raw schema
+
+A request body must be a DTO — `ZodValidationPipe` constructs it (`new Dto()`) to bind the parsed value. A **response** body is output-only, so the schema alone is enough. Pass it directly:
+
+```ts
+const EventSchema = z
+  .discriminatedUnion('event', [
+    z.object({ event: z.literal('progress'), pct: z.number() }),
+    z.object({ event: z.literal('done'), id: z.string() }),
+  ])
+  .meta({ id: 'Event' }); // ← names the OpenAPI component
+
+@Get('stream')
+@ZodResponse({ type: EventSchema, contentType: 'text/event-stream' })
+events() {}
+```
+
+Internally a raw schema is normalised to `createZodDto(schema).Output` — **output IO**, because the response body is the schema's output. Everything downstream (component registration, `$ref` rewriting, multi-status stacking) works exactly as it does for a DTO.
+
+**Why this exists.** `createZodDto` can't wrap a `z.discriminatedUnion` / `z.union` / `z.intersection` (or any schema whose `z.infer` is a union): `class Dto extends createZodDto(schema) {}` fails to compile with **TS2509** ("Base constructor return type … is not an object type"). Before, the workaround was `registerSchema(schema)` plus a hand-written `@ApiResponse({ content: { … { schema: { $ref: '#/components/schemas/Event' } } } })`. Now the schema goes straight into `@ZodResponse`.
+
+**Naming.** The OpenAPI component name comes from the schema's `.meta({ id })`. A raw schema with no `.meta({ id })` still works, but lands under a generated name (`_AnonZodResponseSchema_N`) and logs a one-time warning — add `.meta({ id })` to control it. Reusing the **same schema instance** across routes maps to one component (cached per instance).
 
 ## Multi-status stacking
 
@@ -160,9 +183,9 @@ events() {}
 
 Streamed and binary responses — Server-Sent Events (`text/event-stream`), newline-delimited JSON (`application/x-ndjson`), file downloads (`application/octet-stream`, `application/pdf`, `image/*`, …) — are written straight to the response buffer. There's no single body object to validate, and the OpenAPI media-type key must be the stream type, not `application/json`. Two options on `@ZodResponse` cover both needs:
 
-| Option        | Default              | Effect                                                                                   |
-| ------------- | -------------------- | ---------------------------------------------------------------------------------------- |
-| `contentType` | `'application/json'` | The OpenAPI media-type key. A non-JSON type emits `content[<contentType>].schema = $ref`. |
+| Option        | Default              | Effect                                                                                           |
+| ------------- | -------------------- | ------------------------------------------------------------------------------------------------ |
+| `contentType` | `'application/json'` | The OpenAPI media-type key. A non-JSON type emits `content[<contentType>].schema = $ref`.        |
 | `stream`      | `false` (inferred)   | When `true`, `ZodSerializerInterceptor` **skips validation** — the body passes through verbatim. |
 
 The `type` DTO describes **one event / line / blob**, not the whole stream — exactly the shape you'd hand-write into `@ApiOkResponse({ content: { 'text/event-stream': { schema } } })`, now with the full `@ZodResponse` ergonomics (component registration, `$ref` rewriting, multi-status stacking).
