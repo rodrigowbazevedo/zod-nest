@@ -1,9 +1,8 @@
 # [1.10.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.9.0...v1.10.0) (2026-06-01)
 
-
 ### Features
 
-* **response:** contentType + stream options for @ZodResponse (streaming responses) ([#86](https://github.com/rodrigowbazevedo/zod-nest/issues/86)) ([01c145f](https://github.com/rodrigowbazevedo/zod-nest/commit/01c145fc4c2a66b34c9278a5693a7f0cf0345c61))
+- **response:** contentType + stream options for @ZodResponse (streaming responses) ([#86](https://github.com/rodrigowbazevedo/zod-nest/issues/86)) ([01c145f](https://github.com/rodrigowbazevedo/zod-nest/commit/01c145fc4c2a66b34c9278a5693a7f0cf0345c61))
 
 # [1.9.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.8.1...v1.9.0) (2026-05-20)
 

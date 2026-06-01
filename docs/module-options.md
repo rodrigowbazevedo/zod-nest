@@ -195,11 +195,11 @@ A trailing `/*` entry matches a media-type family (`font/*` → `font/woff2`, `f
 
 ### `DEFAULT_STREAM_CONTENT_TYPES`
 
-| Category        | Entries                                                       |
-| --------------- | ------------------------------------------------------------- |
-| Streaming       | `text/event-stream`, `application/x-ndjson`                   |
-| Binary / files  | `application/octet-stream`, `application/pdf`                  |
-| Media families  | `image/*`, `audio/*`, `video/*`                               |
+| Category       | Entries                                       |
+| -------------- | --------------------------------------------- |
+| Streaming      | `text/event-stream`, `application/x-ndjson`   |
+| Binary / files | `application/octet-stream`, `application/pdf` |
+| Media families | `image/*`, `audio/*`, `video/*`               |
 
 The constant is exported so you can introspect, extend, or replace it programmatically.
 
