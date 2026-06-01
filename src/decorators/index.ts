@@ -1,6 +1,7 @@
 export { ZodResponse } from './zod-response.decorator.js';
 export type {
   ResponseStatusInput,
+  ZodResponseEntry,
   ZodResponseOptions,
   ZodResponseType,
 } from './zod-response.decorator.js';

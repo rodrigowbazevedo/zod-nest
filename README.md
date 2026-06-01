@@ -23,7 +23,7 @@ For the long-form motivation, see [`docs/why-this-exists.md`](docs/why-this-exis
 - **OpenAPI 3.1 emission** — no post-processing, no spec downgrade, no leftover internal extension keys.
 - **`createZodDto`** — class wrapper around a Zod schema with introspectable `schema`, `id`, `io`, and a sibling `Output` class when input/output diverge.
 - **`ZodValidationPipe`** — auto-detects DTO from handler-arg metatype, accepts an explicit DTO or raw Zod schema, customizable exception factory.
-- **`@ZodResponse`** — stackable per status code, accepts a single DTO, an array (`[Dto]`), or a tuple (`[A, B, …]`). No internal `@HttpCode` — caller controls status.
+- **`@ZodResponse`** — stackable per status code; each entry is a DTO **or a raw Zod schema** (single, array `[Entry]`, or tuple `[A, B, …]`, mixable). A raw schema is normalised to an output DTO internally, so a `z.discriminatedUnion` / `z.union` / `z.intersection` that can't be wrapped in `createZodDto` (TS2509) drops straight into a response. No internal `@HttpCode` — caller controls status.
 - **`@ZodBody` / `@ZodQuery` / `@ZodHeaders` / `@ZodCookies`** — method-level decorators that wire OpenAPI docs for schemas whose `z.infer<>` is a union (intersection-of-union, discriminated unions, etc.) — the ones that can't be wrapped in `createZodDto` because TS refuses unions as class bases (TS2509). Schema validation stays via `@Body(new ZodValidationPipe(schema))`; the type at the handler arg stays `z.infer<>`.
 - **`ZodSerializerInterceptor`** — response validation with a `passthroughOnError` escape hatch for untrusted upstream shapes.
 - **`applyZodNest`** — one call after `SwaggerModule.createDocument(...)` replaces the entire `cleanupOpenApiDoc` ritual.
@@ -471,7 +471,7 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 
 **DTO** — [`docs/dto.md`](docs/dto.md)
 
-- `createZodDto(schema, options?)`, `isZodDto(value)`, `ZodDto<TSchema>`, `Io`
+- `createZodDto(schema, options?)`, `isZodDto(value)`, `isZodSchema(value)`, `ZodDto<TSchema>`, `Io`
 
 **Validation** — [`docs/validation-pipe.md`](docs/validation-pipe.md)
 
@@ -479,7 +479,7 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 
 **Response** — [`docs/responses.md`](docs/responses.md)
 
-- `@ZodResponse({ status?, type, description?, passthroughOnError? })`, `ZodSerializerInterceptor`, `ZodSerializationException`, `defaultStatusFor`, `resolveEffectiveStatus`, `ResponseStatusInput`, `ResponseStatusWildcard`, `ResponseVariant`, `ZOD_RESPONSES_METADATA_KEY`
+- `@ZodResponse({ status?, type, description?, passthroughOnError?, contentType?, stream? })` (`type` is a DTO or raw schema, or an array/tuple of either), `ZodSerializerInterceptor`, `ZodSerializationException`, `defaultStatusFor`, `resolveEffectiveStatus`, `ResponseStatusInput`, `ResponseStatusWildcard`, `ResponseVariant`, `ZodResponseEntry`, `ZodResponseType`, `ZOD_RESPONSES_METADATA_KEY`
 
 **Parameter decorators for raw schemas** — [`docs/recipes/intersection-with-union.md`](docs/recipes/intersection-with-union.md)
 

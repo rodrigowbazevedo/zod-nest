@@ -9,6 +9,7 @@ import { createZodDto, ZodSerializationException } from '../../src';
 import { ZodSerializerInterceptor } from '../../src/interceptors/serializer.interceptor.js';
 import { normalizeZodNestOptions } from '../../src/module/options.js';
 import { ZOD_RESPONSES_METADATA_KEY } from '../../src/response/metadata.js';
+import { toResponseDto } from '../../src/response/normalize-type.js';
 import { collect, makeContext, makeFakeLogger, makeNext } from './helpers.js';
 
 class UserDto extends createZodDto(z.object({ id: z.string() }), { id: 'Logging_User' }) {}
@@ -91,7 +92,7 @@ describe('ZodSerializerInterceptor — logging', () => {
     const [payload, _stack, context] = logger.error.mock.calls[0] ?? [];
     expect(payload).toMatchObject({
       side: 'output',
-      dto: 'UserDto',
+      dto: 'Logging_User',
       status: 200,
       handler: 'TheController.someHandler',
     });
@@ -115,10 +116,10 @@ describe('ZodSerializerInterceptor — logging', () => {
     expect(logger.warn).toHaveBeenCalledTimes(1);
     expect(logger.error).not.toHaveBeenCalled();
     const [payload] = logger.warn.mock.calls[0] ?? [];
-    expect(payload).toMatchObject({ side: 'output', dto: 'UserDto' });
+    expect(payload).toMatchObject({ side: 'output', dto: 'Logging_User' });
   });
 
-  it('formats DTO label as `[UserDto]` for array kind', async () => {
+  it('formats DTO label by component id (`[Logging_User]`) for array kind', async () => {
     const logger = makeFakeLogger();
     const moduleOpts = normalizeZodNestOptions({ validationLogs: true, logger });
     const interceptor = new ZodSerializerInterceptor(new Reflector(), moduleOpts);
@@ -135,10 +136,10 @@ describe('ZodSerializerInterceptor — logging', () => {
     ).rejects.toBeInstanceOf(ZodSerializationException);
 
     const [payload] = logger.error.mock.calls[0] ?? [];
-    expect((payload as { dto: string }).dto).toBe('[UserDto]');
+    expect((payload as { dto: string }).dto).toBe('[Logging_User]');
   });
 
-  it('formats DTO label as `[UserDto, TagDto]` for tuple kind', async () => {
+  it('formats DTO label by component id (`[Logging_User, Logging_Tag]`) for tuple kind', async () => {
     const logger = makeFakeLogger();
     const moduleOpts = normalizeZodNestOptions({ validationLogs: true, logger });
     const interceptor = new ZodSerializerInterceptor(new Reflector(), moduleOpts);
@@ -155,7 +156,28 @@ describe('ZodSerializerInterceptor — logging', () => {
     ).rejects.toBeInstanceOf(ZodSerializationException);
 
     const [payload] = logger.error.mock.calls[0] ?? [];
-    expect((payload as { dto: string }).dto).toBe('[UserDto, TagDto]');
+    expect((payload as { dto: string }).dto).toBe('[Logging_User, Logging_Tag]');
+  });
+
+  it('labels a normalised raw-schema response by its component id, not "SiblingClass"', async () => {
+    const logger = makeFakeLogger();
+    const moduleOpts = normalizeZodNestOptions({ validationLogs: { output: true }, logger });
+    const interceptor = new ZodSerializerInterceptor(new Reflector(), moduleOpts);
+    const handler = TheController.prototype.someHandler;
+    const rawDto = toResponseDto(z.object({ id: z.string() }).meta({ id: 'Logging_Raw' }));
+    attach(handler, [{ ...strictSingle, dto: rawDto, validationSchema: rawDto.schema }]);
+
+    await expect(
+      collect(
+        interceptor.intercept(
+          makeContext({ statusCode: 200, handler, classRef: TheController }),
+          makeNext({ id: 42 }),
+        ),
+      ),
+    ).rejects.toBeInstanceOf(ZodSerializationException);
+
+    const [payload] = logger.error.mock.calls[0] ?? [];
+    expect((payload as { dto: string }).dto).toBe('Logging_Raw');
   });
 
   it('redacts default-listed keys from the logged value', async () => {

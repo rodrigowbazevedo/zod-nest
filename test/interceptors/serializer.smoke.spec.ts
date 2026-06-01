@@ -178,7 +178,7 @@ describe('ZodSerializerInterceptor — end-to-end smoke', () => {
     // time — the 500 comes later from Nest's exception filter on throw.
     expect(payload).toMatchObject({
       side: 'output',
-      dto: 'UserDto',
+      dto: 'Smoke_Serialize_User',
       status: 200,
     });
   });
@@ -188,6 +188,6 @@ describe('ZodSerializerInterceptor — end-to-end smoke', () => {
     await request(app.getHttpServer()).get('/users/soft-broken');
     expect(logger.warn).toHaveBeenCalled();
     const [payload] = logger.warn.mock.calls[0] ?? [];
-    expect(payload).toMatchObject({ side: 'output', dto: 'ProxyDto' });
+    expect(payload).toMatchObject({ side: 'output', dto: 'Smoke_Serialize_Proxy' });
   });
 });
