@@ -15,6 +15,8 @@ behavioural rationale — lives in
 | `cleanupOpenApiDoc(rawDoc)`                                           | `applyZodNest(rawDoc, { app })`                             | Step 4. Same — `app` must be passed explicitly.                   |
 | `@ZodSerializerDto(Dto)` + `@ApiOkResponse({ type: Dto })`            | `@ZodResponse({ type: Dto })`                               | Step 5. Collapse both decorators into one.                        |
 | `@ApiNotFoundResponse({ type: ErrorDto })` (next to a `@ZodResponse`) | `@ZodResponse({ status: 404, type: ErrorDto })`             | Step 5. Use stacking for validated multi-status.                  |
+| `@ApiOkResponse({ content: { 'text/event-stream' \| 'application/x-ndjson': { schema } } })` (SSE / NDJSON) | `@ZodResponse({ type: Dto, contentType: '<type>' })`        | Step 5. DTO = one event/line; `stream` inferred true → not validated. |
+| `@ApiOkResponse({ content: { 'application/octet-stream': { schema: { format: 'binary' } } } })` (binary) | `@ZodResponse({ type: BlobDto, contentType: 'application/octet-stream' })` | Step 5. Pair with `overrideJSONSchema(BlobSchema, { type: 'string', format: 'binary' })`. Supersedes the old JSON-labelled binary note. |
 | `Dto.isZodDto`                                                        | `isZodDto(Dto)` (imported from `zod-nest`)                  | Step 7. Or use `Symbol.for('zod-nest.dto') in Dto`.               |
 | `Dto.Output.schema`                                                   | `z.output<typeof schema>` (where `schema` is the zod input) | Step 7. `.Output` only exists when input/output diverge.          |
 | `createZodDto(s, { codec: true })`                                    | Express in schema with `z.pipe` / `z.transform`             | No `codec` flag in v0.                                            |
@@ -31,6 +33,7 @@ the change at the relevant step and let the user decide.
 | OpenAPI version                                         | 3.0 or 3.1 (configurable)               | 3.1 only                                                                   | Step 4          |
 | `_Output` suffix                                        | Always present                          | Only when input/output JSON Schemas diverge                                | Step 7          |
 | Input validation logging                                | None                                    | Opt-in via `ZodNestModule.forRoot({ validationLogs: true })`               | Step 6          |
+| Off-list stream content types                           | n/a (manual `@ApiResponse` content)     | `ZodNestModule.forRoot({ streamContentTypes: ['text/csv', …] })` extends the built-in stream set (SSE/NDJSON/octet-stream/pdf/media) | Step 6          |
 | Doc-build errors                                        | Silent / dangling refs at runtime       | Throws `ZodNestDocumentError` (`AMBIGUOUS_RENAME` / `DANGLING_REF`)        | Step 8          |
 
 For each row, the canonical explanation lives in MIGRATION.md — link the user

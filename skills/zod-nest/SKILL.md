@@ -15,8 +15,12 @@ description: >
   inline schema", "name this schema for OpenAPI", "missing @ZodResponse",
   "stack @ZodResponse", "leverage zod-nest", "override JSON schema for DTO",
   "unrepresentable type", "z.instanceof in DTO", "fix file upload schema",
-  "use FileSchema / BlobSchema / BufferSchema", or "best practices zod-nest".
-  Out of scope by design: `passthroughOnError`, custom exception factories,
+  "use FileSchema / BlobSchema / BufferSchema", "SSE / streaming response",
+  "text/event-stream or NDJSON in swagger", "@ZodResponse contentType / stream",
+  "my stream response is being validated / 500s", "document a streamed or
+  binary endpoint", or "best practices zod-nest". The `@ZodResponse`
+  `contentType` / `stream` options (streamed and binary responses) are in
+  scope. Out of scope by design: `passthroughOnError`, custom exception factories,
   `validationLogs` / `redactKeys` / logger config, per-call `Override`
   callbacks on `applyZodNest` (per-emission escape hatch, user-driven). The
   per-instance `overrideJSONSchema` *is* in scope.
@@ -90,7 +94,8 @@ Sections:
    and **unrepresentable schemas exposed via a DTO without
    `overrideJSONSchema`** (Rule 5 — new).
 2. **Handler ergonomics** — missing `@ZodResponse`, multi-status candidates,
-   redundant `@ApiResponse` next to a `@ZodResponse`.
+   redundant `@ApiResponse` next to a `@ZodResponse`, and hand-written
+   stream / binary responses that should use `@ZodResponse({ contentType })`.
 
 If nothing fires, output a single line: `✅ zod-nest usage looks healthy — no
 diagnostics for this change.` and stop.
@@ -163,12 +168,17 @@ for the full rule catalog. The diagnostics:
    applies `@ApiResponse(...)` internally. Any `@ApiResponse` /
    `@ApiOkResponse` / `@ApiCreatedResponse` (etc.) sitting alongside a
    `@ZodResponse` for the same status and same DTO is now redundant — drop
-   the manual `@Api*Response` call. Exception: if the manual call carries
-   additional info `@ZodResponse` can't express (e.g. `content:
-'application/octet-stream'` for binary downloads pre-migration), surface
-   the [binary downloads recipe](https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md)
-   as the canonical replacement (`BlobSchema` from `zod-nest/helpers` +
-   `@ZodResponse({ type: BlobDto })`).
+   the manual `@Api*Response` call. (A manual call carrying a non-JSON
+   `content` map is a Rule 4 case, not a plain deletion.)
+4. **Hand-written stream / binary response** — a handler declaring a non-JSON
+   `@Api*Response({ content: { '<media type>': ... } })` (`text/event-stream`,
+   `application/x-ndjson`, `application/octet-stream`, `application/pdf`,
+   `image|audio|video/*`), or an `@Sse()` / stream-typed
+   `@Header('Content-Type', …)` handler with no `@ZodResponse`. Propose
+   `@ZodResponse({ type, contentType })` — the DTO documents one event/line/blob,
+   the media-type key is preserved, and validation is skipped. See the
+   [streaming responses](https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/responses.md#streaming-responses-contenttype--stream)
+   and [binary downloads](https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md) docs.
 
 ### Step 4 — emit the checklist
 
@@ -200,6 +210,11 @@ Proposed: `@ZodResponse({ type: UserDto })` above the method.
 🟡 `src/users/users.controller.ts:30` — single `@ZodResponse({ type: UserDto })`
 but `@ApiNotFoundResponse({ type: ErrorDto })` is also present. Suggest
 stacking: `@ZodResponse({ status: 404, type: ErrorDto })`.
+
+🟡 `src/notifications/sse.controller.ts:18` — `@Sse('stream')` with a
+hand-written `@ApiOkResponse({ content: { 'text/event-stream': … } })` and no
+`@ZodResponse`. Proposed: `@ZodResponse({ type: NotificationEventDto, contentType: 'text/event-stream' })`
+(documents one event; validation skipped for the stream).
 ```
 
 If nothing fires, the `✅` line from the Output contract is the entire output.

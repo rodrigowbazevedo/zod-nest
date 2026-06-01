@@ -74,15 +74,52 @@ out of sync with the validated DTO.
   getUser(): Promise<UserDto> { /* ... */ }
 ```
 
-**Binary-download exception.** If the manual call carries info `@ZodResponse`
-alone can't express — historically `@ApiOkResponse({ content: { 'application/octet-stream': ... } })`
-for binary downloads — propose the canonical replacement instead of a plain
-deletion: `overrideJSONSchema(BlobSchema, { type: 'string', format: 'binary' })`
-
-- `@ZodResponse({ type: BlobDto })`. See
-  <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md>.
+**Non-JSON content exception → Rule 4.** A manual `@Api*Response` carrying a
+`content` map for a non-JSON media type (binary downloads, SSE, NDJSON) is no
+longer something `@ZodResponse` "can't express" — it's a Rule 4 case. Don't
+propose a plain deletion; route to Rule 4's `contentType` replacement below.
 
 Canonical: <https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/responses.md>.
+
+## 4. Hand-written stream / binary response (use `contentType` / `stream`)
+
+**Detection** — a handler that either:
+
+- declares a non-JSON response by hand —
+  `@ApiOkResponse` / `@ApiResponse` / `@ApiCreatedResponse` with
+  `content: { '<media type>': { schema } }` where the media type is a stream /
+  binary one (`text/event-stream`, `application/x-ndjson`,
+  `application/octet-stream`, `application/pdf`, `image/*`, `audio/*`,
+  `video/*`), **or**
+- is `@Sse(...)` / carries `@Header('Content-Type', '<stream type>')` and has
+  **no** `@ZodResponse`.
+
+**Severity** — 🟡 (likely improvement). Since the `contentType` + `stream`
+options landed, `@ZodResponse` models these directly: the DTO documents one
+event / line / blob, the OpenAPI card uses the right media-type key, and
+validation is skipped (a streamed body has nothing to validate against).
+
+**Proposed edit** — collapse to a single `@ZodResponse` with `contentType`
+(the DTO describes one event/line):
+
+```diff
+  @Sse('events')
+- @ApiOkResponse({ content: { 'text/event-stream': { schema: { $ref: '#/components/schemas/Event' } } } })
++ @ZodResponse({ type: EventDto, contentType: 'text/event-stream' })
+  streamEvents(): Observable<MessageEvent> { /* ... */ }
+```
+
+For a stream-typed `@Header('Content-Type', …)` already present, `contentType`
+is inferred — `@ZodResponse({ type: EventDto })` alone suffices. For binary
+downloads, pair with `overrideJSONSchema(BlobSchema, { type: 'string', format: 'binary' })`
+and `@ZodResponse({ type: BlobDto, contentType: 'application/octet-stream' })`.
+For an off-list content type, surface `stream: true` (per-handler) or
+`ZodNestModule.forRoot({ streamContentTypes: [...] })` (global).
+
+Canonical:
+<https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/responses.md#streaming-responses-contenttype--stream>,
+<https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/streaming-responses.md>,
+<https://github.com/rodrigowbazevedo/zod-nest/blob/main/docs/recipes/binary-downloads.md>.
 
 ## Status resolution precedence — one bullet
 
