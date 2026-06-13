@@ -303,6 +303,147 @@ describe('expandParamMarkers', () => {
     expect((doc.components?.schemas as Record<string, unknown>).Object).toBeDefined();
   });
 
+  // ─── ref mode (queryParamStyle: 'ref' + per-marker override) ─────────────
+
+  const refDoc = (paramIn: string, dtoId: string): OpenAPIObject =>
+    docOf({
+      paths: { '/x': { get: { parameters: [markerParam(paramIn, dtoId)] } } },
+      components: {
+        schemas: { Object: objectMarkerSchema(), [dtoId]: { type: 'object', properties: {} } },
+      },
+    });
+
+  const querySchema = (required: string[]): ReadonlyMap<string, unknown> =>
+    new Map<string, unknown>([
+      [
+        'Q',
+        {
+          type: 'object',
+          properties: { timeFrom: { type: 'string' }, search: { type: 'string' } },
+          required,
+        },
+      ],
+    ]);
+
+  it('collapses a query marker to a single $ref param under queryParamStyle: "ref"', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      queryParamStyle: 'ref',
+    });
+
+    const params = paramsOf(doc, '/x', 'get');
+    expect(params).toEqual([
+      {
+        name: 'Q',
+        in: 'query',
+        required: true,
+        style: 'form',
+        explode: true,
+        schema: { $ref: '#/components/schemas/Q' },
+      },
+    ]);
+  });
+
+  it('marks the ref param `required: false` when the schema has no required fields', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema([]),
+      outputSchemas: new Map(),
+      queryParamStyle: 'ref',
+    });
+
+    const params = paramsOf(doc, '/x', 'get');
+    expect(params[0]?.required).toBe(false);
+  });
+
+  it('still expands per-property under the default queryParamStyle ("expand")', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({ doc, inputSchemas: querySchema(['timeFrom']), outputSchemas: new Map() });
+
+    const params = paramsOf(doc, '/x', 'get');
+    expect(params.map((p) => p.name)).toEqual(['timeFrom', 'search']);
+  });
+
+  it('honors a per-marker `ref: true` override even when the global style is "expand"', () => {
+    const doc = docOf({
+      paths: { '/x': { get: { parameters: [{ ...markerParam('query', 'Q'), ref: true }] } } },
+      components: {
+        schemas: { Object: objectMarkerSchema(), Q: { type: 'object', properties: {} } },
+      },
+    });
+
+    expandParamMarkers({ doc, inputSchemas: querySchema(['timeFrom']), outputSchemas: new Map() });
+
+    const params = paramsOf(doc, '/x', 'get');
+    expect(params[0]?.schema).toEqual({ $ref: '#/components/schemas/Q' });
+    expect(params[0]?.style).toBe('form');
+  });
+
+  it('honors a per-marker `ref: false` override even when the global style is "ref"', () => {
+    const doc = docOf({
+      paths: { '/x': { get: { parameters: [{ ...markerParam('query', 'Q'), ref: false }] } } },
+      components: {
+        schemas: { Object: objectMarkerSchema(), Q: { type: 'object', properties: {} } },
+      },
+    });
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      queryParamStyle: 'ref',
+    });
+
+    const params = paramsOf(doc, '/x', 'get');
+    expect(params.map((p) => p.name)).toEqual(['timeFrom', 'search']);
+  });
+
+  it('never collapses non-query markers — path stays expanded under "ref"', () => {
+    const doc = docOf({
+      paths: { '/x/{id}': { get: { parameters: [markerParam('path', 'P')] } } },
+      components: {
+        schemas: { Object: objectMarkerSchema(), P: { type: 'object', properties: {} } },
+      },
+    });
+    const inputSchemas = new Map<string, unknown>([
+      ['P', { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }],
+    ]);
+
+    expandParamMarkers({ doc, inputSchemas, outputSchemas: new Map(), queryParamStyle: 'ref' });
+
+    const params = paramsOf(doc, '/x/{id}', 'get');
+    expect(params).toEqual([
+      { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+    ]);
+  });
+
+  it('falls back to expansion under "ref" when the DTO component is absent', () => {
+    // Defensive: `withRegistryExposure` should always emit the component, but
+    // if it is somehow missing the contract still ships (expanded) rather than
+    // dangling on a `$ref` to a non-existent schema.
+    const doc = docOf({
+      paths: { '/x': { get: { parameters: [markerParam('query', 'Missing')] } } },
+      components: { schemas: { Object: objectMarkerSchema() } },
+    });
+    const inputSchemas = new Map<string, unknown>([
+      ['Missing', { type: 'object', properties: { q: { type: 'string' } }, required: [] }],
+    ]);
+
+    expandParamMarkers({ doc, inputSchemas, outputSchemas: new Map(), queryParamStyle: 'ref' });
+
+    const params = paramsOf(doc, '/x', 'get');
+    expect(params).toEqual([
+      { name: 'q', in: 'query', required: false, schema: { type: 'string' } },
+    ]);
+  });
+
   it('is a no-op when there are no marker parameters', () => {
     const original = {
       '/static': {

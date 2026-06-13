@@ -186,6 +186,8 @@ The decorator set: `@ZodBody`, `@ZodQuery`, `@ZodHeaders`, `@ZodCookies`. All ar
 
 See [`docs/recipes/intersection-with-union.md`](docs/recipes/intersection-with-union.md) for the full pattern.
 
+Named query objects (both `@Query() dto` and `@ZodQuery`) expand to one parameter per field by default. Pass `applyZodNest(raw, { app, queryParamStyle: 'ref' })` — or `@ZodQuery(schema, { ref: true })` per handler — to instead emit a single schema-based query parameter that `$ref`s the shared component. Same wire format; see [`docs/swagger-integration.md → Query parameter style`](docs/swagger-integration.md#query-parameter-style).
+
 ### I/O suffix rules
 
 If a schema's input and output JSON Schemas are byte-equal (the common case), the OpenAPI doc emits a single `components.schemas[Id]`. If they differ (e.g. a `transform`, a `pipe`, an `.optional().default(x)` field), the doc emits two: `Id` for input, `IdOutput` for output. Response refs are rewritten to `IdOutput` automatically.
