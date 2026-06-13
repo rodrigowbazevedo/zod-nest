@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.11.0...v1.12.0) (2026-06-13)
+
+
+### Features
+
+* **document:** opt-in $ref (schema-based) query parameters ([#93](https://github.com/rodrigowbazevedo/zod-nest/issues/93)) ([25f9e93](https://github.com/rodrigowbazevedo/zod-nest/commit/25f9e937e5a37f7888a4211ddaaf957d3face5c0)), closes [#92](https://github.com/rodrigowbazevedo/zod-nest/issues/92)
+
 # [1.11.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.10.0...v1.11.0) (2026-06-01)
 
 
