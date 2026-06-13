@@ -424,6 +424,24 @@ describe('expandParamMarkers', () => {
     ]);
   });
 
+  it('falls back to expansion under "ref" when the doc has no components.schemas', () => {
+    const doc = docOf({
+      paths: { '/x': { get: { parameters: [markerParam('query', 'Q')] } } },
+      components: {}, // no `schemas` key at all
+    });
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema([]),
+      outputSchemas: new Map(),
+      queryParamStyle: 'ref',
+    });
+
+    // No component catalog → nothing to `$ref` → expands per property.
+    const params = paramsOf(doc, '/x', 'get');
+    expect(params.map((p) => p.name)).toEqual(['timeFrom', 'search']);
+  });
+
   it('falls back to expansion under "ref" when the DTO component is absent', () => {
     // Defensive: `withRegistryExposure` should always emit the component, but
     // if it is somehow missing the contract still ships (expanded) rather than
@@ -442,6 +460,30 @@ describe('expandParamMarkers', () => {
     expect(params).toEqual([
       { name: 'q', in: 'query', required: false, schema: { type: 'string' } },
     ]);
+  });
+
+  it('skips a marker whose `ref` is not a boolean (defensive)', () => {
+    const doc = docOf({
+      paths: {
+        '/x': { get: { parameters: [{ ...markerParam('query', 'Q'), ref: 'nope' }] } },
+      },
+      components: {
+        schemas: { Object: objectMarkerSchema(), Q: { type: 'object', properties: {} } },
+      },
+    });
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      queryParamStyle: 'ref',
+    });
+
+    // The malformed `ref` makes `readMarker` reject it, so the param is kept
+    // verbatim rather than expanded or collapsed.
+    const params = paramsOf(doc, '/x', 'get');
+    expect(params).toHaveLength(1);
+    expect(params[0]).toMatchObject({ __zodNestDto: true, ref: 'nope' });
   });
 
   it('is a no-op when there are no marker parameters', () => {

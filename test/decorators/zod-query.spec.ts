@@ -3,9 +3,10 @@ import 'reflect-metadata';
 import { Get } from '@nestjs/common';
 import { z } from 'zod';
 
+import { appendQueryMarker } from '../../src/decorators/internal/query-marker.js';
 import { ZodQuery } from '../../src/decorators/zod-query.decorator.js';
 import { ZodNestError } from '../../src/schema/errors.js';
-import { createRegistry } from '../../src/schema/registry.js';
+import { createRegistry, defaultRegistry } from '../../src/schema/registry.js';
 
 const API_PARAMETERS_KEY = 'swagger/apiParameters';
 
@@ -55,6 +56,20 @@ describe('@ZodQuery', () => {
 
     expect(apiParams(Controller.prototype.handler)).toHaveLength(1);
     expect(registry.ids()).toContain('RegisteredQuery');
+  });
+
+  it('defaults to defaultRegistry when no registry option is given', () => {
+    const schema = z.object({ q: z.string() }).meta({ id: 'ZodQueryDefaultRegistryProbe' });
+
+    class Controller {
+      @Get()
+      @ZodQuery(schema)
+      handler(): void {}
+    }
+
+    const [marker] = apiParams(Controller.prototype.handler);
+    expect(marker?.dtoId).toBe('ZodQueryDefaultRegistryProbe');
+    expect(defaultRegistry.ids()).toContain('ZodQueryDefaultRegistryProbe');
   });
 
   it('uses the explicit `id` option as the marker dtoId', () => {
@@ -180,5 +195,14 @@ describe('@ZodQuery', () => {
     expect(() => ZodQuery(z.object({ q: z.string() }), { registry, ref: true })).toThrow(
       /requires a named schema/,
     );
+  });
+
+  it('appendQueryMarker leaves the descriptor untouched when it has no function value', () => {
+    const decorator = appendQueryMarker('Probe', undefined);
+    const descriptor: TypedPropertyDescriptor<unknown> = { value: undefined };
+
+    const returned = decorator({}, 'handler', descriptor);
+
+    expect(returned).toBe(descriptor);
   });
 });
