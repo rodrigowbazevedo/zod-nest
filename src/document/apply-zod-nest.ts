@@ -3,6 +3,7 @@ import type { OpenAPIObject } from '@nestjs/swagger';
 import type { Override } from '../schema/override.js';
 import type { ZodNestRegistry } from '../schema/registry.js';
 import type { CollectedUsage } from './collect-usage.js';
+import type { QueryParamStyle } from './expand-param-markers.js';
 
 import { defaultRegistry } from '../schema/registry.js';
 import { bulkEmit } from './bulk-emit.js';
@@ -65,6 +66,20 @@ export interface ApplyZodNestOptions {
    * Set to `false` to emit `{}` for those instead.
    */
   strict?: boolean;
+  /**
+   * How named `@Query()` / `@ZodQuery` DTOs are represented in the document
+   * (default `'expand'`):
+   *
+   * - `'expand'` — one query parameter per top-level property of the DTO.
+   * - `'ref'` — a single schema-based query parameter referencing the DTO's
+   *   `components.schemas` entry (`style: 'form'`, `explode: true`). The wire
+   *   format is unchanged; only the spec representation collapses to the
+   *   shared component. Note: Swagger UI renders the two forms differently.
+   *
+   * Query-only — path / header / cookie DTOs always expand. A per-handler
+   * `@ZodQuery({ ref })` override takes precedence over this preference.
+   */
+  queryParamStyle?: QueryParamStyle;
 }
 
 /**
@@ -77,9 +92,11 @@ export interface ApplyZodNestOptions {
  *   keyed by the marker's `dtoId` (renaming as needed).
  * - Every `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` marker
  *   parameter is expanded into one parameter per top-level property of the
- *   DTO's schema (`expandParamMarkers`). The synthetic `components.schemas.Object`
- *   that `@nestjs/swagger` materialises for the marker placeholder is pruned
- *   when it has no remaining referrers.
+ *   DTO's schema (`expandParamMarkers`) — except `@Query()` DTOs under
+ *   `queryParamStyle: 'ref'` (or a `@ZodQuery({ ref: true })` override), which
+ *   collapse to a single `$ref` schema-based query parameter. The synthetic
+ *   `components.schemas.Object` that `@nestjs/swagger` materialises for the
+ *   marker placeholder is pruned when it has no remaining referrers.
  * - The I/O suffix truth table is applied — equal input/output bodies collapse
  *   to one `components.schemas[id]`; divergent bodies split as
  *   `id` (input) + `idOutput` (output), with response-side refs rewritten.
@@ -115,7 +132,7 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions): Ope
     collected: extended,
     collisions: registry.getCollisions(),
   });
-  expandParamMarkers({ doc, inputSchemas, outputSchemas });
+  expandParamMarkers({ doc, inputSchemas, outputSchemas, queryParamStyle: opts.queryParamStyle });
   rewriteRefs({ doc, renames, divergentOutputIds });
   stripMarkers(doc);
   assertNoDanglingRefs({ doc, collected: extended });

@@ -3,12 +3,14 @@ import 'reflect-metadata';
 import { Get } from '@nestjs/common';
 import { z } from 'zod';
 
+import { appendQueryMarker } from '../../src/decorators/internal/query-marker.js';
 import { ZodQuery } from '../../src/decorators/zod-query.decorator.js';
-import { createRegistry } from '../../src/schema/registry.js';
+import { ZodNestError } from '../../src/schema/errors.js';
+import { createRegistry, defaultRegistry } from '../../src/schema/registry.js';
 
 const API_PARAMETERS_KEY = 'swagger/apiParameters';
 
-interface ParamMeta {
+interface ParamMeta extends Record<string, unknown> {
   name: string;
   in: string;
   schema?: Record<string, unknown>;
@@ -22,7 +24,9 @@ const findByName = (handler: object, name: string): ParamMeta | undefined =>
   apiParams(handler).find((p) => p.in === 'query' && p.name === name);
 
 describe('@ZodQuery', () => {
-  it('expands each property into one @ApiQuery entry', () => {
+  // ─── Named schemas defer to the marker pass (expandParamMarkers) ─────────
+
+  it('emits a single deferred query marker for a named schema (no per-property expansion at decoration time)', () => {
     const registry = createRegistry();
     const schema = z
       .object({ q: z.string(), limit: z.number().optional() })
@@ -34,16 +38,120 @@ describe('@ZodQuery', () => {
       handler(): void {}
     }
 
-    expect(findByName(Controller.prototype.handler, 'q')).toBeDefined();
-    expect(findByName(Controller.prototype.handler, 'limit')).toBeDefined();
-    expect(findByName(Controller.prototype.handler, 'q')?.required).toBe(true);
-    expect(findByName(Controller.prototype.handler, 'limit')?.required).toBe(false);
+    const params = apiParams(Controller.prototype.handler);
+    expect(params).toEqual([
+      { name: 'QueryParams', in: 'query', __zodNestDto: true, dtoId: 'QueryParams', io: 'input' },
+    ]);
   });
 
-  it('uses $ref for property schemas that are named via .meta({ id })', () => {
+  it('registers the named root schema so it lands in components.schemas', () => {
+    const registry = createRegistry();
+    const schema = z.object({ q: z.string() }).meta({ id: 'RegisteredQuery' });
+
+    class Controller {
+      @Get()
+      @ZodQuery(schema, { registry })
+      handler(): void {}
+    }
+
+    expect(apiParams(Controller.prototype.handler)).toHaveLength(1);
+    expect(registry.ids()).toContain('RegisteredQuery');
+  });
+
+  it('defaults to defaultRegistry when no registry option is given', () => {
+    const schema = z.object({ q: z.string() }).meta({ id: 'ZodQueryDefaultRegistryProbe' });
+
+    class Controller {
+      @Get()
+      @ZodQuery(schema)
+      handler(): void {}
+    }
+
+    const [marker] = apiParams(Controller.prototype.handler);
+    expect(marker?.dtoId).toBe('ZodQueryDefaultRegistryProbe');
+    expect(defaultRegistry.ids()).toContain('ZodQueryDefaultRegistryProbe');
+  });
+
+  it('uses the explicit `id` option as the marker dtoId', () => {
+    const registry = createRegistry();
+    const schema = z.object({ q: z.string() });
+
+    class Controller {
+      @Get()
+      @ZodQuery(schema, { registry, id: 'ForcedId' })
+      handler(): void {}
+    }
+
+    const [marker] = apiParams(Controller.prototype.handler);
+    expect(marker?.dtoId).toBe('ForcedId');
+    expect(marker?.__zodNestDto).toBe(true);
+  });
+
+  it('carries `ref: true` on the marker when requested', () => {
+    const registry = createRegistry();
+    const schema = z.object({ q: z.string() }).meta({ id: 'RefTrueQuery' });
+
+    class Controller {
+      @Get()
+      @ZodQuery(schema, { registry, ref: true })
+      handler(): void {}
+    }
+
+    const [marker] = apiParams(Controller.prototype.handler);
+    expect(marker?.ref).toBe(true);
+  });
+
+  it('carries `ref: false` on the marker when forced to expand', () => {
+    const registry = createRegistry();
+    const schema = z.object({ q: z.string() }).meta({ id: 'RefFalseQuery' });
+
+    class Controller {
+      @Get()
+      @ZodQuery(schema, { registry, ref: false })
+      handler(): void {}
+    }
+
+    const [marker] = apiParams(Controller.prototype.handler);
+    expect(marker?.ref).toBe(false);
+  });
+
+  it('omits `ref` from the marker when unset (follows the global preference)', () => {
+    const registry = createRegistry();
+    const schema = z.object({ q: z.string() }).meta({ id: 'NoRefQuery' });
+
+    class Controller {
+      @Get()
+      @ZodQuery(schema, { registry })
+      handler(): void {}
+    }
+
+    const [marker] = apiParams(Controller.prototype.handler);
+    expect(marker).not.toHaveProperty('ref');
+  });
+
+  // ─── Anonymous schemas expand per-property at decoration time ────────────
+
+  it('expands each property into one @ApiQuery entry for an anonymous schema', () => {
+    const registry = createRegistry();
+    const schema = z.object({ q: z.string(), limit: z.number().optional() });
+
+    class Controller {
+      @Get()
+      @ZodQuery(schema, { registry })
+      handler(): void {}
+    }
+
+    expect(findByName(Controller.prototype.handler, 'q')?.required).toBe(true);
+    expect(findByName(Controller.prototype.handler, 'limit')?.required).toBe(false);
+    expect(apiParams(Controller.prototype.handler).some((p) => p.__zodNestDto === true)).toBe(
+      false,
+    );
+  });
+
+  it('uses $ref for named property schemas of an anonymous root', () => {
     const registry = createRegistry();
     const statusSchema = z.enum(['open', 'closed']).meta({ id: 'Status' });
-    const schema = z.object({ status: statusSchema }).meta({ id: 'StatusQuery' });
+    const schema = z.object({ status: statusSchema });
 
     class Controller {
       @Get()
@@ -54,26 +162,12 @@ describe('@ZodQuery', () => {
     expect(findByName(Controller.prototype.handler, 'status')?.schema).toEqual({
       $ref: '#/components/schemas/Status',
     });
-    expect(registry.ids()).toEqual(expect.arrayContaining(['StatusQuery', 'Status']));
+    expect(registry.ids()).toContain('Status');
   });
 
-  it('inlines anonymous property schemas', () => {
+  it('treats default-wrapped properties as optional (anonymous root)', () => {
     const registry = createRegistry();
-    const schema = z.object({ q: z.string() }).meta({ id: 'AnonProp' });
-
-    class Controller {
-      @Get()
-      @ZodQuery(schema, { registry })
-      handler(): void {}
-    }
-
-    const param = findByName(Controller.prototype.handler, 'q');
-    expect(param?.schema).toEqual({ type: 'string' });
-  });
-
-  it('treats default-wrapped properties as optional', () => {
-    const registry = createRegistry();
-    const schema = z.object({ limit: z.number().default(10) }).meta({ id: 'DefaultPropQuery' });
+    const schema = z.object({ limit: z.number().default(10) });
 
     class Controller {
       @Get()
@@ -84,10 +178,31 @@ describe('@ZodQuery', () => {
     expect(findByName(Controller.prototype.handler, 'limit')?.required).toBe(false);
   });
 
+  // ─── Guards ──────────────────────────────────────────────────────────────
+
   it('throws ZodNestError when the schema is not z.object', () => {
     const registry = createRegistry();
     expect(() => ZodQuery(z.string(), { registry })).toThrow(
       /requires a `z.object\(\{\.\.\.\}\)` schema/,
     );
+  });
+
+  it('throws ZodNestError for `ref: true` on an anonymous schema (no component to $ref)', () => {
+    const registry = createRegistry();
+    expect(() => ZodQuery(z.object({ q: z.string() }), { registry, ref: true })).toThrow(
+      ZodNestError,
+    );
+    expect(() => ZodQuery(z.object({ q: z.string() }), { registry, ref: true })).toThrow(
+      /requires a named schema/,
+    );
+  });
+
+  it('appendQueryMarker leaves the descriptor untouched when it has no function value', () => {
+    const decorator = appendQueryMarker('Probe', undefined);
+    const descriptor: TypedPropertyDescriptor<unknown> = { value: undefined };
+
+    const returned = decorator({}, 'handler', descriptor);
+
+    expect(returned).toBe(descriptor);
   });
 });

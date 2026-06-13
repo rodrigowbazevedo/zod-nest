@@ -33,6 +33,44 @@ class TemplatesController {
 
 The emitted operation has four parameters — `limit`, `cursor`, `search`, `sortBy` — each with its own `required` and `description`. The `TemplatesQuery` schema is still emitted under `components.schemas` (it might be referenced by `@Body()` elsewhere); the expansion is purely additive at the operation level.
 
+## Schema-based query parameters (`queryParamStyle: 'ref'`)
+
+The expansion above duplicates each field inline even though `TemplatesQuery` already lives in `components.schemas`. Opt into the **schema-based** form to collapse the whole query object to a single parameter that references the shared component — no controller change needed, just one flag on `applyZodNest`:
+
+```ts
+const doc = applyZodNest(SwaggerModule.createDocument(app, config), {
+  app,
+  queryParamStyle: 'ref',
+});
+```
+
+The `@Query() q: TemplatesQueryDto` operation now emits one parameter instead of four:
+
+```yaml
+parameters:
+  - in: query
+    name: TemplatesQuery
+    required: false # no required fields on this schema → optional container
+    style: form
+    explode: true
+    schema:
+      $ref: '#/components/schemas/TemplatesQuery'
+```
+
+`style: form` + `explode: true` is the OpenAPI serialization that makes this wire-identical to the expanded form (`?limit=20&search=foo`), so clients and `ZodValidationPipe` behave exactly the same — only the document representation changes. Note Swagger UI renders a schema-based query parameter as a single combined input rather than one input per field, which is why this is opt-in.
+
+To flip a single endpoint without changing the global default, use `@ZodQuery` with its `ref` option (it overrides `queryParamStyle`):
+
+```ts
+@Get()
+@ZodQuery(TemplatesQuery, { ref: true })
+list(@Query(new ZodValidationPipe(TemplatesQuery)) q: z.infer<typeof TemplatesQuery>): unknown {
+  return q;
+}
+```
+
+Ref mode is **query-only** and needs a named schema. `@Param()` / `@Headers()` / `@Cookie()` DTOs always expand; an anonymous `@ZodQuery` always expands too (and `@ZodQuery({ ref: true })` on an anonymous schema throws). See [`swagger-integration.md → Query parameter style`](../swagger-integration.md#query-parameter-style) for the full reference.
+
 ## `@Param()` — typed path parameters
 
 ```ts
