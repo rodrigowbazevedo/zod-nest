@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.0.0...v2.0.1) (2026-06-14)
+
+
+### Bug Fixes
+
+* **schema:** emit `type: object` on composition allOf wrappers ([#96](https://github.com/rodrigowbazevedo/zod-nest/issues/96)) ([d864ad7](https://github.com/rodrigowbazevedo/zod-nest/commit/d864ad734ee61826b0d664812101e036e2e1da90))
+
 # [2.0.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.12.0...v2.0.0) (2026-06-14)
 
 
