@@ -133,6 +133,13 @@ describe('OpenAPI 3.1 conformance', () => {
 
     const { app, doc } = await bootstrap([AdminsController]);
     try {
+      // The composed schema carries an explicit `type: 'object'` alongside
+      // `allOf` (the more correct / tool-friendly emission) — assert that exact
+      // shape AND that the resulting document still passes OpenAPI 3.1 validation.
+      const admin = doc.components?.schemas?.['ConformAdmin'] as Record<string, unknown>;
+      expect(admin.type).toBe('object');
+      expect(admin.allOf).toBeDefined();
+      expect(admin.unevaluatedProperties).toBe(false);
       await expect(validate(doc)).resolves.toBeDefined();
     } finally {
       await app.close();

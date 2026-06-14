@@ -33,6 +33,7 @@ describe('composition snapshot — Base → Child → GrandChild chain', () => {
     expect(inputSchemas.get('Snap_Child')).toEqual({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       $id: '#/components/schemas/Snap_Child',
+      type: 'object',
       allOf: [
         { $ref: '#/components/schemas/Snap_Base' },
         {
@@ -47,6 +48,7 @@ describe('composition snapshot — Base → Child → GrandChild chain', () => {
     expect(inputSchemas.get('Snap_GrandChild')).toEqual({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       $id: '#/components/schemas/Snap_GrandChild',
+      type: 'object',
       allOf: [
         { $ref: '#/components/schemas/Snap_Child' },
         {
