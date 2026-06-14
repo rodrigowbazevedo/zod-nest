@@ -12,6 +12,7 @@ import { expandParamMarkers } from './expand-param-markers.js';
 import { extendExposureViaRefs } from './expose-closure.js';
 import { inlineAnonymousBodies } from './inline-anon.js';
 import { mergeSchemas } from './merge-schemas.js';
+import { applyRefTitles } from './ref-titles.js';
 import { rewriteRefs } from './rewrite-refs.js';
 import { stripMarkers } from './strip-markers.js';
 
@@ -66,6 +67,18 @@ export interface ApplyZodNestOptions {
    * `@ZodQuery({ ref })` override takes precedence over this preference.
    */
   queryParamStyle?: QueryParamStyle;
+  /**
+   * Copy each named component's `title` (when set via `.meta({ title })`) onto
+   * every `$ref` that targets it, as a sibling: `{ $ref, title }` (default
+   * `true`).
+   *
+   * OpenAPI 3.1 allows siblings next to `$ref`, and Swagger UI's 3.1 renderer
+   * inlines referenced schemas without showing their component name
+   * (swagger-api/swagger-ui#9540); the sibling `title` gives the renderer (and
+   * other 3.1-aware tools) a name to display. The annotation is semantically
+   * inert. Set `false` to emit bare `$ref`s.
+   */
+  refTitles?: boolean;
 }
 
 /**
@@ -92,6 +105,9 @@ export interface ApplyZodNestOptions {
  *   transitive `$ref` deps, plus any `{ expose: true }` opt-ins) are kept —
  *   unreferenced registered schemas are pruned. Exposure is document-scoped, so
  *   several documents sharing one registry each carry only what they use.
+ * - Each named component's `title` is copied onto every `$ref` that targets it
+ *   as a `{ $ref, title }` sibling (`applyRefTitles`, unless `refTitles: false`)
+ *   so Swagger UI's 3.1 renderer surfaces the component name. Inert annotation.
  * - Every `$ref` whose target is missing throws `ZodNestDocumentError(DANGLING_REF)`.
  * - `doc.openapi` is set to `'3.1.0'` — zod-nest emits OpenAPI 3.1 only; this
  *   guarantees the version string matches the emitted body regardless of the
@@ -124,6 +140,9 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {})
   rewriteRefs({ doc, renames, divergentOutputIds });
   stripMarkers(doc);
   inlineAnonymousBodies({ doc, registry });
+  if (opts.refTitles !== false) {
+    applyRefTitles(doc);
+  }
   assertNoDanglingRefs({ doc, collected: extended });
   doc.openapi = OPENAPI_VERSION;
 
