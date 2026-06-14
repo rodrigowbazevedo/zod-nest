@@ -98,6 +98,27 @@ describe('mergeSchemas — suffix truth table', () => {
     expect([...result.divergentOutputIds]).toEqual(['Person']);
   });
 
+  it('both-exposed but one side has no emitted body → not byte-equal, writes the present side', () => {
+    const doc = emptyDoc();
+    const result = mergeSchemas({
+      doc,
+      // `Half` is exposed on both sides, but only the output body was emitted —
+      // the input body is `undefined`, so canonical equality short-circuits to
+      // "not equal" and only the defined side is written.
+      inputSchemas: new Map(),
+      outputSchemas: new Map([['Half', { type: 'object', required: ['name'] }]]),
+      collected: usage({
+        inputExposedIds: new Set(['Half']),
+        outputExposedIds: new Set(['Half']),
+      }),
+      collisions: NO_COLLISIONS,
+    });
+
+    expect(schemasOf(doc).Half).toBeUndefined();
+    expect(schemasOf(doc).HalfOutput).toEqual({ type: 'object', required: ['name'] });
+    expect([...result.divergentOutputIds]).toEqual(['Half']);
+  });
+
   it('canonical equality treats key-reordered objects as equal', () => {
     const doc = emptyDoc();
     mergeSchemas({
