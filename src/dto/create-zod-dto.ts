@@ -45,13 +45,13 @@ export const createZodDto = <TSchema extends z.ZodType>(
     // `registerSchema` resolves explicit id → `.meta({ id })`. When both miss,
     // fall back to the DTO-specific className → anonymous-counter chain
     // (with one-time minification warning).
-    const named = registerSchema(schema, registry, { id: options?.id });
+    const named = registerSchema(schema, registry, { id: options?.id, expose: options?.expose });
     if (named !== undefined) {
       cachedId = named;
       return cachedId;
     }
     cachedId = resolveFallbackId(className);
-    registry.register(schema, cachedId);
+    registry.register(schema, cachedId, { expose: options?.expose });
     return cachedId;
   };
 

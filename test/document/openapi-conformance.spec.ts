@@ -36,7 +36,7 @@ const bootstrap = async (
     .setOpenAPIVersion('3.1.0')
     .build();
   const raw = SwaggerModule.createDocument(app, config);
-  const doc = applyZodNest(raw, { app });
+  const doc = applyZodNest(raw);
   return { app, doc };
 };
 

@@ -1,13 +1,7 @@
-import { DiscoveryService } from '@nestjs/core';
-
-import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
-import type { ResponseVariant } from '../response/metadata.js';
 import type { ZodNestRegistry } from '../schema/registry.js';
 
 import { isZodDtoMarker } from '../dto/marker.js';
-import { isZodDto } from '../dto/predicates.js';
-import { getResponseVariants } from '../response/metadata.js';
 import { COMPONENTS_SCHEMAS_PREFIX, ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
 import { HTTP_METHODS } from './http-methods.js';
 import { walkRefs } from './walk-refs.js';
@@ -26,21 +20,18 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * Pre-pass over an `applyZodNest` input. Walks the already-built OpenAPI doc
- * for input-side ids (reliable — `@nestjs/swagger` materializes
- * `requestBody`/`parameters` schemas with `$ref`s back to `components.schemas`
- * entries) and walks the NestJS app's controller graph via `DiscoveryService`
- * for output-side ids (`@nestjs/swagger` is currently anemic on response
- * shapes — the source of truth lives in `@ZodResponse` metadata).
+ * for both input-side ids (`requestBody` / `parameters` `$ref`s, plus query /
+ * param marker placeholders) and output-side ids (`responses.*.content.*`
+ * `$ref`s — `@ZodResponse`'s swagger bridge emits these via `@ApiResponse`, so
+ * the document is the source of truth). Walking the document keeps exposure
+ * scoped to the endpoints in *this* document — important when several Swagger
+ * documents share one registry.
  */
-export const collectUsage = (
-  doc: OpenAPIObject,
-  app: INestApplication,
-  registry: ZodNestRegistry,
-): CollectedUsage => {
+export const collectUsage = (doc: OpenAPIObject, registry: ZodNestRegistry): CollectedUsage => {
   const classToDtoId = buildClassToDtoIdMap(doc);
   const knownIds = new Set(registry.ids());
   const inputExposedIds = collectInputExposedIds(doc, classToDtoId, knownIds);
-  const outputExposedIds = collectOutputExposedIds(app);
+  const outputExposedIds = collectOutputExposedIds(doc, classToDtoId, knownIds);
   return { inputExposedIds, outputExposedIds, classToDtoId };
 };
 
@@ -186,51 +177,37 @@ const collectRefFromSchema = (
   });
 };
 
-const collectOutputExposedIds = (app: INestApplication): Set<string> => {
+const collectOutputExposedIds = (
+  doc: OpenAPIObject,
+  classToDtoId: ReadonlyMap<string, string>,
+  knownIds: ReadonlySet<string>,
+): Set<string> => {
   const ids = new Set<string>();
-  const discovery = app.get(DiscoveryService);
-  for (const wrapper of discovery.getControllers()) {
-    const instance = wrapper.instance as object | null | undefined;
-    if (instance === null || instance === undefined) {
+  const paths = doc.paths ?? {};
+  for (const pathItem of Object.values(paths)) {
+    if (!isPlainRecord(pathItem)) {
       continue;
     }
-    // `Object.getPrototypeOf(instance)` only returns null when called on a
-    // null-prototype object (`Object.create(null)`). NestJS controllers are
-    // always class instances, so the prototype is always a real object.
-    const proto = Object.getPrototypeOf(instance) as Record<string, unknown>;
-    for (const methodName of Object.getOwnPropertyNames(proto)) {
-      if (methodName === 'constructor') {
-        continue;
-      }
-      const handler = proto[methodName];
-      if (typeof handler !== 'function') {
-        continue;
-      }
-      const variants = getResponseVariants(handler);
-      if (variants === undefined) {
-        continue;
-      }
-      for (const variant of variants) {
-        addVariantDtoIds(variant, ids);
-      }
+    for (const operation of operationsOf(pathItem)) {
+      collectRefsFromResponses(operation.responses, classToDtoId, knownIds, ids);
     }
   }
   return ids;
 };
 
-const addVariantDtoIds = (variant: ResponseVariant, ids: Set<string>): void => {
-  if (variant.kind === 'single') {
-    if (isZodDto(variant.dto)) {
-      ids.add(variant.dto.id);
-    }
+const collectRefsFromResponses = (
+  responses: unknown,
+  classToDtoId: ReadonlyMap<string, string>,
+  knownIds: ReadonlySet<string>,
+  ids: Set<string>,
+): void => {
+  if (!isPlainRecord(responses)) {
     return;
   }
-  if (!Array.isArray(variant.dto)) {
-    return;
-  }
-  for (const dto of variant.dto) {
-    if (isZodDto(dto)) {
-      ids.add(dto.id);
+  for (const response of Object.values(responses)) {
+    if (!isPlainRecord(response)) {
+      continue;
     }
+    collectRefsFromContent(response.content, classToDtoId, knownIds, ids);
   }
 };

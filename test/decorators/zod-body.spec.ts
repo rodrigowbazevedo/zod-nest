@@ -44,7 +44,7 @@ describe('@ZodBody', () => {
     expect(registry.ids()).toContain('ZodBody_RefMode');
   });
 
-  it('emits an inline body when the schema is anonymous', () => {
+  it('emits a synthetic anonymous $ref when the schema is anonymous (applyZodNest inlines it)', () => {
     const registry = createRegistry();
     const schema = z.intersection(
       z.union([z.object({ a: z.string() }), z.object({ b: z.string() })]),
@@ -59,9 +59,11 @@ describe('@ZodBody', () => {
 
     const body = findBody(Controller.prototype.handler);
     expect(body).toBeDefined();
-    expect(body?.schema?.$ref).toBeUndefined();
-    expect(typeof body?.schema).toBe('object');
-    expect(registry.ids()).toHaveLength(0);
+    // Anonymous bodies register under a synthetic `anonymous` id and reference
+    // it by $ref; `applyZodNest`'s `inlineAnonymousBodies` pass emits the body
+    // (under the doc's strict/override), inlines it, and prunes the component.
+    expect(body?.schema?.$ref).toMatch(/^#\/components\/schemas\/_AnonBodySchema_\d+$/);
+    expect(registry.anonymousIds()).toHaveLength(1);
   });
 
   it('honors `id` option, overriding any .meta({ id })', () => {
@@ -142,12 +144,12 @@ describe('@ZodBody', () => {
     });
   });
 
-  it('registers named children of an anonymous root so nested $refs resolve', () => {
-    // Inline-mode path with a named descendant: the root has no id (so the
-    // body is inlined into the operation), but a child has `.meta({ id })`
-    // and gets registered into the registry. Without that walk,
-    // `applyZodNest`'s bulk-emit would skip the child and the inlined body's
-    // nested $ref would dangle.
+  it('registers an anonymous root and its named children so nested $refs resolve', () => {
+    // The root has no id, so it's registered under a synthetic `anonymous` id
+    // and referenced by $ref. Its named child has `.meta({ id })` and is
+    // registered too (via descendant discovery), so the body bulk-emit writes
+    // for the synthetic root keeps a resolvable $ref to the child — which
+    // survives into the inlined body `applyZodNest` produces.
     const registry = createRegistry();
     const NamedChild = z.object({ value: z.string() }).meta({ id: 'ZodBody_NamedChild' });
     const anonymousRoot = z.object({ child: NamedChild });
@@ -159,10 +161,9 @@ describe('@ZodBody', () => {
     }
 
     expect(registry.ids()).toContain('ZodBody_NamedChild');
+    expect(registry.anonymousIds()).toHaveLength(1);
     const body = findBody(Controller.prototype.handler);
-    expect(body?.schema?.$ref).toBeUndefined();
-    const props = body?.schema?.properties as Record<string, { $ref?: string }> | undefined;
-    expect(props?.['child']?.$ref).toBe('#/components/schemas/ZodBody_NamedChild');
+    expect(body?.schema?.$ref).toMatch(/^#\/components\/schemas\/_AnonBodySchema_\d+$/);
   });
 
   describe('flatten: true', () => {
@@ -331,7 +332,7 @@ describe('@ZodBody', () => {
       );
     });
 
-    it('is a no-op for a bare z.object (emits the same body as without flatten)', () => {
+    it('bare z.object: flatten emits the inline body; default defers a synthetic $ref (converged by applyZodNest)', () => {
       const registry = createRegistry();
       const schema = z.object({ q: z.string(), n: z.number() });
 
@@ -347,7 +348,16 @@ describe('@ZodBody', () => {
 
       const flat = findBody(Controller.prototype.flatHandler);
       const plain = findBody(Controller.prototype.plainHandler);
-      expect(flat?.schema).toEqual(plain?.schema);
+      // flatten short-circuits to the inline flat body (Swagger-UI friendly).
+      expect(flat?.schema?.type).toBe('object');
+      expect(Object.keys(flat?.schema?.properties as Record<string, unknown>).sort()).toEqual([
+        'n',
+        'q',
+      ]);
+      // The default path defers to a synthetic anonymous $ref; `applyZodNest`
+      // inlines it back to an equivalent flat body (see the swagger-smoke
+      // end-to-end suite), so the two converge in the final document.
+      expect(plain?.schema?.$ref).toMatch(/^#\/components\/schemas\/_AnonBodySchema_\d+$/);
     });
 
     it('throws when an intersection has a non-object LEFT arm', () => {

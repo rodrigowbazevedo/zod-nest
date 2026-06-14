@@ -56,6 +56,16 @@ Step 4 is the minification trap — class names become single-character identifi
 
 **When `options.id` and `schema.meta.id` both exist, `options.id` wins.** This is by design: a caller passing an explicit id is making a deliberate per-DTO override decision.
 
+### Exposing a schema that no endpoint references
+
+`applyZodNest` is reachability-scoped: a registered schema only lands in `components.schemas` when an endpoint in that document references it (directly or transitively). To force a schema into the document even when nothing references it — for out-of-band client codegen, say — pass `{ expose: true }`:
+
+```ts
+class WebhookEvent extends createZodDto(webhookEventSchema, { id: 'WebhookEvent', expose: true }) {}
+```
+
+`expose` is also available on `registerSchema(schema, registry, { id, expose: true })`. Its transitive `$ref` dependencies are exposed alongside it. The flag is sticky — once set for an id it stays set.
+
 ### Registering without `createZodDto`
 
 `registerSchema(schema, registry?, options?)` is the standalone version of steps 1–2 above — it resolves a schema's id from `options.id` (if provided) then `.meta({ id })`, and registers it with the given registry (defaults to `defaultRegistry`). `createZodDto` itself routes through this helper.

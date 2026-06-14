@@ -7,7 +7,7 @@ This guide is for projects on the public [`nestjs-zod`](https://github.com/BenLo
 ## TL;DR — 5 bullets
 
 1. **Bump Zod to v4** (`zod@^4`). `zod-nest` is v4-only.
-2. **Replace `cleanupOpenApiDoc(SwaggerModule.createDocument(...))` with `applyZodNest(SwaggerModule.createDocument(...), { app })`.** One call, mutates the doc, returns it.
+2. **Replace `cleanupOpenApiDoc(SwaggerModule.createDocument(...))` with `applyZodNest(SwaggerModule.createDocument(...))`.** One call, mutates the doc, returns it.
 3. **`@ZodResponse` keeps the same name and call shape** — only the import source changes. New superpowers: it stacks per status code, and it no longer applies `@HttpCode` internally.
 4. **If you used `@ZodResponse({ status: X })` to also set the HTTP status, add an explicit `@HttpCode(X)`.** `nestjs-zod`'s `@ZodResponse` was a composite that called `@HttpCode` for you; `zod-nest`'s doesn't.
 5. **DTO discriminator changed** — `Symbol.for('zod-nest.dto')` instead of `MyDto.isZodDto`. Check any reflection-based code.
@@ -37,7 +37,7 @@ Peer dependencies (`@nestjs/common`, `@nestjs/core`, `@nestjs/swagger`, `rxjs`, 
 | Concern                                              | `nestjs-zod`                                                                                    | `zod-nest`                                                                                                                                                  |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Zod version                                          | v3 + v4                                                                                         | v4 only                                                                                                                                                     |
-| Doc entry point                                      | `cleanupOpenApiDoc(SwaggerModule.createDocument(...))`                                          | `applyZodNest(rawDoc, { app })` (mutates + returns)                                                                                                         |
+| Doc entry point                                      | `cleanupOpenApiDoc(SwaggerModule.createDocument(...))`                                          | `applyZodNest(rawDoc)` (mutates + returns)                                                                                                         |
 | Single-status response                               | `@ZodResponse({ type: Dto })` (composite of `@ZodSerializerDto` + `@ApiResponse` + `@HttpCode`) | `@ZodResponse({ type: Dto })` (composite of variant registration + `@ApiResponse`; **no internal `@HttpCode`** — caller controls status via `@HttpCode(n)`) |
 | Older single-status pattern                          | `@ZodSerializerDto(Dto) + @ApiOkResponse({ type: Dto })`                                        | `@ZodResponse({ type: Dto })`                                                                                                                               |
 | Multi-status responses                               | not stackable (`@ZodResponse` validates type-consistency at decoration time)                    | stack `@ZodResponse` calls; status inferred for the default variant                                                                                         |
@@ -114,11 +114,11 @@ If your codebase still uses Zod v3 APIs, work through Zod's own [v3-to-v4 migrat
 ```diff
   const raw = SwaggerModule.createDocument(app, config);
 - const doc = cleanupOpenApiDoc(raw, { version: '3.1' });
-+ const doc = applyZodNest(raw, { app });
++ const doc = applyZodNest(raw);
   SwaggerModule.setup('docs', app, doc);
 ```
 
-`applyZodNest` always emits OpenAPI 3.1 — there's no version flag. The `{ app }` argument is required (used to walk controllers via `DiscoveryService` for output-side DTO discovery).
+`applyZodNest` always emits OpenAPI 3.1 — there's no version flag. It takes no required arguments — `applyZodNest(doc)` is the whole call. (zod-nest v1 required an `{ app }` argument; v2 removed it — output-side DTO usage is now read from the document's `responses`.)
 
 If you served OpenAPI 3.0 from `nestjs-zod`, you'll need a downgrade pass _after_ `applyZodNest`. There are good standalone tools (e.g. `openapi-down-convert`) for this.
 
@@ -325,7 +325,7 @@ class UsersController {
 
 // main.ts
 const raw = SwaggerModule.createDocument(app, config);
-const doc = applyZodNest(raw, { app });
+const doc = applyZodNest(raw);
 SwaggerModule.setup('docs', app, doc);
 ```
 
@@ -355,7 +355,7 @@ A schema whose `z.infer<>` is a TS union can't be a class base, so `class Dto ex
 `applyZodNest` validates the final `$ref` graph. A dangling ref means a DTO is referenced from the doc but the registry doesn't know about it — typically a typo'd `.meta({ id })`, two `ZodNestRegistry` instances being used in the same app, or a user-supplied pre-pass that injected a ref to a non-existent component. The error message lists every offending ref with a hint from the collected-usage table. Schemas used only as `extend()` parents auto-register since 1.6 (`extend()` calls `registerSchema` on parent + result); for other named-but-DTO-less references, register the schema directly with `registerSchema(schema)` or wrap it in `createZodDto`.
 
 **"After migration, my `@Query()` DTOs emit a single bogus `x-zod-nest-dto` parameter instead of one parameter per field."**
-You're seeing the unprocessed marker from `@nestjs/swagger`'s `_OPENAPI_METADATA_FACTORY` explosion. `applyZodNest` has to run on the doc to split it into per-field parameters — confirm Step 4 wired `applyZodNest(rawDoc, { app })` between `SwaggerModule.createDocument(...)` and `SwaggerModule.setup(...)`. The expansion is symmetric with `nestjs-zod`'s `cleanupOpenApiDoc` (same field-per-parameter output) and covers `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` uniformly. See [`docs/recipes/query-param-dtos.md`](docs/recipes/query-param-dtos.md).
+You're seeing the unprocessed marker from `@nestjs/swagger`'s `_OPENAPI_METADATA_FACTORY` explosion. `applyZodNest` has to run on the doc to split it into per-field parameters — confirm Step 4 wired `applyZodNest(rawDoc)` between `SwaggerModule.createDocument(...)` and `SwaggerModule.setup(...)`. The expansion is symmetric with `nestjs-zod`'s `cleanupOpenApiDoc` (same field-per-parameter output) and covers `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` uniformly. See [`docs/recipes/query-param-dtos.md`](docs/recipes/query-param-dtos.md).
 
 **"I get `ZodNestDocumentError: UNEXPANDABLE_PARAM_DTO` at boot."**
 A `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` argument is bound to a `createZodDto` whose underlying schema isn't an object — typically `createZodDto(z.array(...))` or `createZodDto(z.union(...))`. The expansion has no top-level `properties` record to walk, so it bails out. Use `@Body()` for non-object DTOs, or restructure the schema as an object whose fields become the parameters. See [`docs/swagger-integration.md → UNEXPANDABLE_PARAM_DTO`](docs/swagger-integration.md#unexpandable_param_dto).

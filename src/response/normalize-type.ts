@@ -3,7 +3,8 @@ import type { ZodDto } from '../dto/dto.types.js';
 
 import { createZodDto } from '../dto/create-zod-dto.js';
 import { isZodDto, isZodSchema } from '../dto/predicates.js';
-import { registerSchema } from '../schema/registry.js';
+import { ANON_RESPONSE_PREFIX, resolveAnonId } from '../schema/anon-id.js';
+import { defaultRegistry, registerSchema } from '../schema/registry.js';
 
 /**
  * Cache of `raw schema -> output DTO` so the same schema instance reused across
@@ -13,22 +14,6 @@ import { registerSchema } from '../schema/registry.js';
  * `outputCache` pattern in `src/dto/output-dto.ts`.
  */
 const responseDtoCache = new WeakMap<z.ZodType, ZodDto>();
-
-let anonResponseSchemaCounter = 0;
-let warnedOnAnonymousResponseSchema = false;
-
-const warnAnonymousOnce = (fallbackId: string): void => {
-  if (warnedOnAnonymousResponseSchema) {
-    return;
-  }
-  warnedOnAnonymousResponseSchema = true;
-  // eslint-disable-next-line no-console
-  console.warn(
-    `[zod-nest] @ZodResponse received a raw Zod schema with no \`.meta({ id })\`. ` +
-      `It will appear in components.schemas as "${fallbackId}". Add ` +
-      `\`schema.meta({ id: 'Foo' })\` to control the OpenAPI component name.`,
-  );
-};
 
 const schemaToOutputDto = (schema: z.ZodType): ZodDto => {
   const cached = responseDtoCache.get(schema);
@@ -43,17 +28,20 @@ const schemaToOutputDto = (schema: z.ZodType): ZodDto => {
   // `createZodDto`'s anonymous-id fallback keys off the class name, which here
   // is the shared base "ZodDtoBase" — so an unnamed schema would not get a
   // unique id. Resolve the id ourselves: `.meta({ id })` when present, else a
-  // generated unique anonymous id passed explicitly.
+  // generated synthetic id registered as `anonymous`.
   const namedId = registerSchema(schema);
   if (namedId !== undefined) {
     const dto = createZodDto(schema).Output;
     responseDtoCache.set(schema, dto);
     return dto;
   }
-  anonResponseSchemaCounter += 1;
-  const fallbackId = `_AnonZodResponseSchema_${anonResponseSchemaCounter}`;
-  warnAnonymousOnce(fallbackId);
-  const dto = createZodDto(schema, { id: fallbackId }).Output;
+  // No resolvable id: register a synthetic anonymous id so the body is emitted
+  // (under the document's `strict` / `override`) and referenced by `$ref`.
+  // `applyZodNest`'s `inlineAnonymousBodies` pass inlines that body into the
+  // response and prunes the synthetic component, so it never reaches the doc.
+  const anonId = resolveAnonId(schema, ANON_RESPONSE_PREFIX);
+  registerSchema(schema, defaultRegistry, { id: anonId, anonymous: true });
+  const dto = createZodDto(schema, { id: anonId }).Output;
   responseDtoCache.set(schema, dto);
   return dto;
 };

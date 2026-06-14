@@ -130,7 +130,7 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
   beforeAll(async () => {
     const result = await bootstrap([CasesController]);
     app = result.app;
-    doc = applyZodNest(result.raw, { app, registry });
+    doc = applyZodNest(result.raw, { registry });
   });
 
   afterAll(async () => {
@@ -182,16 +182,22 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     expect(trace?.required).toBe(false);
   });
 
-  it('exposes named root query/headers schemas in components.schemas via registration', () => {
-    // The root object schemas for @ZodQuery / @ZodHeaders are registered with
-    // their ids by the decorator. Per the "every registered id is exposed"
-    // rule in applyZodNest, they land in `components.schemas` even though
-    // the operation expands them into per-property params (so no $ref points
-    // at the root in the doc). Naming the schema via `.meta({ id })` is the
-    // trigger — anonymous roots stay invisible.
+  it('exposes the named @ZodQuery root (via its doc marker) even when expanded inline', () => {
+    // Exposure is now reachability-scoped. `@ZodQuery` emits a deferred marker
+    // parameter carrying the root dtoId, so `collectUsage` sees it in the doc
+    // and exposes the root — honoring "expand inline but still document the
+    // query schema" — even though no `$ref` points at the root after expansion.
     const schemas = doc.components?.schemas as Record<string, unknown>;
     expect(schemas['ListingQuery']).toBeDefined();
-    expect(schemas['ListingHeaders']).toBeDefined();
+  });
+
+  it('prunes the eagerly-expanded @ZodHeaders root (no doc reference to it)', () => {
+    // `@ZodHeaders` expands per-property at decoration time without a root
+    // marker, so nothing in the document references `ListingHeaders`. Under
+    // reachability-scoped exposure it is pruned — the per-property header
+    // parameters carry the full contract.
+    const schemas = doc.components?.schemas as Record<string, unknown>;
+    expect(schemas['ListingHeaders']).toBeUndefined();
   });
 
   // ─── flatten: true (Swagger UI multipart compatibility) ─────────────────
@@ -210,23 +216,22 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c', 'd']);
   });
 
-  it('exposes named per-arm schemas in components.schemas (via descendant registration)', () => {
-    // FlatLeft / FlatRight are arms of the flattened intersection — their
-    // ids are registered as descendants of the original schema (walked at
-    // decoration time) so per-property `$ref`s resolve. With the
-    // "every registered id is exposed" rule, they also land in
-    // `components.schemas` even though the operation's inline body doesn't
-    // `$ref` them directly.
+  it('prunes flattened arms that are merged away (no $ref points at them)', () => {
+    // FlatLeft / FlatRight are merged into the flat inline body, so nothing in
+    // the document `$ref`s them. Under reachability-scoped exposure they are
+    // pruned — only schemas referenced by an endpoint (directly or via a
+    // surviving `$ref`) are kept.
     const schemas = doc.components?.schemas as Record<string, unknown>;
-    expect(schemas['FlatLeft']).toBeDefined();
-    expect(schemas['FlatRight']).toBeDefined();
+    expect(schemas['FlatLeft']).toBeUndefined();
+    expect(schemas['FlatRight']).toBeUndefined();
   });
 
-  it('exposes the flattened root in components.schemas in its natural (allOf) form when it has .meta({ id })', () => {
-    // The operation body is the flat merged form (Swagger UI friendly),
-    // AND the schema catalog has the original `allOf` composition keyed
-    // by the root's id. Both forms coexist — operation gets the flat
-    // body for UI rendering, catalog gets the structural composition.
+  it('keeps the flat inline body but prunes the flattened named root (nothing $refs it)', () => {
+    // The operation body is the flat merged form (Swagger UI friendly). The
+    // named root's natural (allOf) composition is NOT referenced by any
+    // operation — flatten inlines the body — so under reachability-scoped
+    // exposure the catalog entry is pruned. Add `.meta({ id })` plus an
+    // endpoint that `$ref`s it (or `{ expose: true }`) to keep it.
     const op = opAt(doc, '/cases/flattened-with-named-root', 'post');
     const requestBody = op.requestBody as Record<string, unknown> | undefined;
     const content = requestBody?.content as
@@ -239,11 +244,9 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     expect(Object.keys(opProps).sort()).toEqual(['a', 'b']);
 
     const schemas = doc.components?.schemas as Record<string, unknown>;
-    expect(schemas['FlatNamedRoot']).toBeDefined();
-    const rootBody = schemas['FlatNamedRoot'] as Record<string, unknown>;
-    expect(rootBody.allOf).toBeDefined();
-    expect(schemas['FlatNamedRootLeft']).toBeDefined();
-    expect(schemas['FlatNamedRootRight']).toBeDefined();
+    expect(schemas['FlatNamedRoot']).toBeUndefined();
+    expect(schemas['FlatNamedRootLeft']).toBeUndefined();
+    expect(schemas['FlatNamedRootRight']).toBeUndefined();
   });
 
   it('emits components.schemas entries for named child schemas referenced inside a flattened body', () => {

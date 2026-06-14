@@ -130,7 +130,7 @@ async function bootstrap() {
     app,
     new DocumentBuilder().setTitle('Users').setVersion('1').build(),
   );
-  const doc = applyZodNest(raw, { app });
+  const doc = applyZodNest(raw);
   SwaggerModule.setup('docs', app, doc);
 
   await app.listen(3000);
@@ -151,7 +151,7 @@ Every DTO is one Zod schema wrapped in a class. The class exists so NestJS' intr
 
 The class returned by `createZodDto(schema)` carries `schema`, `id`, `io: 'input'`, and a lazy `Output` sibling. `parse` / `safeParse` are static methods on the class. The class is tagged with `Symbol.for('zod-nest.dto')` so `ZodValidationPipe` and `ZodSerializerInterceptor` can discriminate it from plain constructors. The id comes from `schema.meta({ id })` when present (preferred) or from the second-argument options.
 
-**Naming is exposing.** Every schema put through `registerSchema()` — directly, or transitively via `createZodDto` / `@ZodBody` / `extend` / descendant discovery — lands in `components.schemas` when `applyZodNest` runs, regardless of whether any `$ref` in the doc points at it. If you give a schema `.meta({ id })`, you're declaring it documented. Anonymous schemas without an id stay inlined where used.
+**Exposure is reachability-scoped.** A schema lands in `components.schemas` when an endpoint in the document references it — directly or transitively through a `$ref` (response inner deps included), or as a query/param/header/cookie DTO captured via its marker. A registered schema that no endpoint reaches is pruned; force it in with `{ expose: true }`. Anonymous schemas without an id stay inlined where used. This keeps several Swagger documents that share one registry from each carrying the whole catalog.
 
 See [`docs/dto.md`](docs/dto.md) for the full surface.
 
@@ -186,7 +186,7 @@ The decorator set: `@ZodBody`, `@ZodQuery`, `@ZodHeaders`, `@ZodCookies`. All ar
 
 See [`docs/recipes/intersection-with-union.md`](docs/recipes/intersection-with-union.md) for the full pattern.
 
-Named query objects (both `@Query() dto` and `@ZodQuery`) expand to one parameter per field by default. Pass `applyZodNest(raw, { app, queryParamStyle: 'ref' })` — or `@ZodQuery(schema, { ref: true })` per handler — to instead emit a single schema-based query parameter that `$ref`s the shared component. Same wire format; see [`docs/swagger-integration.md → Query parameter style`](docs/swagger-integration.md#query-parameter-style).
+Named query objects (both `@Query() dto` and `@ZodQuery`) expand to one parameter per field by default. Pass `applyZodNest(raw, { queryParamStyle: 'ref' })` — or `@ZodQuery(schema, { ref: true })` per handler — to instead emit a single schema-based query parameter that `$ref`s the shared component. Same wire format; see [`docs/swagger-integration.md → Query parameter style`](docs/swagger-integration.md#query-parameter-style).
 
 ### I/O suffix rules
 
@@ -377,7 +377,7 @@ Use this sparingly — it bypasses the contract you declared. Logging at `warn` 
 import { applyZodNest } from 'zod-nest';
 
 const raw = SwaggerModule.createDocument(app, config);
-const doc = applyZodNest(raw, { app });
+const doc = applyZodNest(raw);
 SwaggerModule.setup('docs', app, doc);
 ```
 
@@ -542,7 +542,7 @@ Cell definitions live in [`.github/compat-matrix.json`](.github/compat-matrix.js
 
 If you're coming from `nestjs-zod`, the headline changes are:
 
-- Replace `cleanupOpenApiDoc(SwaggerModule.createDocument(app, config))` with `applyZodNest(SwaggerModule.createDocument(app, config), { app })`.
+- Replace `cleanupOpenApiDoc(SwaggerModule.createDocument(app, config))` with `applyZodNest(SwaggerModule.createDocument(app, config))`.
 - Replace `@ApiOkResponse({ type: Dto }) + @ZodSerializerDto(Dto)` pairs with `@ZodResponse({ type: Dto })`.
 - Drop `class-validator` / `class-transformer` if they were installed only for `nestjs-zod` interop.
 - Check any `MyDto.isZodDto` reflection — the discriminator is now `Symbol.for('zod-nest.dto') in MyDto`.

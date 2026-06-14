@@ -1,4 +1,3 @@
-import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import type { Override } from '../schema/override.js';
 import type { ZodNestRegistry } from '../schema/registry.js';
@@ -11,33 +10,26 @@ import { collectUsage } from './collect-usage.js';
 import { assertNoDanglingRefs } from './dangling-refs.js';
 import { expandParamMarkers } from './expand-param-markers.js';
 import { extendExposureViaRefs } from './expose-closure.js';
+import { inlineAnonymousBodies } from './inline-anon.js';
 import { mergeSchemas } from './merge-schemas.js';
 import { rewriteRefs } from './rewrite-refs.js';
 import { stripMarkers } from './strip-markers.js';
 
-const withRegistryExposure = (
+const withForcedExposure = (
   collected: CollectedUsage,
   registry: ZodNestRegistry,
 ): CollectedUsage => {
-  // Default-expose any registered id that no other mechanism has already
-  // exposed. Schemas already in `inputExposedIds` (doc refs, marker params)
-  // or `outputExposedIds` (`@ZodResponse` metadata) are left alone — the
-  // truth table in `mergeSchemas` is calibrated around the directional
-  // exposure for those, and forcing them into both sides would cause input
-  // /output divergence to split a previously-single-form emission into
-  // `Id` + `IdOutput` for response-only DTOs.
-  //
-  // Newly-exposed ids land in `inputExposedIds` — the default side for
-  // documentation purposes. The "input" form is permissive (`additionalProperties: true`
-  // on object schemas), which is the more general representation when no
-  // usage context says otherwise.
-  const alreadyExposed = new Set([...collected.inputExposedIds, ...collected.outputExposedIds]);
-  const extras = registry.ids().filter((id) => !alreadyExposed.has(id));
-  if (extras.length === 0) {
+  // Exposure is reachability-scoped: only ids actually referenced by this
+  // document's endpoints (and their transitive `$ref` deps) are emitted.
+  // `{ expose: true }` is the author's explicit opt-in to document a schema
+  // that no endpoint references — seed those onto the input side (the default
+  // documentation side) so the closure pass pulls in their deps too.
+  const forced = registry.forceExposedIds();
+  if (forced.length === 0) {
     return collected;
   }
   return {
-    inputExposedIds: new Set([...collected.inputExposedIds, ...extras]),
+    inputExposedIds: new Set([...collected.inputExposedIds, ...forced]),
     outputExposedIds: collected.outputExposedIds,
     classToDtoId: collected.classToDtoId,
   };
@@ -46,12 +38,6 @@ const withRegistryExposure = (
 const OPENAPI_VERSION = '3.1.0';
 
 export interface ApplyZodNestOptions {
-  /**
-   * The NestJS app instance. Required so `applyZodNest` can walk controllers
-   * via `DiscoveryService` to pick up `@ZodResponse` output-side DTO usage —
-   * `@nestjs/swagger` is currently anemic on response shapes.
-   */
-  app: INestApplication;
   /**
    * `ZodNestRegistry` instance that holds the zod-nest DTOs. Defaults to
    * `defaultRegistry` (the process-wide singleton populated by `createZodDto`).
@@ -100,25 +86,27 @@ export interface ApplyZodNestOptions {
  * - The I/O suffix truth table is applied — equal input/output bodies collapse
  *   to one `components.schemas[id]`; divergent bodies split as
  *   `id` (input) + `idOutput` (output), with response-side refs rewritten.
+ * - Anonymous body/response schemas (no `.meta({ id })`) are inlined at their
+ *   `$ref` sites and their synthetic components pruned (`inlineAnonymousBodies`).
+ * - Only schemas reachable from this document's endpoints (plus their
+ *   transitive `$ref` deps, plus any `{ expose: true }` opt-ins) are kept —
+ *   unreferenced registered schemas are pruned. Exposure is document-scoped, so
+ *   several documents sharing one registry each carry only what they use.
  * - Every `$ref` whose target is missing throws `ZodNestDocumentError(DANGLING_REF)`.
  * - `doc.openapi` is set to `'3.1.0'` — zod-nest emits OpenAPI 3.1 only; this
  *   guarantees the version string matches the emitted body regardless of the
  *   `DocumentBuilder` configuration on the caller side.
  *
  * Composable with other doc-transform passes — apply other mutations before
- * or after this function. The `app` argument is required because the
- * output-side DTO usage lives on controller-method metadata that the doc
- * doesn't surface; `DiscoveryService` resolves it.
+ * or after this function.
  */
-export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions): OpenAPIObject => {
+export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {}): OpenAPIObject => {
   const registry = opts.registry ?? defaultRegistry;
 
-  const collected = collectUsage(doc, opts.app, registry);
-  // Every id in the registry is exposed by default — calling `registerSchema`
-  // (directly, or transitively via `createZodDto` / `@ZodBody` / `extend` /
-  // descendant discovery) is the user's stated intent to document the schema.
-  // Doc-walked refs and `@ZodResponse` metadata are additive on top.
-  const exposed = withRegistryExposure(collected, registry);
+  const collected = collectUsage(doc, registry);
+  // Reachability-scoped exposure: `collectUsage` seeds what the document's
+  // endpoints actually reference; `{ expose: true }` opt-ins are added on top.
+  const exposed = withForcedExposure(collected, registry);
   const { inputSchemas, outputSchemas } = bulkEmit({
     registry,
     override: opts.override,
@@ -135,6 +123,7 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions): Ope
   expandParamMarkers({ doc, inputSchemas, outputSchemas, queryParamStyle: opts.queryParamStyle });
   rewriteRefs({ doc, renames, divergentOutputIds });
   stripMarkers(doc);
+  inlineAnonymousBodies({ doc, registry });
   assertNoDanglingRefs({ doc, collected: extended });
   doc.openapi = OPENAPI_VERSION;
 

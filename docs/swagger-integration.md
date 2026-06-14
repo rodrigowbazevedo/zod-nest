@@ -10,7 +10,7 @@ const raw = SwaggerModule.createDocument(
   app,
   new DocumentBuilder().setTitle('Users').setVersion('1').build(),
 );
-const doc = applyZodNest(raw, { app });
+const doc = applyZodNest(raw);
 SwaggerModule.setup('docs', app, doc);
 ```
 
@@ -20,23 +20,25 @@ One call replaces the entire `cleanupOpenApiDoc` ritual that earlier libraries n
 
 ```ts
 interface ApplyZodNestOptions {
-  app: INestApplication;
   registry?: ZodNestRegistry;
   override?: Override;
   strict?: boolean;
   queryParamStyle?: 'expand' | 'ref';
 }
+
+// All options are optional — `applyZodNest(doc)` is valid.
 ```
+
+> **v2:** the `app` option was removed. Output-side DTO usage is now read from the document's `responses` (populated by `@ZodResponse`'s `@ApiResponse` bridge), so the `DiscoveryService` controller walk is gone. Replace `applyZodNest(doc, { app })` with `applyZodNest(doc)`.
 
 | Option            | Required | Default           | What it does                                                                                                                 |
 | ----------------- | -------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `app`             | yes      | —                 | The NestJS app instance. Used to walk controllers via `DiscoveryService` to pick up `@ZodResponse` output-side DTO usage.    |
 | `registry`        | no       | `defaultRegistry` | Pass an explicit registry for multi-app isolation.                                                                           |
 | `override`        | no       | `undefined`       | User-supplied emission override applied on top of the built-in overrides (composition, primitives).                          |
 | `strict`          | no       | `true`            | Strict mode throws `ZodNestUnrepresentableError` on unrepresentable Zod constructs (bigint / date / symbol / transform / …). |
 | `queryParamStyle` | no       | `'expand'`        | How named `@Query()` / `@ZodQuery` DTOs render: `'expand'` (one parameter per property) or `'ref'` (a single schema-based parameter that `$ref`s the component). Query-only; see [Query parameter style](#query-parameter-style). |
 
-**Why `app` is required.** `@nestjs/swagger` is anemic on response shapes — it materializes `requestBody` and `parameters` `$ref`s back to `components.schemas`, but response types live on controller-method metadata that the raw doc doesn't surface. `applyZodNest` uses `DiscoveryService` to walk the controller graph and pick up `@ZodResponse` output-side DTO usage.
+**Output usage comes from the document.** `@ZodResponse` is a composite decorator — it applies the equivalent `@ApiResponse(...)`, so `@nestjs/swagger` writes the response shape into `paths.<route>.<method>.responses.<status>.content[...]`. `applyZodNest` reads those response `$ref`s directly, which keeps output exposure scoped to the endpoints in *this* document (rather than every controller in the app). This is why `app` is no longer needed.
 
 **Response cards are written by `@ZodResponse` itself.** The decorator is a composite — it applies the equivalent `@ApiResponse(...)` so `@nestjs/swagger`'s native pipeline writes `paths.<route>.<method>.responses.<status>.content[...]`. `applyZodNest` only does the marker→schema replacement pass on the placeholders that emerge from that. See [`responses.md → "OpenAPI emission"`](responses.md#openapi-emission) and [`responses.md → "Decorator ordering & the microtask trick"`](responses.md#decorator-ordering--the-microtask-trick) for the runtime details.
 
@@ -44,14 +46,15 @@ interface ApplyZodNestOptions {
 
 `applyZodNest` runs these passes in order, mutating the doc as it goes:
 
-1. **Collect usage.** Walk the input-side `$ref`s in the doc (reliable — `@nestjs/swagger` materializes them) and the output-side `@ZodResponse` metadata on every controller method. Produces `{ inputExposedIds, outputExposedIds }`. Every id present in the registry is then default-exposed on the input side (unless already covered by either set) — **every schema put through `registerSchema()` lands in `components.schemas`, regardless of whether the doc references it.** The exposure sets are then closed over `$ref`s so nested `.meta({ id })` schemas reachable from an exposed body are emitted too.
+1. **Collect usage.** Walk the document for both input-side ids (`requestBody` / `parameters` `$ref`s, plus `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` marker placeholders) and output-side ids (`responses.*.content.*` `$ref`s — `@ZodResponse`'s swagger bridge emits these via `@ApiResponse`). Produces `{ inputExposedIds, outputExposedIds }`. **Exposure is reachability-scoped: only schemas the document's endpoints actually reference are kept** — a schema put through `registerSchema()` that no endpoint reaches is *pruned*, not emitted. Two exceptions are added on top: ids registered with `{ expose: true }` (the author's explicit opt-in to document an unreferenced schema), and the query/param/header/cookie roots captured via their markers (expanded inline, but still documented). The exposure sets are then closed over `$ref`s so nested `.meta({ id })` schemas reachable from an exposed body are emitted too. Walking the document (rather than the app's controller graph) keeps exposure scoped to *this* document — several Swagger documents sharing one registry each carry only what they use.
 2. **Bulk emit.** Run `z.toJSONSchema` against the registry once per side (`input`, `output`), producing two maps `Record<dtoId, SchemaObject>`. Filtered to the ids `zod-nest` itself registered — including ids discovered transitively from `.meta({ id })` on descendants of explicitly-registered DTOs (`createZodDto` calls `register()`, which walks the Zod composition tree and adopts every named descendant). Third-party entries in `z.globalRegistry` that aren't reachable through a registered DTO are left alone.
 3. **Merge schemas.** For each id, apply the I/O suffix truth table. Equal bodies collapse to `components.schemas[id]`. Divergent bodies split as `id` (input) + `<id>Output` (output). Class-name → dtoId rename pass runs alongside.
 4. **Expand parameter markers.** Walk `paths.*.<op>.parameters[]` for `__zodNestDto: true` placeholders — the byproduct of `@nestjs/swagger` exploding a `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` DTO via `_OPENAPI_METADATA_FACTORY`. Each marker becomes one parameter per top-level property of the DTO's schema, with `description` mirrored onto both the parameter object and its schema. Optional fields bound to `in: 'path'` are coerced to `required: true` with a `console.warn`, since OpenAPI 3.1 forbids optional path parameters. Non-object DTOs (arrays, unions, primitives) throw `ZodNestDocumentError({ code: 'UNEXPANDABLE_PARAM_DTO' })`. The synthetic `components.schemas.Object` placeholder that `@nestjs/swagger` materialises from the marker's `type: () => Object` is pruned once its only referrer (the marker parameter) is gone. The exception is a `@Query()` marker under ref mode (see [Query parameter style](#query-parameter-style)), which collapses to a single `$ref` parameter instead of expanding. See [`recipes/query-param-dtos.md`](recipes/query-param-dtos.md) for the consumer-facing pattern.
 5. **Rewrite refs.** Two sub-passes: (a) class-name → dtoId rename for every `$ref` in the doc; (b) response-side `$ref` rewrite to `<id>Output` for every id in `divergentOutputIds`. Scoped to `paths.*.{op}.responses.*` so request-side refs are untouched.
 6. **Strip markers.** Remove every `x-zod-nest-dto` placeholder from `components.schemas[*].properties`, drop the JSON Schema 2020-12 metadata (`$schema`, `$id`) that Zod's bulk `toJSONSchema` leaks onto every emitted body, plus any leftover marker parameter from `paths.*.<op>.parameters[]` (defensive — `expandParamMarkers` removes them in the normal path). The `$id` / `$schema` strip exists because Swagger UI's strict ref resolver re-anchors lookups against the leaf schema when `$id` is a relative URI fragment (`#/components/schemas/<Id>`) and then fails to find `components` at the new root; the fields are redundant in OpenAPI anyway since the schema's identity comes from its `components.schemas` key. Empty `properties` blocks are dropped. The `x-zod-nest-error` extension (engine collision policy) is preserved so the broken contract stays visible in Swagger UI.
-7. **Assert no dangling refs.** Walk every `$ref` and confirm the target exists in `components.schemas`. Throws `ZodNestDocumentError({ code: 'DANGLING_REF' })` on the first miss, listing every offending ref with a per-ref hint inferred from collected usage.
-8. **Force OpenAPI 3.1.** Set `doc.openapi = '3.1.0'` so the version string matches the emitted body even when `DocumentBuilder.setOpenAPIVersion('3.1.0')` was not called on the caller side.
+7. **Inline anonymous bodies.** Every schema passed inline to `@ZodResponse` / `@ZodBody` with no resolvable id (no `.meta({ id })`, no `id` option) was registered under a synthetic `anonymous` id so its body could be emitted under the document's `strict` / `override` in step 2. This pass replaces each `$ref` to such an id with a deep clone of the emitted body and prunes the synthetic component — so anonymous schemas appear inline at their use site and never leave a `_Anon*Schema_*` entry in `components.schemas`. Named members referenced inside the inlined body stay as `$ref`s (and remain exposed). A reused anonymous instance duplicates its body at each site; add `.meta({ id })` to share it as a named component instead.
+8. **Assert no dangling refs.** Walk every `$ref` and confirm the target exists in `components.schemas`. Throws `ZodNestDocumentError({ code: 'DANGLING_REF' })` on the first miss, listing every offending ref with a per-ref hint inferred from collected usage.
+9. **Force OpenAPI 3.1.** Set `doc.openapi = '3.1.0'` so the version string matches the emitted body even when `DocumentBuilder.setOpenAPIVersion('3.1.0')` was not called on the caller side.
 
 The function is **composable** — apply your own doc-transform passes before or after `applyZodNest`. Just ensure that any pre-pass that touches `$ref`s knows what's coming.
 
@@ -115,12 +118,12 @@ For the full pattern with code, see [`recipes/intersection-with-union.md`](recip
 
 ## Query parameter style
 
-By default, a named query DTO — whether bound as `@Query() params: SomeDto` (a `createZodDto` class) or declared with `@ZodQuery(schema)` — is **expanded** into one OpenAPI parameter per top-level property. The same object also lands in `components.schemas` (every named schema is exposed), so the shape effectively ships twice.
+By default, a named query DTO — whether bound as `@Query() params: SomeDto` (a `createZodDto` class) or declared with `@ZodQuery(schema)` — is **expanded** into one OpenAPI parameter per top-level property. The named root object also lands in `components.schemas`: the decorator emits a marker carrying the root's id, which the collect-usage pass picks up and exposes even though no `$ref` points at it after expansion — so the shape is both expanded *and* documented as a component. (This is specific to query: `@ZodHeaders` / `@ZodCookies` expand eagerly without a root marker, so their root object is pruned unless referenced elsewhere — the per-property parameters carry the full contract.)
 
 Set `queryParamStyle: 'ref'` on `applyZodNest` to instead emit a single **schema-based** query parameter that references the shared component:
 
 ```ts
-const doc = applyZodNest(raw, { app, queryParamStyle: 'ref' });
+const doc = applyZodNest(raw, { queryParamStyle: 'ref' });
 ```
 
 ```yaml
@@ -228,11 +231,11 @@ const appBRegistry = createRegistry();
 
 // In app A's bootstrap:
 class UserDto extends createZodDto(userSchema, { registry: appARegistry }) {}
-const docA = applyZodNest(rawA, { app: appA, registry: appARegistry });
+const docA = applyZodNest(rawA, { registry: appARegistry });
 
 // In app B's bootstrap:
 class UserDto extends createZodDto(userSchema, { registry: appBRegistry }) {}
-const docB = applyZodNest(rawB, { app: appB, registry: appBRegistry });
+const docB = applyZodNest(rawB, { registry: appBRegistry });
 ```
 
 The registries are independent — `appARegistry.ids()` won't see `appBRegistry`'s DTOs.
@@ -242,7 +245,7 @@ The registries are independent — `appARegistry.ids()` won't see `appBRegistry`
 `applyZodNest` **mutates** the input doc and returns it. The return value is identity-equal to the input:
 
 ```ts
-const doc = applyZodNest(raw, { app });
+const doc = applyZodNest(raw);
 console.log(doc === raw); // → true
 ```
 
@@ -250,7 +253,7 @@ Most callers won't care. If you need the original unmodified, deep-clone before 
 
 ```ts
 const original = structuredClone(raw);
-const doc = applyZodNest(raw, { app });
+const doc = applyZodNest(raw);
 // original is untouched
 ```
 
@@ -262,7 +265,7 @@ After `SwaggerModule.createDocument(app, config)`, before `SwaggerModule.setup(.
 
 ```ts
 const raw = SwaggerModule.createDocument(app, config);
-const doc = applyZodNest(raw, { app });
+const doc = applyZodNest(raw);
 SwaggerModule.setup('docs', app, doc);
 ```
 
