@@ -24,6 +24,7 @@ interface ApplyZodNestOptions {
   override?: Override;
   strict?: boolean;
   queryParamStyle?: 'expand' | 'ref';
+  refTitles?: boolean;
 }
 
 // All options are optional — `applyZodNest(doc)` is valid.
@@ -37,6 +38,7 @@ interface ApplyZodNestOptions {
 | `override`        | no       | `undefined`       | User-supplied emission override applied on top of the built-in overrides (composition, primitives).                          |
 | `strict`          | no       | `true`            | Strict mode throws `ZodNestUnrepresentableError` on unrepresentable Zod constructs (bigint / date / symbol / transform / …). |
 | `queryParamStyle` | no       | `'expand'`        | How named `@Query()` / `@ZodQuery` DTOs render: `'expand'` (one parameter per property) or `'ref'` (a single schema-based parameter that `$ref`s the component). Query-only; see [Query parameter style](#query-parameter-style). |
+| `refTitles`       | no       | `true`            | Copy each named component's `title` (when set via `.meta({ title })`) onto every `$ref` that targets it, as a `{ $ref, title }` sibling. Helps Swagger UI's 3.1 renderer show the component name (see [`$ref` titles](#ref-titles-swagger-ui-31)). Set `false` for bare `$ref`s. |
 
 **Output usage comes from the document.** `@ZodResponse` is a composite decorator — it applies the equivalent `@ApiResponse(...)`, so `@nestjs/swagger` writes the response shape into `paths.<route>.<method>.responses.<status>.content[...]`. `applyZodNest` reads those response `$ref`s directly, which keeps output exposure scoped to the endpoints in *this* document (rather than every controller in the app). This is why `app` is no longer needed.
 
@@ -53,10 +55,28 @@ interface ApplyZodNestOptions {
 5. **Rewrite refs.** Two sub-passes: (a) class-name → dtoId rename for every `$ref` in the doc; (b) response-side `$ref` rewrite to `<id>Output` for every id in `divergentOutputIds`. Scoped to `paths.*.{op}.responses.*` so request-side refs are untouched.
 6. **Strip markers.** Remove every `x-zod-nest-dto` placeholder from `components.schemas[*].properties`, drop the JSON Schema 2020-12 metadata (`$schema`, `$id`) that Zod's bulk `toJSONSchema` leaks onto every emitted body, plus any leftover marker parameter from `paths.*.<op>.parameters[]` (defensive — `expandParamMarkers` removes them in the normal path). The `$id` / `$schema` strip exists because Swagger UI's strict ref resolver re-anchors lookups against the leaf schema when `$id` is a relative URI fragment (`#/components/schemas/<Id>`) and then fails to find `components` at the new root; the fields are redundant in OpenAPI anyway since the schema's identity comes from its `components.schemas` key. Empty `properties` blocks are dropped. The `x-zod-nest-error` extension (engine collision policy) is preserved so the broken contract stays visible in Swagger UI.
 7. **Inline anonymous bodies.** Every schema passed inline to `@ZodResponse` / `@ZodBody` with no resolvable id (no `.meta({ id })`, no `id` option) was registered under a synthetic `anonymous` id so its body could be emitted under the document's `strict` / `override` in step 2. This pass replaces each `$ref` to such an id with a deep clone of the emitted body and prunes the synthetic component — so anonymous schemas appear inline at their use site and never leave a `_Anon*Schema_*` entry in `components.schemas`. Named members referenced inside the inlined body stay as `$ref`s (and remain exposed). A reused anonymous instance duplicates its body at each site; add `.meta({ id })` to share it as a named component instead.
-8. **Assert no dangling refs.** Walk every `$ref` and confirm the target exists in `components.schemas`. Throws `ZodNestDocumentError({ code: 'DANGLING_REF' })` on the first miss, listing every offending ref with a per-ref hint inferred from collected usage.
-9. **Force OpenAPI 3.1.** Set `doc.openapi = '3.1.0'` so the version string matches the emitted body even when `DocumentBuilder.setOpenAPIVersion('3.1.0')` was not called on the caller side.
+8. **Apply `$ref` titles.** Copy each named component's `title` (when set via `.meta({ title })`) onto every `$ref` that targets it, as a `{ $ref, title }` sibling. Inert annotation; helps Swagger UI's 3.1 renderer show the component name (see [`$ref` titles](#ref-titles-swagger-ui-31)). Skipped when `refTitles: false`.
+9. **Assert no dangling refs.** Walk every `$ref` and confirm the target exists in `components.schemas`. Throws `ZodNestDocumentError({ code: 'DANGLING_REF' })` on the first miss, listing every offending ref with a per-ref hint inferred from collected usage.
+10. **Force OpenAPI 3.1.** Set `doc.openapi = '3.1.0'` so the version string matches the emitted body even when `DocumentBuilder.setOpenAPIVersion('3.1.0')` was not called on the caller side.
 
 The function is **composable** — apply your own doc-transform passes before or after `applyZodNest`. Just ensure that any pre-pass that touches `$ref`s knows what's coming.
+
+## `$ref` titles (Swagger UI 3.1)
+
+Swagger UI's OpenAPI **3.1** renderer inlines `$ref`-ed schemas without surfacing the referenced component's name — a property typed `{ $ref: '#/components/schemas/Foo' }` shows up as a bare `object` instead of `Foo` ([swagger-api/swagger-ui#9540](https://github.com/swagger-api/swagger-ui/issues/9540), open across 5.x). The emitted spec is valid and `$ref`-correct — this is purely a renderer limitation — but it makes complex docs hard to read.
+
+OpenAPI 3.1 (unlike 3.0) permits sibling keywords next to `$ref`. So `applyZodNest`'s last content pass copies each component's `title` onto the refs that point at it:
+
+```jsonc
+// before
+{ "foo": { "$ref": "#/components/schemas/Foo" } }
+// after (Foo declared `.meta({ title: 'Foo' })`)
+{ "foo": { "$ref": "#/components/schemas/Foo", "title": "Foo" } }
+```
+
+Only components that declare a `title` (via `.meta({ title })`) contribute one; refs to untitled components stay bare, and a ref that already carries its own `title` is never overwritten. The `title` is an annotation keyword — no validation effect.
+
+> **Caveat.** This is a forward-looking aid: in swagger-ui 5.32.6 the sibling `title` is currently a visual no-op for property/array refs (the #9540 bug is deeper than missing titles). It's emitted so the names are present for 3.1-aware tooling and for whenever #9540 is fixed. If you need names rendered **today**, the working options are renderer-side: serve a 3.0-downconverted doc to Swagger UI, or use a 3.1-native renderer (Scalar, Redoc, Stoplight Elements). Set `refTitles: false` to opt out of the annotation entirely.
 
 ## Schema metadata flows through
 

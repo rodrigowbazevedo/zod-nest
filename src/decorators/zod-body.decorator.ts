@@ -65,10 +65,12 @@ const resolveBodySchema = (schema: z.ZodType, options: ZodBodyOptions | undefine
   if (options?.flatten === true) {
     return flattenObjectIntersection(schema, options.registry ?? defaultRegistry, '@ZodBody');
   }
-  const resolution = resolveSchemaRef(schema, {
+  // `deferAnonInline: true` always resolves to a `$ref` (named → its id,
+  // anonymous → a synthetic id inlined later by `applyZodNest`), so the
+  // overload narrows the result to a `ref`.
+  return resolveSchemaRef(schema, {
     id: options?.id,
     registry: options?.registry,
     deferAnonInline: true,
-  });
-  return resolution.kind === 'ref' ? resolution.ref : resolution.schema;
+  }).ref;
 };

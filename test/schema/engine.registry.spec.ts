@@ -28,4 +28,21 @@ describe('toOpenApi — registry', () => {
     registry.register(a, 'Registry_Single');
     expect(registry.hasCollision('Registry_Single')).toBe(false);
   });
+
+  it('skips a registry collision that the emitted schema does not reference', () => {
+    const registry = createRegistry();
+    // A collision exists in the registry…
+    registry.register(z.object({ a: z.string() }), 'Registry_UnrefCollision');
+    registry.register(z.object({ b: z.number() }), 'Registry_UnrefCollision');
+    expect(registry.hasCollision('Registry_UnrefCollision')).toBe(true);
+
+    // …but the schema we emit doesn't reference it, so the collision id is not
+    // in the result's refs and the decoration loop skips it (no error marker,
+    // no throw).
+    const Unrelated = z.object({ value: z.string() }).meta({ id: 'Registry_Unrelated' });
+    const out = toOpenApi(Unrelated, { io: 'output', registry });
+
+    expect(out.refs.has('Registry_UnrefCollision')).toBe(false);
+    expect(out.schema).toBeDefined();
+  });
 });

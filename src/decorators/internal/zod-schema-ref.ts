@@ -20,9 +20,15 @@ import { defaultRegistry, registerSchema } from '../../schema/registry.js';
  *   directly into the operation. Named descendants are still registered so
  *   any nested `$ref`s inside the inline body resolve at doc-build time.
  */
-export type SchemaRefResolution =
-  | { readonly kind: 'ref'; readonly ref: { readonly $ref: string } }
-  | { readonly kind: 'inline'; readonly schema: Record<string, unknown> };
+export interface SchemaRefResolutionRef {
+  readonly kind: 'ref';
+  readonly ref: { readonly $ref: string };
+}
+export interface SchemaRefResolutionInline {
+  readonly kind: 'inline';
+  readonly schema: Record<string, unknown>;
+}
+export type SchemaRefResolution = SchemaRefResolutionRef | SchemaRefResolutionInline;
 
 export interface ResolveSchemaRefOptions {
   /** Forces this id, overriding any `.meta({ id })` already on the schema. */
@@ -53,10 +59,21 @@ export interface ResolveSchemaRefOptions {
  *   any *named descendants* are registered so refs inside the inline body
  *   resolve at doc-build time.
  */
-export const resolveSchemaRef = (
+// With `deferAnonInline: true`, an anonymous schema is registered and returned
+// as a `$ref` too, so the result is always a `ref` — narrow the return so
+// callers (e.g. `@ZodBody`) don't carry a dead `inline` branch.
+export function resolveSchemaRef(
+  schema: z.ZodType,
+  options: ResolveSchemaRefOptions & { readonly deferAnonInline: true },
+): SchemaRefResolutionRef;
+export function resolveSchemaRef(
   schema: z.ZodType,
   options?: ResolveSchemaRefOptions,
-): SchemaRefResolution => {
+): SchemaRefResolution;
+export function resolveSchemaRef(
+  schema: z.ZodType,
+  options?: ResolveSchemaRefOptions,
+): SchemaRefResolution {
   const registry = options?.registry ?? defaultRegistry;
   const id = registerSchema(schema, registry, { id: options?.id });
   if (id !== undefined) {
@@ -74,4 +91,4 @@ export const resolveSchemaRef = (
   }
   const { schema: body } = toOpenApi(schema, { io: 'input', registry });
   return { kind: 'inline', schema: body as Record<string, unknown> };
-};
+}
