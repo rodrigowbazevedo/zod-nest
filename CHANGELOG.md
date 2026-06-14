@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.0.1...v2.1.0) (2026-06-14)
+
+
+### Features
+
+* **document:** copy component title onto $refs for Swagger UI 3.1 (refTitles) ([#98](https://github.com/rodrigowbazevedo/zod-nest/issues/98)) ([0b1db03](https://github.com/rodrigowbazevedo/zod-nest/commit/0b1db03ed64a2ac35e5186e17803749b4079c89c)), closes [swagger-api/swagger-ui#9540](https://github.com/swagger-api/swagger-ui/issues/9540)
+
 ## [2.0.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.0.0...v2.0.1) (2026-06-14)
 
 
