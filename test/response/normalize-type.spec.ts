@@ -23,15 +23,23 @@ describe('toResponseDto', () => {
     expect(toResponseDto(schema)).toBe(toResponseDto(schema));
   });
 
-  it('gives an unnamed schema a generated id (not the shared base class name) and warns once', () => {
+  it('gives an unnamed schema a synthetic anonymous id (inlined + pruned by applyZodNest)', () => {
+    const dto = toResponseDto(z.object({ a: z.string() }));
+    // The synthetic id is internal — it carries the body through bulk emission
+    // and is inlined + pruned by `applyZodNest`'s `inlineAnonymousBodies` pass,
+    // so it never reaches the final document.
+    expect(dto.id).toMatch(/^_AnonResponseSchema_\d+$/);
+    const other = toResponseDto(z.object({ b: z.number() }));
+    // Distinct unnamed schemas get distinct ids — they must not collapse onto
+    // the shared "ZodDtoBase" class name.
+    expect(other.id).not.toBe(dto.id);
+  });
+
+  it('does not warn on an unnamed schema (anonymous schemas are inlined, not surfaced)', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
-      const dto = toResponseDto(z.object({ a: z.string() }));
-      expect(dto.id).toMatch(/^_AnonZodResponseSchema_\d+$/);
-      const other = toResponseDto(z.object({ b: z.number() }));
-      // Distinct unnamed schemas get distinct ids — they must not collapse onto
-      // the shared "ZodDtoBase" class name.
-      expect(other.id).not.toBe(dto.id);
+      toResponseDto(z.object({ c: z.boolean() }));
+      expect(warn).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
     }

@@ -62,7 +62,7 @@ describe('query parameter ref mode (end-to-end)', () => {
       }
       const result = await bootstrap([LocalController]);
       app = result.app;
-      doc = applyZodNest(result.raw, { app, registry, queryParamStyle: 'ref' });
+      doc = applyZodNest(result.raw, { registry, queryParamStyle: 'ref' });
     });
 
     afterAll(async () => {
@@ -115,7 +115,7 @@ describe('query parameter ref mode (end-to-end)', () => {
       }
       const result = await bootstrap([LocalController]);
       app = result.app;
-      doc = applyZodNest(result.raw, { app, registry });
+      doc = applyZodNest(result.raw, { registry });
     });
 
     afterAll(async () => {
@@ -146,7 +146,7 @@ describe('query parameter ref mode (end-to-end)', () => {
       app = result.app;
       // No queryParamStyle → global default is "expand", but the decorator
       // override forces ref for this handler.
-      doc = applyZodNest(result.raw, { app, registry });
+      doc = applyZodNest(result.raw, { registry });
     });
 
     afterAll(async () => {

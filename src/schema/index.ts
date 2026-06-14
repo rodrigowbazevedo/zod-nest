@@ -11,7 +11,7 @@ export type { OverrideJSONSchemaArg } from './custom-override.js';
 export { toOpenApi } from './engine.js';
 export type { ToOpenApiOptions, ToOpenApiResult } from './engine.js';
 export { createRegistry, defaultRegistry, registerSchema } from './registry.js';
-export type { RegisterSchemaOptions, ZodNestRegistry } from './registry.js';
+export type { RegisterFlags, RegisterSchemaOptions, ZodNestRegistry } from './registry.js';
 export type { Override, OverrideContext } from './override.js';
 export type { SchemaObject } from './openapi.types.js';
 export { ZodNestError, ZodNestUnrepresentableError } from './errors.js';

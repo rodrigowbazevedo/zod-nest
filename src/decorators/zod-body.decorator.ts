@@ -65,6 +65,10 @@ const resolveBodySchema = (schema: z.ZodType, options: ZodBodyOptions | undefine
   if (options?.flatten === true) {
     return flattenObjectIntersection(schema, options.registry ?? defaultRegistry, '@ZodBody');
   }
-  const resolution = resolveSchemaRef(schema, { id: options?.id, registry: options?.registry });
+  const resolution = resolveSchemaRef(schema, {
+    id: options?.id,
+    registry: options?.registry,
+    deferAnonInline: true,
+  });
   return resolution.kind === 'ref' ? resolution.ref : resolution.schema;
 };

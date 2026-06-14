@@ -146,9 +146,10 @@ const expandParameterList = (
  * Decide whether a `'query'` marker collapses to a single schema-based
  * parameter (`ref`) or expands per-property. The per-marker `ref` override
  * wins; otherwise the global `queryParamStyle` decides. Ref mode is query-only
- * and needs the DTO's component to exist in the doc — if it somehow doesn't
- * (the `withRegistryExposure` pass should guarantee it), fall back to
- * expansion so the contract still ships rather than dangling.
+ * and needs the DTO's component to exist in the doc — `collectUsage` adds the
+ * marker's dtoId to `inputExposedIds` so `mergeSchemas` emits it. If it somehow
+ * still isn't present, fall back to expansion so the contract ships rather than
+ * dangling.
  */
 const resolveMarker = (marker: MarkerParam, body: unknown, context: ExpandContext): unknown[] => {
   const useRef = marker.ref ?? context.queryParamStyle === 'ref';

@@ -9,6 +9,14 @@ export interface CreateZodDtoOptions {
   id?: string;
   /** Registry to register this DTO's schema into. Defaults to `defaultRegistry`. */
   registry?: ZodNestRegistry;
+  /**
+   * Force this DTO's schema into the emitted document even when no endpoint
+   * references it. Exposure is otherwise reachability-scoped — a registered
+   * schema that no exposed endpoint reaches is pruned. Set `true` to keep an
+   * intentionally-documented schema (e.g. for out-of-band client codegen).
+   * Defaults to `false`.
+   */
+  expose?: boolean;
 }
 
 /**

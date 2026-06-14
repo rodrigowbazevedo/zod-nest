@@ -94,7 +94,7 @@ describe('applyZodNest — happy path (input + output)', () => {
   beforeAll(async () => {
     const boot = await bootstrap([HappyController]);
     app = boot.app;
-    doc = applyZodNest(boot.raw, { app });
+    doc = applyZodNest(boot.raw);
   });
 
   afterAll(() => app.close());
@@ -147,7 +147,7 @@ describe('applyZodNest — divergent dtoId (rename + ref rewrite)', () => {
   beforeAll(async () => {
     const boot = await bootstrap([RenameController]);
     app = boot.app;
-    doc = applyZodNest(boot.raw, { app });
+    doc = applyZodNest(boot.raw);
   });
 
   afterAll(() => app.close());
@@ -197,7 +197,7 @@ describe('applyZodNest — suffix: input/output collapse when canonically equal'
   beforeAll(async () => {
     const boot = await bootstrap([EqualController]);
     app = boot.app;
-    doc = applyZodNest(boot.raw, { app });
+    doc = applyZodNest(boot.raw);
   });
 
   afterAll(() => app.close());
@@ -231,7 +231,7 @@ describe('applyZodNest — suffix: divergent input/output splits with Output suf
   beforeAll(async () => {
     const boot = await bootstrap([DivergentController]);
     app = boot.app;
-    doc = applyZodNest(boot.raw, { app });
+    doc = applyZodNest(boot.raw);
   });
 
   afterAll(() => app.close());
@@ -279,7 +279,7 @@ describe('applyZodNest — @ZodResponse-only DTO lands via the controller walk',
   beforeAll(async () => {
     const boot = await bootstrap([OutputOnlyController]);
     app = boot.app;
-    doc = applyZodNest(boot.raw, { app });
+    doc = applyZodNest(boot.raw);
   });
 
   afterAll(() => app.close());
@@ -319,7 +319,7 @@ describe('applyZodNest — array + tuple @ZodResponse shorthand registers underl
   beforeAll(async () => {
     const boot = await bootstrap([ShapesController]);
     app = boot.app;
-    doc = applyZodNest(boot.raw, { app });
+    doc = applyZodNest(boot.raw);
   });
 
   afterAll(() => app.close());
@@ -357,7 +357,7 @@ describe('applyZodNest — multi-status @ZodResponse stack', () => {
   beforeAll(async () => {
     const boot = await bootstrap([MultiController]);
     app = boot.app;
-    doc = applyZodNest(boot.raw, { app });
+    doc = applyZodNest(boot.raw);
   });
 
   afterAll(() => app.close());
@@ -430,7 +430,7 @@ describe('applyZodNest — @ZodResponse emits responses.<status>.content', () =>
   beforeAll(async () => {
     const boot = await bootstrap([EmitController]);
     app = boot.app;
-    doc = applyZodNest(boot.raw, { app });
+    doc = applyZodNest(boot.raw);
   });
 
   afterAll(() => app.close());
@@ -505,7 +505,7 @@ describe('applyZodNest — controller with no zod-nest DTOs is a clean pass-thro
     // doesn't pull in DTOs from earlier suites that populated
     // `defaultRegistry` at module load. The test's intent is "this isolated
     // app with no DTOs produces no schemas".
-    const doc = applyZodNest(raw, { app, registry: createRegistry() });
+    const doc = applyZodNest(raw, { registry: createRegistry() });
     expect(Object.keys(schemasOf(doc)).length).toBe(originalSchemaCount);
     await app.close();
   });
@@ -541,7 +541,7 @@ describe('applyZodNest — dangling ref guard', () => {
 
     let caught: unknown;
     try {
-      applyZodNest(raw, { app });
+      applyZodNest(raw);
     } catch (e) {
       caught = e;
     }
@@ -580,7 +580,7 @@ describe('applyZodNest — same dtoId across two classes decorates with duplicat
 
   it('replaces the body with `x-zod-nest-error: duplicate-id` instead of silently picking one', async () => {
     const { app, raw } = await bootstrap([CollisionController]);
-    const doc = applyZodNest(raw, { app });
+    const doc = applyZodNest(raw);
 
     const body = schemasOf(doc).CollisionShared as Record<string, unknown>;
     expect(body['x-zod-nest-error']).toBe('duplicate-id');
@@ -618,7 +618,7 @@ describe('applyZodNest — ambiguous rename guard', () => {
 
     let caught: unknown;
     try {
-      applyZodNest(raw, { app });
+      applyZodNest(raw);
     } catch (e) {
       caught = e;
     }
@@ -659,7 +659,7 @@ describe('applyZodNest — composability with user-supplied pre/post passes', ()
       }
     }
 
-    const doc = applyZodNest(raw, { app });
+    const doc = applyZodNest(raw);
 
     // Post-pass tag must still be present on the operation.
     const op = (doc.paths as Record<string, Record<string, Record<string, unknown>>>)['/compose']
@@ -693,7 +693,7 @@ describe('applyZodNest — nested .meta({ id }) schemas are registered transitiv
 
   it('emits both the wrapping DTO and the nested helper into components.schemas without dangling refs', async () => {
     const { app, raw } = await bootstrap([NestedController]);
-    const doc = applyZodNest(raw, { app });
+    const doc = applyZodNest(raw);
 
     const components = schemasOf(doc);
     expect(components.NestedParent).toBeDefined();
@@ -742,7 +742,7 @@ describe('applyZodNest — extend() parent with .meta({ id }) is auto-registered
 
   it('emits the extend() parent body into components.schemas without dangling refs', async () => {
     const { app, raw } = await bootstrap([ExtendParentController]);
-    const doc = applyZodNest(raw, { app });
+    const doc = applyZodNest(raw);
 
     const components = schemasOf(doc);
     expect(components.ExtendChildDto).toBeDefined();
@@ -807,7 +807,7 @@ describe('applyZodNest — @Query() / @Param() / @Headers() DTO marker expansion
   beforeAll(async () => {
     const boot = await bootstrap([ParamMixController]);
     app = boot.app;
-    doc = applyZodNest(boot.raw, { app });
+    doc = applyZodNest(boot.raw);
   });
 
   afterAll(() => app.close());
@@ -884,7 +884,7 @@ describe('applyZodNest — optional field in @Param() DTO is coerced to required
   it('coerces `required: true` and emits a console.warn naming the field', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const { app, raw } = await bootstrap([OptPathController]);
-    const doc = applyZodNest(raw, { app });
+    const doc = applyZodNest(raw);
 
     const params = paramsAt(doc, '/opt-path/{id}', 'get');
     const id = params.find((p) => p.name === 'id');
@@ -916,7 +916,7 @@ describe('applyZodNest — UNEXPANDABLE_PARAM_DTO guard for non-object query DTO
     const { app, raw } = await bootstrap([ArrQueryController]);
     let caught: unknown;
     try {
-      applyZodNest(raw, { app });
+      applyZodNest(raw);
     } catch (e) {
       caught = e;
     }

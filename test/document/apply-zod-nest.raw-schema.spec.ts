@@ -70,7 +70,7 @@ describe('applyZodNest — @ZodResponse accepts a raw Zod schema', () => {
     app = moduleRef.createNestApplication({ logger: false });
     await app.init();
     const config = new DocumentBuilder().setTitle('t').setVersion('v').build();
-    doc = applyZodNest(SwaggerModule.createDocument(app, config), { app });
+    doc = applyZodNest(SwaggerModule.createDocument(app, config));
   });
 
   afterAll(() => app.close());

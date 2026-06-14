@@ -199,7 +199,7 @@ const userB = z.object({ uuid: z.uuid() }).meta({ id: 'User' }); // collision
 class UserDtoA extends createZodDto(userA) {}
 class UserDtoB extends createZodDto(userB) {}
 
-applyZodNest(raw, { app });
+applyZodNest(raw);
 // → ZodNestDocumentError({ code: 'AMBIGUOUS_RENAME', details: { id: 'User', classes: [...] } })
 ```
 
@@ -232,7 +232,7 @@ class TagsController {
   }
 }
 
-applyZodNest(raw, { app });
+applyZodNest(raw);
 // → ZodNestDocumentError({
 //     code: 'UNEXPANDABLE_PARAM_DTO',
 //     details: { dtoId: 'TagsDto', in: 'query', io: 'input' },

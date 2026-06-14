@@ -50,7 +50,7 @@ Internally a raw schema is normalised to `createZodDto(schema).Output` — **out
 
 **Why this exists.** `createZodDto` can't wrap a `z.discriminatedUnion` / `z.union` / `z.intersection` (or any schema whose `z.infer` is a union): `class Dto extends createZodDto(schema) {}` fails to compile with **TS2509** ("Base constructor return type … is not an object type"). Before, the workaround was `registerSchema(schema)` plus a hand-written `@ApiResponse({ content: { … { schema: { $ref: '#/components/schemas/Event' } } } })`. Now the schema goes straight into `@ZodResponse`.
 
-**Naming.** The OpenAPI component name comes from the schema's `.meta({ id })`. A raw schema with no `.meta({ id })` still works, but lands under a generated name (`_AnonZodResponseSchema_N`) and logs a one-time warning — add `.meta({ id })` to control it. Reusing the **same schema instance** across routes maps to one component (cached per instance).
+**Named vs. anonymous.** With a `.meta({ id })`, the schema becomes a named `components.schemas` entry and the response references it by `$ref`. **Without an id, the schema is inlined directly into the response body** — `applyZodNest` renders the body at the use site and emits no synthetic component (so there is no `_Anon…` entry and no warning). Named schemas referenced *inside* an inlined anonymous body (e.g. the members of an anonymous `z.union([A, B])` where `A`/`B` have ids) stay as `$ref`s and remain in `components.schemas`. Reusing the **same anonymous instance** across routes duplicates the inlined body at each site — add `.meta({ id })` to share it as one named component instead. This mirrors how `@ZodBody` treats anonymous request bodies.
 
 ## Multi-status stacking
 

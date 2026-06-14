@@ -1,138 +1,181 @@
-import 'reflect-metadata';
-
-import { Controller, Get, HttpStatus, Post } from '@nestjs/common';
-import { DiscoveryModule } from '@nestjs/core';
-import { Test } from '@nestjs/testing';
 import { z } from 'zod';
 
-import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
 
-import { createZodDto, ZodResponse } from '../../src';
 import { collectUsage } from '../../src/document/collect-usage.js';
+import { makeZodDtoMarker } from '../../src/dto/marker.js';
+import { ZOD_NEST_DTO_EXTENSION } from '../../src/schema/constants.js';
 import { createRegistry } from '../../src/schema/registry.js';
 
-const stubRegistry = createRegistry();
+// Output exposure is now read from the document's `responses` (the swagger
+// bridge emits `@ApiResponse` content `$ref`s), keeping it scoped to the
+// document rather than walking every controller in the app.
 
-class UserDto extends createZodDto(z.object({ id: z.string() }), { id: 'CollectOut_User' }) {}
-class ErrorDto extends createZodDto(z.object({ msg: z.string() }), { id: 'CollectOut_Error' }) {}
-class TagDto extends createZodDto(z.object({ name: z.string() }), { id: 'CollectOut_Tag' }) {}
-
-@Controller('users')
-class UsersController {
-  @Get(':id')
-  @ZodResponse({ status: HttpStatus.OK, type: UserDto })
-  @ZodResponse({ status: HttpStatus.NOT_FOUND, type: ErrorDto })
-  one(): UserDto {
-    return new UserDto();
-  }
-
-  @Get()
-  @ZodResponse({ type: [UserDto] })
-  list(): UserDto[] {
-    return [];
-  }
-
-  @Get('pair')
-  @ZodResponse({ type: [UserDto, TagDto] })
-  pair(): unknown {
-    return [];
-  }
-
-  @Post()
-  noResponse(): void {
-    return;
-  }
-}
-
-@Controller('plain')
-class PlainController {
-  @Get()
-  hello(): string {
-    return 'hi';
-  }
-}
-
-const emptyDoc = (): OpenAPIObject =>
+const makeDoc = (override: { paths?: unknown; components?: unknown } = {}): OpenAPIObject =>
   ({
     openapi: '3.1.0',
     info: { title: 't', version: 'v' },
     paths: {},
     components: { schemas: {} },
-  }) as OpenAPIObject;
+    ...override,
+  }) as unknown as OpenAPIObject;
 
-describe('collectUsage — controller walk (output side)', () => {
-  let app: INestApplication;
-
-  beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [DiscoveryModule],
-      controllers: [UsersController, PlainController],
-    }).compile();
-    app = moduleRef.createNestApplication({ logger: false });
-    await app.init();
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
-
-  it('collects dtoIds from single, array, and tuple @ZodResponse variants across all controllers', () => {
-    const { outputExposedIds } = collectUsage(emptyDoc(), app, stubRegistry);
-    expect([...outputExposedIds].sort()).toEqual([
-      'CollectOut_Error',
-      'CollectOut_Tag',
-      'CollectOut_User',
-    ]);
-  });
-
-  it('deduplicates ids across multiple variants referencing the same DTO', () => {
-    const { outputExposedIds } = collectUsage(emptyDoc(), app, stubRegistry);
-    // UserDto appears in `one` (status 200), `list` (array), and `pair` (tuple[0]) — only one entry.
-    const userCount = [...outputExposedIds].filter((id) => id === 'CollectOut_User').length;
-    expect(userCount).toBe(1);
-  });
-
-  it('ignores controller handlers without @ZodResponse metadata', () => {
-    // PlainController.hello and UsersController.noResponse have no @ZodResponse;
-    // their absence is implicit — no errors thrown, no extra ids emitted.
-    const { outputExposedIds } = collectUsage(emptyDoc(), app, stubRegistry);
-    expect(outputExposedIds.has('CollectOut_User')).toBe(true);
-    expect(outputExposedIds.size).toBe(3);
-  });
+// Marker `type` is a callable (() => Object) — incompatible with the swagger
+// `SchemaObject.type: string` typing; build the fixture as `unknown`.
+const markerSchema = (dtoId: string): unknown => ({
+  type: 'object',
+  properties: { [ZOD_NEST_DTO_EXTENSION]: makeZodDtoMarker(dtoId, 'output') },
 });
 
-describe('collectUsage — controller walk edge cases', () => {
-  it('returns empty when no controllers are registered', async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [DiscoveryModule],
-      controllers: [],
-    }).compile();
-    const localApp = moduleRef.createNestApplication({ logger: false });
-    await localApp.init();
+const ref = (name: string): { $ref: string } => ({ $ref: `#/components/schemas/${name}` });
 
-    const { outputExposedIds } = collectUsage(emptyDoc(), localApp, stubRegistry);
-    expect(outputExposedIds.size).toBe(0);
+const jsonResponse = (schema: unknown): unknown => ({
+  content: { 'application/json': { schema } },
+});
 
-    await localApp.close();
+describe('collectUsage — output side (document responses)', () => {
+  const emptyRegistry = createRegistry();
+
+  it('collects a class-placeholder response ref as its marker dtoId', () => {
+    const doc = makeDoc({
+      paths: {
+        '/users/{id}': {
+          get: {
+            responses: {
+              '200': jsonResponse(ref('UserDto')),
+              '404': jsonResponse(ref('ErrorDto')),
+            },
+          },
+        },
+      },
+      components: { schemas: { UserDto: markerSchema('User'), ErrorDto: markerSchema('Error') } },
+    });
+
+    const { outputExposedIds } = collectUsage(doc, emptyRegistry);
+    expect([...outputExposedIds].sort()).toEqual(['Error', 'User']);
   });
 
-  it('skips DiscoveryService wrappers with null/undefined instances + non-function methods', () => {
-    // Mock DiscoveryService directly to feed pathological wrappers that
-    // exercise the defensive null-instance + non-function-handler guards.
-    const fakeApp = {
-      get: () => ({
-        getControllers: () => [
-          { instance: null },
-          { instance: undefined },
-          // A "controller" whose prototype has a non-function property —
-          // exercises the `typeof handler !== 'function'` skip.
-          { instance: Object.assign(Object.create({ someProp: 'not-a-function' }), {}) },
-        ],
-      }),
-    } as unknown as INestApplication;
+  it('collects array (items.$ref) and tuple (prefixItems) response shapes', () => {
+    const doc = makeDoc({
+      paths: {
+        '/list': {
+          get: { responses: { '200': jsonResponse({ type: 'array', items: ref('UserDto') }) } },
+        },
+        '/pair': {
+          get: {
+            responses: {
+              '200': jsonResponse({ type: 'array', prefixItems: [ref('UserDto'), ref('TagDto')] }),
+            },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          UserDto: markerSchema('User'),
+          TagDto: markerSchema('Tag'),
+        },
+      },
+    });
 
-    const { outputExposedIds } = collectUsage(emptyDoc(), fakeApp, stubRegistry);
+    const { outputExposedIds } = collectUsage(doc, emptyRegistry);
+    expect([...outputExposedIds].sort()).toEqual(['Tag', 'User']);
+  });
+
+  it('deduplicates a dtoId referenced across multiple responses / operations', () => {
+    const doc = makeDoc({
+      paths: {
+        '/a': { get: { responses: { '200': jsonResponse(ref('UserDto')) } } },
+        '/b': {
+          get: { responses: { '200': jsonResponse({ type: 'array', items: ref('UserDto') }) } },
+        },
+      },
+      components: { schemas: { UserDto: markerSchema('User') } },
+    });
+
+    const { outputExposedIds } = collectUsage(doc, emptyRegistry);
+    expect([...outputExposedIds]).toEqual(['User']);
+  });
+
+  it('collects a direct dtoId response ref (no marker) when the id is registered', () => {
+    // Decorator-emitted / anonymous response refs target the dtoId directly
+    // with no class-placeholder hop — matched against the registry's known ids.
+    const registry = createRegistry();
+    registry.register(z.object({ id: z.string() }), 'DirectId');
+
+    const doc = makeDoc({
+      paths: {
+        '/x': { get: { responses: { '200': jsonResponse(ref('DirectId')) } } },
+      },
+    });
+
+    const { outputExposedIds } = collectUsage(doc, registry);
+    expect([...outputExposedIds]).toEqual(['DirectId']);
+  });
+
+  it('is document-scoped — a registered DTO not referenced by any response is not exposed', () => {
+    const registry = createRegistry();
+    registry.register(z.object({ id: z.string() }), 'Unreferenced');
+
+    const doc = makeDoc({
+      paths: { '/x': { get: { responses: { '200': jsonResponse(ref('UserDto')) } } } },
+      components: { schemas: { UserDto: markerSchema('User') } },
+    });
+
+    const { outputExposedIds } = collectUsage(doc, registry);
+    expect(outputExposedIds.has('Unreferenced')).toBe(false);
+    expect([...outputExposedIds]).toEqual(['User']);
+  });
+
+  it('walks non-application/json media types (streamed / binary responses)', () => {
+    const doc = makeDoc({
+      paths: {
+        '/stream': {
+          get: {
+            responses: {
+              '200': { content: { 'text/event-stream': { schema: ref('EventDto') } } },
+            },
+          },
+        },
+      },
+      components: { schemas: { EventDto: markerSchema('Event') } },
+    });
+
+    const { outputExposedIds } = collectUsage(doc, emptyRegistry);
+    expect([...outputExposedIds]).toEqual(['Event']);
+  });
+
+  it('ignores responses without content and non-zod-nest refs', () => {
+    const doc = makeDoc({
+      paths: {
+        '/x': {
+          get: {
+            responses: {
+              '204': { description: 'no content' },
+              '200': jsonResponse(ref('ThirdParty')),
+            },
+          },
+        },
+      },
+      components: { schemas: { ThirdParty: { type: 'object' } } },
+    });
+
+    const { outputExposedIds } = collectUsage(doc, emptyRegistry);
+    expect(outputExposedIds.size).toBe(0);
+  });
+
+  it('ignores malformed paths / operations / responses (defensive)', () => {
+    const doc = {
+      ...makeDoc(),
+      paths: {
+        '/null-pathitem': null,
+        '/null-op': { get: null },
+        '/null-responses': { get: { responses: null } },
+        '/null-response': { get: { responses: { '200': null } } },
+        '/null-content': { get: { responses: { '200': { content: null } } } },
+      },
+    } as unknown as OpenAPIObject;
+
+    const { outputExposedIds } = collectUsage(doc, emptyRegistry);
     expect(outputExposedIds.size).toBe(0);
   });
 });

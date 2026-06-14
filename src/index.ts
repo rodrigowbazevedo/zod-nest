@@ -18,6 +18,7 @@ export type {
   Override,
   OverrideContext,
   OverrideJSONSchemaArg,
+  RegisterFlags,
   RegisterSchemaOptions,
   SchemaObject,
   ToOpenApiOptions,
