@@ -162,10 +162,15 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
       delta.required = deltaRequired;
     }
 
-    delete jsonSchema.type;
     delete jsonSchema.properties;
     delete jsonSchema.required;
     delete jsonSchema.additionalProperties;
+    // Keep `type: 'object'` on the wrapper rather than deleting it: every arm of
+    // the `allOf` is an object, so the wrapper is unambiguously an object, and
+    // the explicit `type` is the more correct / tool-friendly emission.
+    // `type: 'object'` + `allOf` is valid (the instance must be an object AND
+    // satisfy every arm); `unevaluatedProperties: false` still closes the shape.
+    jsonSchema.type = 'object';
     jsonSchema.allOf = [{ $ref: buildRef(parentId) }, delta];
     jsonSchema.unevaluatedProperties = false;
   };

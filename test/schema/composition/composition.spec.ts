@@ -61,7 +61,9 @@ describe('composition emission — extend with registered parent', () => {
 
     expect(body.unevaluatedProperties).toBe(false);
     expect(body.additionalProperties).toBeUndefined();
-    expect(body.type).toBeUndefined();
+    // The wrapper keeps an explicit `type: 'object'` alongside `allOf` (every
+    // arm is an object, so this is the more correct / tool-friendly emission).
+    expect(body.type).toBe('object');
     expect(body.properties).toBeUndefined();
     expect(body.required).toBeUndefined();
   });
