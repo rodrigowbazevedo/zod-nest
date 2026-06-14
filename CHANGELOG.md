@@ -1,3 +1,15 @@
+# [2.0.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.12.0...v2.0.0) (2026-06-14)
+
+
+* feat!: reachability-scoped schema exposure + inline anonymous schemas ([#95](https://github.com/rodrigowbazevedo/zod-nest/issues/95)) ([3ab53a1](https://github.com/rodrigowbazevedo/zod-nest/commit/3ab53a140437736b3a16cd108090945a7cd041ba))
+
+
+---
+
+### Migrating
+
+This release contains breaking changes. See [MIGRATION.md](https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md) for the upgrade path.
+
 # [1.12.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v1.11.0...v1.12.0) (2026-06-13)
 
 
