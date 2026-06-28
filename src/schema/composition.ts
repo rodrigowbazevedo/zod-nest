@@ -23,6 +23,15 @@ import { registerSchema } from './registry.js';
 export interface LineageEntry {
   readonly op: 'extend';
   readonly parent: z.ZodObject;
+  /**
+   * Keys the child redeclared with a *different* schema than the parent's
+   * (e.g. narrowing `type: SomeEnum` to `type: z.literal('A')`). Computed by
+   * reference comparison at `extend()` time — Zod's `.extend()` keeps the same
+   * shape reference for untouched keys and assigns a fresh one for overrides.
+   * The composition override keeps these in the delta instead of dropping them
+   * as parent-owned, so the narrowing survives in the emitted `allOf`.
+   */
+  readonly overriddenKeys: ReadonlySet<string>;
 }
 
 // `WeakMap` (not `z.registry`) so transient derived schemas can GC — Zod's
@@ -57,6 +66,22 @@ const computeShapeKeys = (
 };
 
 /**
+ * Keys the child shares with the parent by name but redeclares with a
+ * different schema. Relies on Zod's `.extend()` reference semantics: untouched
+ * keys keep the parent's shape reference, overridden keys get a fresh one.
+ */
+const computeOverriddenKeys = (parent: z.ZodObject, child: z.ZodObject): ReadonlySet<string> => {
+  const overriddenKeys = new Set<string>();
+  for (const key of Object.keys(child.shape)) {
+    const parentProp = parent.shape[key];
+    if (parentProp !== undefined && parentProp !== child.shape[key]) {
+      overriddenKeys.add(key);
+    }
+  }
+  return overriddenKeys;
+};
+
+/**
  * Wraps a derived `z.ZodObject` and records the parent → child link so
  * emission rewrites the body to `allOf: [{ $ref: <parent> }, <delta>]`.
  *
@@ -71,7 +96,11 @@ export const extend = <P extends z.ZodObject, S extends z.ZodObject>(
   build: (p: P) => S,
 ): S => {
   const result = build(parent);
-  lineageMap.set(result, { op: 'extend', parent });
+  lineageMap.set(result, {
+    op: 'extend',
+    parent,
+    overriddenKeys: computeOverriddenKeys(parent, result),
+  });
   if (!propsMap.has(parent)) {
     propsMap.set(parent, computeShapeKeys(parent));
   }
@@ -150,7 +179,10 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
 
     const deltaProps: NonNullable<SchemaObject['properties']> = {};
     for (const [key, value] of Object.entries(childProps)) {
-      if (parentPropSet.has(key)) {
+      // Drop parent-owned keys, but keep any the child overrode with a
+      // different schema — otherwise the narrowing (e.g. enum → literal) is
+      // lost and `allOf` would only carry the parent's wider constraint.
+      if (parentPropSet.has(key) && !entry.overriddenKeys.has(key)) {
         continue;
       }
       deltaProps[key] = value;

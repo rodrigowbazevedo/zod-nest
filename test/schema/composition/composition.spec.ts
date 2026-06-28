@@ -212,6 +212,75 @@ describe('composition emission — extend() auto-registers named parent + result
   });
 });
 
+describe('composition emission — overridden parent properties', () => {
+  // The child narrows a property it inherits from the parent. Because the key
+  // exists in the parent by name, the naive delta builder dropped it entirely
+  // and the narrowing was lost. The override must keep a redeclared key in the
+  // delta so the `allOf` intersects parent constraint with child narrowing.
+  it('keeps a property the child narrowed to a literal', () => {
+    const Base = z
+      .object({ type: z.enum(['A', 'B']), shared: z.string() })
+      .meta({ id: 'Comp_Override_Base' });
+    const Child = extend(Base, (s) =>
+      s.extend({ type: z.literal('A'), field: z.string() }).meta({ id: 'Comp_Override_Child' }),
+    );
+
+    const body = emit(Child) as {
+      allOf?: ({ $ref?: string } | { properties?: Record<string, unknown> })[];
+    };
+
+    const delta = body.allOf?.[1] as { properties?: Record<string, unknown> };
+    // The narrowed discriminator survives in the delta...
+    expect(delta.properties?.type).toMatchObject({ const: 'A' });
+    // ...alongside the genuinely new property...
+    expect(delta.properties?.field).toMatchObject({ type: 'string' });
+    // ...while the untouched inherited key stays parent-owned (omitted).
+    expect(delta.properties?.shared).toBeUndefined();
+  });
+
+  it('omits an inherited property the child redeclared identically by reference', () => {
+    // Reusing the SAME schema reference for an inherited key is not an
+    // override — Zod keeps the parent reference, so it stays parent-owned.
+    const sharedProp = z.string();
+    const Base = z.object({ kept: sharedProp }).meta({ id: 'Comp_Override_SameRef_Base' });
+    const Child = extend(Base, (s) =>
+      s.extend({ kept: sharedProp, added: z.number() }).meta({ id: 'Comp_Override_SameRef_Child' }),
+    );
+
+    const body = emit(Child) as { allOf?: { properties?: Record<string, unknown> }[] };
+    const delta = body.allOf?.[1];
+    expect(delta?.properties?.kept).toBeUndefined();
+    expect(delta?.properties?.added).toMatchObject({ type: 'number' });
+  });
+
+  it('each discriminated-union arm retains its narrowed discriminator', () => {
+    // Mirrors the original repro: a generic base whose `type` is narrowed per
+    // arm, composed back into a discriminated union. Every arm must carry its
+    // own `type` const for the union to remain discriminable downstream.
+    const GenericBase = z.object({ type: z.enum(['A', 'B']) }).meta({ id: 'Comp_DU_Base' });
+    const ArmA = extend(GenericBase, (s) =>
+      s.extend({ type: z.literal('A'), field: z.string() }).meta({ id: 'Comp_DU_ArmA' }),
+    );
+    const ArmB = extend(GenericBase, (s) =>
+      s.extend({ type: z.literal('B'), anotherField: z.string() }).meta({ id: 'Comp_DU_ArmB' }),
+    );
+    const Union = z.discriminatedUnion('type', [ArmA, ArmB]).meta({ id: 'Comp_DU_Union' });
+
+    const registry = createRegistry();
+    const { refs } = toOpenApi(Union, { io: 'input', registry });
+
+    const armADelta = (
+      refs.get('Comp_DU_ArmA') as { allOf?: { properties?: Record<string, unknown> }[] }
+    ).allOf?.[1];
+    const armBDelta = (
+      refs.get('Comp_DU_ArmB') as { allOf?: { properties?: Record<string, unknown> }[] }
+    ).allOf?.[1];
+
+    expect(armADelta?.properties?.type).toMatchObject({ const: 'A' });
+    expect(armBDelta?.properties?.type).toMatchObject({ const: 'B' });
+  });
+});
+
 describe('composition emission — all-optional shapes', () => {
   // Zod omits the `required` array entirely when every property is optional.
   // The override's `jsonSchema.required ?? []` fallback must handle that

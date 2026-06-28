@@ -80,7 +80,7 @@ For a registered parent (one with `.meta({ id })` or registered via `createZodDt
 The delta is computed structurally:
 
 - **`type: "object"`** is kept on the outer schema — every `allOf` arm is an object, so the wrapper is unambiguously an object, and the explicit `type` is the more correct / tool-friendly emission (it pairs validly with `allOf`).
-- **Properties** that exist on the parent are stripped from the delta — they're already in the `$ref`.
+- **Properties** that exist on the parent _unchanged_ are stripped from the delta — they're already in the `$ref`. A property the child **overrides** with a different schema (e.g. narrowing an inherited `type: z.enum([...])` to `type: z.literal('A')`) is **kept** in the delta, so the `allOf` intersects the parent's constraint with the child's narrowing instead of silently dropping it.
 - **Required** entries that exist on the parent are stripped from the delta's `required` array.
 - **`unevaluatedProperties: false`** is set on the outer schema, not on the delta, so the strictness applies to the merged shape.
 - **`additionalProperties`** is intentionally omitted from the delta — `unevaluatedProperties` on the outer schema is the correct strictness gate for `allOf` composition.
