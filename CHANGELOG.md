@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.1...v2.1.2) (2026-06-28)
+
+
+### Bug Fixes
+
+* **schema:** list overridden-and-required keys in extend() composition delta ([#103](https://github.com/rodrigowbazevedo/zod-nest/issues/103)) ([a4305a9](https://github.com/rodrigowbazevedo/zod-nest/commit/a4305a948e93e9e54cc2fef0fbc473192ccbb03b))
+
 ## [2.1.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.0...v2.1.1) (2026-06-28)
 
 
