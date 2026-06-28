@@ -238,6 +238,39 @@ describe('composition emission — overridden parent properties', () => {
     expect(delta.properties?.shared).toBeUndefined();
   });
 
+  it('lists an overridden-and-required key in the delta required array', () => {
+    // The narrowed body lives in the delta, so its `required` marker must too —
+    // otherwise the overridden field reads as optional in the delta arm.
+    const Base = z.object({ type: z.enum(['A', 'B']) }).meta({ id: 'Comp_Override_Req_Base' });
+    const Child = extend(Base, (s) =>
+      s.extend({ type: z.literal('A'), field: z.string() }).meta({ id: 'Comp_Override_Req_Child' }),
+    );
+
+    const body = emit(Child) as { allOf?: { required?: string[] }[] };
+    const delta = body.allOf?.[1];
+    expect(delta?.required).toContain('type');
+    expect(delta?.required).toContain('field');
+  });
+
+  it('keeps an overridden-but-optional key out of the delta required array', () => {
+    // The child narrows the type AND makes it optional — it belongs in the
+    // delta properties but must NOT be marked required.
+    const Base = z.object({ type: z.enum(['A', 'B']) }).meta({ id: 'Comp_Override_Opt_Base' });
+    const Child = extend(Base, (s) =>
+      s
+        .extend({ type: z.literal('A').optional(), field: z.string() })
+        .meta({ id: 'Comp_Override_Opt_Child' }),
+    );
+
+    const body = emit(Child) as {
+      allOf?: { properties?: Record<string, unknown>; required?: string[] }[];
+    };
+    const delta = body.allOf?.[1];
+    expect(delta?.properties?.type).toBeDefined();
+    expect(delta?.required ?? []).not.toContain('type');
+    expect(delta?.required).toContain('field');
+  });
+
   it('omits an inherited property the child redeclared identically by reference', () => {
     // Reusing the SAME schema reference for an inherited key is not an
     // override — Zod keeps the parent reference, so it stays parent-owned.
