@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.0...v2.1.1) (2026-06-28)
+
+
+### Bug Fixes
+
+* **schema:** keep child-overridden properties in extend() composition deltas ([#102](https://github.com/rodrigowbazevedo/zod-nest/issues/102)) ([ea2c4ed](https://github.com/rodrigowbazevedo/zod-nest/commit/ea2c4ed11ec9eab5e25b0b9db98844d94272afda))
+
 # [2.1.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.0.1...v2.1.0) (2026-06-14)
 
 
