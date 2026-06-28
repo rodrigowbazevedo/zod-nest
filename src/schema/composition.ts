@@ -187,7 +187,14 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
       }
       deltaProps[key] = value;
     }
-    const deltaRequired = childRequired.filter((key) => !parentReqSet.has(key));
+    // Mirror the properties logic: drop parent-required keys, but keep any the
+    // child overrode and still requires — its narrowed body now lives in the
+    // delta, so the `required` marker must travel with it (otherwise the
+    // overridden field reads as optional in the delta arm, e.g. breaking a
+    // discriminated union whose discriminator must be required on each arm).
+    const deltaRequired = childRequired.filter(
+      (key) => !parentReqSet.has(key) || entry.overriddenKeys.has(key),
+    );
 
     const delta: SchemaObject = { type: 'object', properties: deltaProps };
     if (deltaRequired.length > 0) {
