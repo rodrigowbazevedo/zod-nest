@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           # Node 24.15.0 still ships npm 10.9.8, which lacks trusted-publisher
           # OIDC support. We upgrade to npm@11 explicitly via the @semantic-
