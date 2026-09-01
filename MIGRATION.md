@@ -413,6 +413,9 @@ The pipe uses `safeParseAsync`, so async refinements work. Check that the schema
 **"Cycle errors when emitting recursive schemas."**
 Set `cycles: 'ref'` in the schema's `.meta(...)` (Zod v4 picks it up) and ensure the schema has an `id` (`.meta({ id: 'Comment' })`). See [`docs/recipes/recursive-schemas.md`](docs/recipes/recursive-schemas.md).
 
+**"I get `ReferenceError: Cannot access 'X' before initialization` from a `z.lazy` getter when a module loads."**
+Earlier versions resolved `z.lazy` getters while registering a schema, so two mutually recursive schemas in the same module crashed under native ESM — and silently lost dependent discovery under CommonJS, which is why the same code appeared to work under Jest. Dependent discovery now happens at document build. Upgrade; there's no code change on your side, and declaration order still doesn't matter. See [`docs/recipes/recursive-schemas.md`](docs/recipes/recursive-schemas.md#mutually-recursive-schemas).
+
 **"What happened to `createZodGuard` / `validate()` helpers?"**
 Dropped. Use `schema.parse(input)` / `schema.safeParse(input)` directly — they're Zod's own API and work the same way as the previous helpers.
 

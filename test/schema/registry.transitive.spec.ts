@@ -180,3 +180,71 @@ describe('ZodNestRegistry.register() — transitive closure', () => {
     expect(registry.hasCollision('Trans_Idem_Child')).toBe(false);
   });
 });
+
+describe('ZodNestRegistry.register() — deferred discovery', () => {
+  it('does not force a z.lazy getter that points at a later declaration', () => {
+    const registry = createRegistry();
+
+    const First: z.ZodType = z.object({ second: z.lazy(() => Second).optional() });
+    expect(() => registry.register(First, 'Defer_First')).not.toThrow();
+
+    const Second = z.object({ first: z.lazy(() => First) }).meta({ id: 'Defer_Second' });
+    registry.register(Second, 'Defer_Second');
+
+    expect(new Set(registry.ids())).toEqual(new Set(['Defer_First', 'Defer_Second']));
+  });
+
+  it('adopts a named descendant declared after the root was registered', () => {
+    const registry = createRegistry();
+
+    const Root: z.ZodType = z.object({ leaf: z.lazy(() => Leaf) });
+    registry.register(Root, 'Defer_LateRoot');
+
+    const Leaf = z.string().meta({ id: 'Defer_LateLeaf' });
+
+    expect(new Set(registry.ids())).toEqual(new Set(['Defer_LateRoot', 'Defer_LateLeaf']));
+  });
+
+  it('reports a collision between two mutually recursive branches sharing an id', () => {
+    const registry = createRegistry();
+
+    const Left: z.ZodType = z.object({ right: z.lazy(() => Right) });
+    registry.register(Left, 'Defer_Collide_Left');
+
+    const DupeA = z.literal('a').meta({ id: 'Defer_Collide_Dupe' });
+    const DupeB = z.literal('b').meta({ id: 'Defer_Collide_Dupe' });
+    const Right = z.object({ left: Left, a: DupeA, b: DupeB });
+    registry.register(Right, 'Defer_Collide_Right');
+
+    expect(registry.hasCollision('Defer_Collide_Dupe')).toBe(true);
+    expect(registry.getCollisions().get('Defer_Collide_Dupe')?.size).toBe(2);
+  });
+
+  it('picks up schemas registered after an earlier read', () => {
+    const registry = createRegistry();
+    const FirstChild = z.string().meta({ id: 'Defer_Read1_Child' });
+    registry.register(z.object({ child: FirstChild }), 'Defer_Read1_Parent');
+
+    expect(new Set(registry.ids())).toEqual(new Set(['Defer_Read1_Parent', 'Defer_Read1_Child']));
+
+    const SecondChild = z.string().meta({ id: 'Defer_Read2_Child' });
+    registry.register(z.object({ child: SecondChild }), 'Defer_Read2_Parent');
+
+    expect(new Set(registry.ids())).toEqual(
+      new Set([
+        'Defer_Read1_Parent',
+        'Defer_Read1_Child',
+        'Defer_Read2_Parent',
+        'Defer_Read2_Child',
+      ]),
+    );
+  });
+
+  it('returns a stable snapshot across repeated reads', () => {
+    const registry = createRegistry();
+    const Child = z.string().meta({ id: 'Defer_Stable_Child' });
+    registry.register(z.object({ child: Child }), 'Defer_Stable_Parent');
+
+    expect(registry.ids()).toEqual(registry.ids());
+  });
+});
