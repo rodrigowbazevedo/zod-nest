@@ -3,6 +3,7 @@ import type { ZodNestRegistry } from '../schema/registry.js';
 
 import { COMPONENTS_SCHEMAS_PREFIX } from '../schema/constants.js';
 import { OUTPUT_SUFFIX } from './constants.js';
+import { walkRefs } from './walk-refs.js';
 
 export interface InlineAnonymousBodiesParams {
   /** OpenAPI doc whose anonymous `$ref`s will be inlined in place. */
@@ -11,25 +12,8 @@ export interface InlineAnonymousBodiesParams {
   registry: ZodNestRegistry;
 }
 
-/**
- * Inlines every anonymous schema's body at its `$ref` site(s) and prunes the
- * synthetic component. An anonymous id is the placeholder minted for a schema
- * passed inline to `@ZodResponse` / `@ZodBody` with no resolvable id; it exists
- * only to carry the body through `bulkEmit` (so the body honors the document's
- * `strict` / `override`). By the time this runs the body has been written to
- * `components.schemas[id]` and cleaned by `stripMarkers`, so we clone it into
- * each referrer and drop the component.
- *
- * Runs after `mergeSchemas` + `rewriteRefs` + `stripMarkers`, before
- * `assertNoDanglingRefs`. The inlined body's nested member `$ref`s point at
- * real, exposed components (closed over by `extendExposureViaRefs`), so the
- * dangling-ref assertion still passes.
- *
- * A reused anonymous instance (same schema across N referrers) has its body
- * duplicated at each site — the author adds `.meta({ id })` to share it as a
- * named component instead. Both the canonical id and its divergent
- * `<id>Output` sibling (if input/output diverged) are inlined and pruned.
- */
+// Inlines each anonymous body at its `$ref` site(s) and prunes the component,
+// except where one is still referenced. See swagger-integration.md step 7.
 export const inlineAnonymousBodies = ({ doc, registry }: InlineAnonymousBodiesParams): void => {
   const anonIds = registry.anonymousIds();
   if (anonIds.length === 0) {
@@ -56,13 +40,33 @@ export const inlineAnonymousBodies = ({ doc, registry }: InlineAnonymousBodiesPa
     return;
   }
 
-  // Inline only within `paths` — anonymous ids are top-level body/response
-  // placeholders, never referenced from another component schema.
+  // A recursive body refs itself, so inlining it would strand that ref once the
+  // component is pruned. Anything still referenced stays a component instead.
+  for (const ref of refsWithin(schemas, bodyByRef)) {
+    bodyByRef.delete(ref);
+  }
+
+  // Inline only within `paths` — the remaining anonymous ids are top-level
+  // body/response placeholders, referenced from nowhere else.
   inlineRefs(doc.paths, bodyByRef);
 
   for (const ref of bodyByRef.keys()) {
     delete schemas[ref.slice(COMPONENTS_SCHEMAS_PREFIX.length)];
   }
+};
+
+const refsWithin = (
+  schemas: Record<string, unknown>,
+  bodyByRef: ReadonlyMap<string, Record<string, unknown>>,
+): Set<string> => {
+  const found = new Set<string>();
+  walkRefs(schemas, (ref) => {
+    if (bodyByRef.has(ref)) {
+      found.add(ref);
+    }
+    return undefined;
+  });
+  return found;
 };
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> =>

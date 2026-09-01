@@ -52,6 +52,8 @@ Internally a raw schema is normalised to `createZodDto(schema).Output` — **out
 
 **Named vs. anonymous.** With a `.meta({ id })`, the schema becomes a named `components.schemas` entry and the response references it by `$ref`. **Without an id, the schema is inlined directly into the response body** — `applyZodNest` renders the body at the use site and emits no synthetic component (so there is no `_Anon…` entry and no warning). Named schemas referenced _inside_ an inlined anonymous body (e.g. the members of an anonymous `z.union([A, B])` where `A`/`B` have ids) stay as `$ref`s and remain in `components.schemas`. Reusing the **same anonymous instance** across routes duplicates the inlined body at each site — add `.meta({ id })` to share it as one named component instead. This mirrors how `@ZodBody` treats anonymous request bodies.
 
+**Recursive anonymous schemas are the exception.** A self-referencing schema can't be inlined — the body holds a `$ref` back to itself — so it keeps its synthetic component and the response references it by `$ref`, exactly like a named schema. That means a `_AnonResponseSchema_N` entry _does_ show up in `components.schemas`. Add `.meta({ id })` to give it a readable name in the published spec.
+
 ## Multi-status stacking
 
 Stack multiple `@ZodResponse` decorators to declare different DTOs per status code:

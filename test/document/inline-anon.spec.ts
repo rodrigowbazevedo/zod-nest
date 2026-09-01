@@ -144,3 +144,132 @@ describe('inlineAnonymousBodies — defensive early returns', () => {
     expect(Object.keys(schemas)).toEqual(['Unrelated']);
   });
 });
+
+interface CommentShape {
+  body: string;
+  replies: CommentShape[];
+}
+
+// Anonymous AND recursive: no `.meta({ id })`, and the body refs itself.
+const AnonComment: z.ZodType<CommentShape> = z.lazy(() =>
+  z.object({ body: z.string(), replies: z.array(AnonComment) }),
+);
+// A distinct instance — `resolveAnonId` caches one id per schema instance, so
+// reusing `AnonComment` here would share its `_AnonBodySchema_` id.
+const AnonReply: z.ZodType<CommentShape> = z.lazy(() =>
+  z.object({ body: z.string(), replies: z.array(AnonReply) }),
+);
+const NamedComment: z.ZodType<CommentShape> = z
+  .lazy(() => z.object({ body: z.string(), replies: z.array(NamedComment) }))
+  .meta({ id: 'RecNamedComment' });
+
+@Controller('rec')
+class RecursiveController {
+  @Post('anon-body')
+  @ZodBody(AnonComment)
+  anonBody(): void {}
+
+  @Get('anon-response')
+  @ZodResponse({ status: HttpStatus.OK, type: AnonReply })
+  anonResponse(): unknown {
+    return {};
+  }
+
+  @Post('named-body')
+  @ZodBody(NamedComment)
+  namedBody(): void {}
+
+  @Post('flat-body')
+  @ZodBody(z.object({ label: z.string() }))
+  flatBody(): void {}
+}
+
+describe('applyZodNest — a recursive anonymous body stays a component', () => {
+  let app: INestApplication;
+  let doc: OpenAPIObject;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [DiscoveryModule],
+      controllers: [RecursiveController],
+    }).compile();
+    app = moduleRef.createNestApplication({ logger: false });
+    await app.init();
+    const config = new DocumentBuilder().setTitle('t').setVersion('v').build();
+    doc = applyZodNest(SwaggerModule.createDocument(app, config));
+  });
+
+  afterAll(() => app.close());
+
+  const schemas = (): Record<string, unknown> => doc.components?.schemas as Record<string, unknown>;
+
+  const bodySchemaAt = (path: string): Record<string, unknown> | undefined => {
+    const op = (doc.paths as Record<string, Record<string, Record<string, unknown>>>)[path]?.[
+      'post'
+    ];
+    const body = op?.requestBody as Record<string, Record<string, unknown>> | undefined;
+    const content = body?.content as Record<string, Record<string, unknown>> | undefined;
+    return content?.['application/json']?.schema as Record<string, unknown> | undefined;
+  };
+
+  const anonIds = (): string[] => Object.keys(schemas()).filter((id) => id.startsWith('_Anon'));
+
+  it('emits a document instead of throwing DANGLING_REF', () => {
+    expect(doc.components?.schemas).toBeDefined();
+  });
+
+  it('references the retained component from the operation', () => {
+    const schema = bodySchemaAt('/rec/anon-body');
+    expect(schema?.$ref).toMatch(/^#\/components\/schemas\/_AnonBodySchema_/);
+  });
+
+  it('keeps the recursive body reachable so its self-ref resolves', () => {
+    const bodyRef = bodySchemaAt('/rec/anon-body')?.$ref as string;
+    const id = bodyRef.slice(ROOT.length);
+    const body = schemas()[id] as { properties?: Record<string, { items?: { $ref?: string } }> };
+
+    expect(body.properties?.replies?.items?.$ref).toBe(bodyRef);
+  });
+
+  it('retains a component for the recursive response body too', () => {
+    expect(anonIds().some((id) => id.startsWith('_AnonResponseSchema_'))).toBe(true);
+  });
+
+  it('leaves every $ref in the document resolvable', () => {
+    const present = new Set(Object.keys(schemas()));
+    const unresolved: string[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          walk(item);
+        }
+        return;
+      }
+      if (node === null || typeof node !== 'object') {
+        return;
+      }
+      const obj = node as Record<string, unknown>;
+      const ref = obj.$ref;
+      if (typeof ref === 'string' && ref.startsWith(ROOT) && !present.has(ref.slice(ROOT.length))) {
+        unresolved.push(ref);
+      }
+      for (const value of Object.values(obj)) {
+        walk(value);
+      }
+    };
+    walk(doc);
+
+    expect(unresolved).toEqual([]);
+  });
+
+  it('still inlines and prunes a non-recursive anonymous body', () => {
+    const schema = bodySchemaAt('/rec/flat-body');
+    expect(schema?.$ref).toBeUndefined();
+    expect(schema?.properties).toMatchObject({ label: { type: 'string' } });
+  });
+
+  it('leaves a named recursive schema on its own id', () => {
+    expect(schemas()['RecNamedComment']).toBeDefined();
+    expect(bodySchemaAt('/rec/named-body')?.$ref).toBe(`${ROOT}RecNamedComment`);
+  });
+});
