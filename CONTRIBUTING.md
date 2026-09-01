@@ -12,7 +12,7 @@ Thanks for your interest. `zod-nest` is a small, single-maintainer OSS project �
 
 You'll need:
 
-- **Node ≥ 22** (the engines field is enforced).
+- **Node ≥ 22.12** (the engines field is enforced). NestJS 12 is ESM, and unflagged `require(esm)` landed in 22.12.0.
 - **npm** — the lockfile is npm's. If you prefer pnpm / yarn locally, that's fine, but please don't commit a switched lockfile.
 
 ```bash

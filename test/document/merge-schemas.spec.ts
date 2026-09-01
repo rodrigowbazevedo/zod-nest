@@ -245,6 +245,68 @@ describe('mergeSchemas — className → dtoId rename', () => {
     expect((caught as ZodNestDocumentError).code).toBe('AMBIGUOUS_RENAME');
     expect((caught as ZodNestDocumentError).details.key).toBe('Bar');
   });
+
+  it('flags a body that predates zod-nest and points at the native Standard Schema path', () => {
+    const doc = emptyDoc();
+    // What `@Body({ schema })` leaves behind on NestJS 12: a real, already
+    // converted component under the same id zod-nest is about to emit.
+    doc.components = {
+      schemas: { Bar: { type: 'object', properties: { role: { enum: ['admin'] } } } as never },
+    };
+
+    let caught: unknown;
+    try {
+      mergeSchemas({
+        doc,
+        inputSchemas: new Map([
+          ['Bar', { type: 'object', properties: { role: { const: 'admin' } } }],
+        ]),
+        outputSchemas: new Map(),
+        collected: usage({ inputExposedIds: new Set(['Bar']) }),
+        collisions: NO_COLLISIONS,
+      });
+    } catch (e) {
+      caught = e;
+    }
+
+    const error = caught as ZodNestDocumentError;
+    expect(error.details.preexisting).toBe(true);
+    expect(error.message).toContain('@Body({ schema })');
+    expect(error.message).toContain('createZodDto');
+  });
+
+  it('does not blame the native path when two emitted ids collide on one key', () => {
+    const doc = emptyDoc();
+
+    let caught: unknown;
+    try {
+      mergeSchemas({
+        doc,
+        // `Foo` diverges, so it writes `FooOutput` — colliding with the
+        // separately registered `FooOutput` id.
+        inputSchemas: new Map([
+          ['Foo', { type: 'object', properties: { a: { type: 'string' } } }],
+          ['FooOutput', { type: 'object', properties: { b: { type: 'string' } } }],
+        ]),
+        outputSchemas: new Map([
+          ['Foo', { type: 'object', properties: { a: { type: 'number' } } }],
+        ]),
+        collected: usage({
+          inputExposedIds: new Set(['Foo', 'FooOutput']),
+          outputExposedIds: new Set(['Foo']),
+        }),
+        collisions: NO_COLLISIONS,
+      });
+    } catch (e) {
+      caught = e;
+    }
+
+    const error = caught as ZodNestDocumentError;
+    expect(error.code).toBe('AMBIGUOUS_RENAME');
+    expect(error.details.preexisting).toBe(false);
+    expect(error.message).toContain('<Id>Output');
+    expect(error.message).not.toContain('@Body({ schema })');
+  });
 });
 
 describe('mergeSchemas — collision decoration', () => {

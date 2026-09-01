@@ -1,5 +1,5 @@
 {
-  "$comment": "Source of truth for the compatibility matrix. Edit this file to extend or shrink supported peer-dep ranges; the workflow at .github/workflows/compat-matrix.yml expands these cells into a strategy matrix and fails if any cell's test suite + pack-smoke breaks. Each cell pins every peer the consumer can independently vary (zod / nest-common / nest-core / nest-swagger / rxjs / reflect-metadata) plus the Node major to run under, so we exercise the floor on the floor Node AND the ceiling on the ceiling Node. Pack-smoke runs inside each cell via scripts/run-compat.mjs, so a cell is green only if the BUILT tarball installs and bootstraps under the cell's Node + peer pin.",
+  "$comment": "Source of truth for the compatibility matrix. Edit this file to extend or shrink supported peer-dep ranges; the workflow at .github/workflows/compat-matrix.yml expands these cells into a strategy matrix and fails if any cell's test suite + pack-smoke breaks. Each cell pins every peer the consumer can independently vary (zod / nest-common / nest-core / nest-swagger / rxjs / reflect-metadata) plus the Node major to run under, so we exercise the floor on the floor Node AND the ceiling on the ceiling Node. Cells that move NestJS additionally pin @nestjs/platform-express and @nestjs/testing to the same major: both peer-require matching @nestjs/common + @nestjs/core majors, so moving the others without them is just a peer conflict. Pack-smoke runs inside each cell via scripts/run-compat.mjs, so a cell is green only if the BUILT tarball installs and bootstraps under the cell's Node + peer pin.",
   "cells": [
     {
       "name": "floor-node22",
@@ -68,6 +68,8 @@
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
       "@nestjs/swagger": "latest",
+      "@nestjs/platform-express": "latest",
+      "@nestjs/testing": "latest",
       "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
@@ -78,6 +80,32 @@
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
       "@nestjs/swagger": "latest",
+      "@nestjs/platform-express": "latest",
+      "@nestjs/testing": "latest",
+      "rxjs": "7.6.0",
+      "reflect-metadata": "0.2.0"
+    },
+    {
+      "name": "nest12-node22",
+      "node": "22",
+      "zod": "4.4.0",
+      "@nestjs/common": "12.0.1",
+      "@nestjs/core": "12.0.1",
+      "@nestjs/swagger": "12.0.1",
+      "@nestjs/platform-express": "12.0.1",
+      "@nestjs/testing": "12.0.1",
+      "rxjs": "7.6.0",
+      "reflect-metadata": "0.2.0"
+    },
+    {
+      "name": "nest12-node24",
+      "node": "24",
+      "zod": "4.4.0",
+      "@nestjs/common": "12.0.1",
+      "@nestjs/core": "12.0.1",
+      "@nestjs/swagger": "12.0.1",
+      "@nestjs/platform-express": "12.0.1",
+      "@nestjs/testing": "12.0.1",
       "rxjs": "7.6.0",
       "reflect-metadata": "0.2.0"
     },
@@ -128,6 +156,8 @@
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
       "@nestjs/swagger": "latest",
+      "@nestjs/platform-express": "latest",
+      "@nestjs/testing": "latest",
       "rxjs": "latest",
       "reflect-metadata": "latest"
     },
@@ -138,6 +168,8 @@
       "@nestjs/common": "latest",
       "@nestjs/core": "latest",
       "@nestjs/swagger": "latest",
+      "@nestjs/platform-express": "latest",
+      "@nestjs/testing": "latest",
       "rxjs": "latest",
       "reflect-metadata": "latest"
     }

@@ -1,7 +1,16 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: 'ts-jest',
   testEnvironment: 'node',
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', {}],
+    '^.+\\.m?js$': ['@swc/jest', { module: { type: 'commonjs' } }],
+  },
+  // Nest 12+ ships ESM and Jest has no `require(esm)`, so its packages must be
+  // transformed. Extend this list when Nest adds an ESM transitive — the
+  // compat matrix catches it as an "unexpected token" parse failure.
+  transformIgnorePatterns: [
+    '/node_modules/(?!(@nestjs|es-toolkit|file-type|load-esm|strtok3|token-types|peek-readable|uint8array-extras)/)',
+  ],
   roots: ['<rootDir>/src', '<rootDir>/test'],
   testMatch: ['**/*.spec.ts'],
   moduleNameMapper: {

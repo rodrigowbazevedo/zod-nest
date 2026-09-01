@@ -9,9 +9,11 @@ export type ZodNestDocumentErrorCode =
  * Thrown by `applyZodNest` when the doc cannot be processed cleanly. Surfaces
  * at doc-build time so typos / mis-registrations fail in CI, not at runtime.
  *
- * `AMBIGUOUS_RENAME`: two distinct DTO classes target the same registry id
- * with differing bodies — the rename pass can't write `components.schemas[id]`
- * unambiguously.
+ * `AMBIGUOUS_RENAME`: two distinct bodies target one `components.schemas[id]`.
+ * `details.preexisting` distinguishes the causes — `true` means the key was
+ * already populated before zod-nest emitted anything (on NestJS 12+, usually
+ * the native Standard Schema path emitting the component itself); `false`
+ * means two registered ids collided on one key.
  *
  * `DANGLING_REF`: a `$ref` in the doc points at a `components.schemas` key
  * that no longer exists after `applyZodNest`. Usually means a marker was

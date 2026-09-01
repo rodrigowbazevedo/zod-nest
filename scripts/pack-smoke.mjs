@@ -68,6 +68,32 @@ const EXPECTED_EXPORTS = [
 
 const log = (msg) => console.log(`[pack-smoke] ${msg}`);
 
+const parseCompatCell = () => {
+  const raw = process.env.COMPAT_CELL;
+  if (!raw) {
+    return {};
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`COMPAT_CELL is not valid JSON: ${err.message}`, { cause: err });
+  }
+};
+
+// `peerDependencies` holds ranges, so installing straight from them smoke-tests
+// each range's maximum rather than the cell under test. When run inside the
+// compat matrix, the cell's exact pins win for the peers it names.
+const resolvePeerArgs = (peerDependencies) => {
+  const cell = parseCompatCell();
+  const pinned = Object.keys(peerDependencies).filter((name) => cell[name] !== undefined);
+  if (pinned.length > 0) {
+    log(`COMPAT_CELL "${cell.name ?? '<unnamed>'}" pins: ${pinned.join(', ')}`);
+  }
+  return Object.entries(peerDependencies)
+    .map(([name, range]) => `'${name}@${cell[name] ?? range}'`)
+    .join(' ');
+};
+
 const sandbox = mkdtempSync(join(tmpdir(), 'zod-nest-pack-smoke-'));
 let tarballPathInRoot = null;
 
@@ -97,9 +123,7 @@ try {
   copyFileSync(tarballPathInRoot, join(sandbox, packMeta.filename));
 
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
-  const peerArgs = Object.entries(pkg.peerDependencies ?? {})
-    .map(([name, ver]) => `'${name}@${ver}'`)
-    .join(' ');
+  const peerArgs = resolvePeerArgs(pkg.peerDependencies ?? {});
 
   log('npm init + install peers + tarball');
   execSync('npm init -y', { cwd: sandbox, stdio: 'ignore' });
