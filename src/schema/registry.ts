@@ -50,6 +50,7 @@ export const createRegistry = (): ZodNestRegistry => {
   const seen = new Map<string, Set<z.ZodType>>();
   const forceExposed = new Set<string>();
   const anonymous = new Set<string>();
+  const pendingRoots: z.ZodType[] = [];
 
   const recordOnce = (schema: z.ZodType, id: string): boolean => {
     let set = seen.get(id);
@@ -62,6 +63,14 @@ export const createRegistry = (): ZodNestRegistry => {
     }
     set.add(schema);
     return true;
+  };
+
+  const flushPendingDiscovery = (): void => {
+    for (const root of pendingRoots.splice(0)) {
+      for (const [child, childId] of discoverDependents(root)) {
+        recordOnce(child, childId);
+      }
+    }
   };
 
   return {
@@ -94,17 +103,18 @@ export const createRegistry = (): ZodNestRegistry => {
       if (!recordOnce(schema, id)) {
         return;
       }
-      // `discoverDependents` walks the Zod tree once and yields every named
-      // descendant transitively (cycle-safe via its own visited set).
-      for (const [child, childId] of discoverDependents(schema)) {
-        recordOnce(child, childId);
-      }
+      // Queue, don't walk: forcing `z.lazy` getters here reads forward
+      // references still in their temporal dead zone (throws under ESM,
+      // yields `undefined` under CJS). Draining on first read is always safe.
+      pendingRoots.push(schema);
     },
     hasCollision: (id) => {
+      flushPendingDiscovery();
       const set = seen.get(id);
       return set !== undefined && set.size > 1;
     },
     getCollisions: () => {
+      flushPendingDiscovery();
       const out = new Map<string, Set<z.ZodType>>();
       for (const [id, set] of seen) {
         if (set.size <= 1) {
@@ -114,7 +124,10 @@ export const createRegistry = (): ZodNestRegistry => {
       }
       return out;
     },
-    ids: () => [...seen.keys()],
+    ids: () => {
+      flushPendingDiscovery();
+      return [...seen.keys()];
+    },
     forceExposedIds: () => [...forceExposed],
     anonymousIds: () => [...anonymous],
   };

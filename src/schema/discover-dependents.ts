@@ -23,6 +23,20 @@ const readId = (schema: z.ZodType): string | undefined => {
   return typeof id === 'string' ? id : undefined;
 };
 
+// A `z.lazy` getter can close over a `const` still in its temporal dead zone
+// (mutual recursion under ESM). Treat that as "no child yet" — `toOpenApi`
+// calls the getter again and reports a genuinely broken reference then.
+const resolveLazyTarget = (getter: () => $ZodType): z.ZodType[] => {
+  try {
+    return [getter() as unknown as z.ZodType];
+  } catch (error) {
+    if (error instanceof ReferenceError) {
+      return [];
+    }
+    throw error;
+  }
+};
+
 const collectChildren = (schema: z.ZodType): z.ZodType[] => {
   const def = (schema as unknown as $ZodTypes)._zod.def;
   if (def.type === 'object') {
@@ -66,7 +80,7 @@ const collectChildren = (schema: z.ZodType): z.ZodType[] => {
     return [def.in as unknown as z.ZodType, def.out as unknown as z.ZodType];
   }
   if (def.type === 'lazy') {
-    return [def.getter() as unknown as z.ZodType];
+    return resolveLazyTarget(() => def.getter());
   }
   if (INNER_TYPE_WRAPPERS.has(def.type)) {
     return [(def as { innerType: $ZodType }).innerType as unknown as z.ZodType];

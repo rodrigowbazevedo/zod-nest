@@ -90,6 +90,8 @@ class BDto extends createZodDto(bSchema) {}
 
 Both DTOs get their own `components.schemas` entry with `$ref`s pointing at each other.
 
+**Declaration order doesn't matter.** Whichever side is declared first necessarily references the other before it exists — that's inherent to mutual recursion, and no arrangement of the two declarations avoids it. `zod-nest` never calls a `z.lazy` getter at registration time, so eager registration is safe too: `extend(...)` and `createZodDto(...)` on the first schema won't reach into the second's uninitialised binding. Dependent discovery happens when the OpenAPI document is built, by which point both modules have finished evaluating.
+
 ## Tree-shaped schemas
 
 For a generic tree (any node can have children of the same shape):
