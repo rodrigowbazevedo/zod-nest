@@ -29,20 +29,11 @@ Two equivalent forms — pick the one that fits the call site:
 
 ```ts
 // Preferred — id on the schema via Zod's metadata.
-const userSchema = z
-  .object({
-    /* ... */
-  })
-  .meta({ id: 'User' });
+const userSchema = z.object({/* ... */}).meta({ id: 'User' });
 class UserDto extends createZodDto(userSchema) {}
 
 // Also valid — id as createZodDto's second argument.
-class UserDto extends createZodDto(
-  z.object({
-    /* ... */
-  }),
-  { id: 'User' },
-) {}
+class UserDto extends createZodDto(z.object({/* ... */}), { id: 'User' }) {}
 ```
 
 Resolution order, applied lazily on the first read of `Dto.id`:

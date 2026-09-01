@@ -245,20 +245,11 @@ The id is what appears as the `components.schemas` key in the OpenAPI document a
 
 ```ts
 // Preferred — on the schema, via Zod's metadata
-const userSchema = z
-  .object({
-    /* ... */
-  })
-  .meta({ id: 'User' });
+const userSchema = z.object({/* ... */}).meta({ id: 'User' });
 class UserDto extends createZodDto(userSchema) {}
 
 // Also valid — passed through createZodDto's options
-class UserDto extends createZodDto(
-  z.object({
-    /* ... */
-  }),
-  { id: 'User' },
-) {}
+class UserDto extends createZodDto(z.object({/* ... */}), { id: 'User' }) {}
 ```
 
 Both produce the same OpenAPI output. `.meta({ id })` is preferred when the schema is hoisted into its own `const`, because the id stays with the schema — composition (`extend(parent, ...)`), shared input/output via `.meta({ id })` on the same schema reference, and any non-DTO use of the schema all pick up the same id without an extra hop through `createZodDto`'s options. Use the `createZodDto(schema, { id })` form when you don't own the schema (e.g. it comes from a third-party module) or when defining a small DTO with an inline schema, where chaining `.meta()` on the inline expression hurts readability.

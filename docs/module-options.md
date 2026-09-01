@@ -6,11 +6,7 @@
 import { ZodNestModule } from 'zod-nest';
 
 @Module({
-  imports: [
-    ZodNestModule.forRoot({
-      /* options */
-    }),
-  ],
+  imports: [ZodNestModule.forRoot({/* options */})],
 })
 class AppModule {}
 ```

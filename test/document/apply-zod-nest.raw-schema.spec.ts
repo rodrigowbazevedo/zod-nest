@@ -85,8 +85,7 @@ describe('applyZodNest — @ZodResponse accepts a raw Zod schema', () => {
     ];
     const responses = ops?.responses as Record<string, Record<string, unknown>> | undefined;
     const content = responses?.[status]?.content as
-      | Record<string, Record<string, unknown>>
-      | undefined;
+      Record<string, Record<string, unknown>> | undefined;
     return content?.['application/json']?.schema as Record<string, unknown> | undefined;
   };
 
