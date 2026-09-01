@@ -192,6 +192,13 @@ export const buildToJsonSchemaOptions = (
   };
 };
 
+// Covers both `.meta({ id })` and `registry.register(schema, id)` — the latter
+// writes the id through to the zod registry.
+const resolveRootId = (schema: z.ZodType, registry: ZodNestRegistry): string | undefined => {
+  const id = registry.zodRegistry.get(schema)?.id;
+  return typeof id === 'string' && id !== '' ? id : undefined;
+};
+
 export const toOpenApi = (schema: z.ZodType, opts: ToOpenApiOptions): ToOpenApiResult => {
   const built = buildToJsonSchemaOptions({
     registry: opts.registry,
@@ -203,7 +210,10 @@ export const toOpenApi = (schema: z.ZodType, opts: ToOpenApiOptions): ToOpenApiR
   const raw = z.toJSONSchema(schema, built.options);
   built.consumeUnrepresentable();
 
-  const result = postProcess(raw);
+  const result = postProcess(raw, {
+    rootId: resolveRootId(schema, opts.registry),
+    strict: opts.strict,
+  });
 
   for (const [id] of opts.registry.getCollisions()) {
     if (!result.refs.has(id)) {

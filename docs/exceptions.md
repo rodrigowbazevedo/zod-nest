@@ -121,6 +121,46 @@ class ZodNestError extends Error {
 
 Base class for non-HTTP `zod-nest` failures (`ZodNestUnrepresentableError`, `ZodNestDocumentError`). Catch this if you want to handle any zod-nest-specific failure with a single filter / `try { ... } catch (e instanceof ZodNestError) { ... }` block.
 
+It is also thrown directly in one case, described below.
+
+### Unresolvable self-reference on an unnamed root
+
+- **Thrown by**: `toOpenApi` in **strict mode**, when the emitted root schema is referenced from inside its own emission but has no id to reference.
+- **When**: a cycle reaches back to the root — mutual recursion, or a self-referencing getter — and the root schema carries no `.meta({ id })`.
+- **Why**: the reference needs a `#/components/schemas/<id>` target. An unnamed root has no component entry, so there is nothing to point at. Emitting anyway would produce a `$ref` that silently resolves to the wrong schema.
+
+```ts
+const Kid = z
+  .object({
+    get owner() {
+      return Root.optional();
+    },
+  })
+  .meta({ id: 'Kid' });
+const Root = z.object({
+  get kids() {
+    return z.array(Kid);
+  },
+}); // ← no id
+toOpenApi(Root, { io: 'input', registry }); // throws ZodNestError
+```
+
+**Mitigation** — two options:
+
+1. **Name the root** with `.meta({ id })`. This is the real fix: the root gains a `components.schemas` entry and the cycle resolves against it.
+
+   ```ts
+   const Root = z
+     .object({
+       get kids() {
+         return z.array(Kid);
+       },
+     })
+     .meta({ id: 'Root' });
+   ```
+
+2. **`strict: false`** — the reference is left as a bare `'#'` rather than being pointed at the wrong schema. The document still won't resolve that ref correctly, so prefer option 1.
+
 ## `ZodNestUnrepresentableError`
 
 ```ts

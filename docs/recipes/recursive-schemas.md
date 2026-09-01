@@ -116,7 +116,7 @@ Generic recursive shapes work in TS but only one concrete instantiation can regi
 
 - **Discriminated unions inside recursion** — Zod requires the discriminator key to be resolvable at schema-construction time, which breaks under `z.lazy`. Model these as `z.union` with a `.refine` instead.
 - **Composition (`extend`) on a recursive schema** — the lineage layer expects a concrete `z.ZodObject`, which `z.lazy` doesn't expose directly. Compose first, then wrap in `z.lazy` only if the result itself is recursive.
-- **Recursive schemas without `.meta({ id })`** — without an id, the back-reference has no stable target. The emission falls back to inlining the body once and then producing a schema cycle the JSON Schema validators can't resolve.
+- **Recursive schemas without `.meta({ id })`** — without an id, the back-reference has no stable target. In strict mode (the default) emission throws `ZodNestError`; with `strict: false` the reference is left as a bare `'#'`, which validators still can't resolve. Give every schema in the cycle an id. See [`docs/exceptions.md`](../exceptions.md#unresolvable-self-reference-on-an-unnamed-root).
 
 ## Async refinement on recursive schemas
 
