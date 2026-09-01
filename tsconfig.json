@@ -20,7 +20,10 @@
     "declarationMap": true,
     "sourceMap": true,
     "noEmit": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    // tsup's dts builder injects the deprecated `baseUrl` (tsup#1388), which TS 6
+    // rejects outright; drop this once tsup supports TypeScript 6.
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "*.config.ts", "*.config.mts"],
   "exclude": ["node_modules", "dist", "coverage"]

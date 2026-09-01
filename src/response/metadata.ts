@@ -73,8 +73,7 @@ export interface ResponseVariant {
 
 export const getResponseVariants = (handler: object): readonly ResponseVariant[] | undefined => {
   const meta = Reflect.getMetadata(ZOD_RESPONSES_METADATA_KEY, handler) as
-    | ResponseVariant[]
-    | undefined;
+    ResponseVariant[] | undefined;
   return meta;
 };
 

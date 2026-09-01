@@ -206,8 +206,7 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     const op = opAt(doc, '/cases/flattened-multipart', 'post');
     const requestBody = op.requestBody as Record<string, unknown> | undefined;
     const content = requestBody?.content as
-      | Record<string, { schema?: Record<string, unknown> }>
-      | undefined;
+      Record<string, { schema?: Record<string, unknown> }> | undefined;
     const schema = content?.['application/json']?.schema;
     expect(schema?.$ref).toBeUndefined();
     expect(schema?.allOf).toBeUndefined();
@@ -235,8 +234,7 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     const op = opAt(doc, '/cases/flattened-with-named-root', 'post');
     const requestBody = op.requestBody as Record<string, unknown> | undefined;
     const content = requestBody?.content as
-      | Record<string, { schema?: Record<string, unknown> }>
-      | undefined;
+      Record<string, { schema?: Record<string, unknown> }> | undefined;
     const opSchema = content?.['application/json']?.schema;
     expect(opSchema?.$ref).toBeUndefined();
     expect(opSchema?.type).toBe('object');

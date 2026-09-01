@@ -42,7 +42,7 @@ export default tseslint.config(
       ],
       'object-shorthand': ['error', 'properties'],
       'arrow-body-style': ['error', 'as-needed'],
-      'unicorn/no-array-for-each': 'error',
+      'unicorn/no-for-each': 'error',
       'unicorn/no-await-expression-member': 'error',
       'no-console': 'warn',
     },

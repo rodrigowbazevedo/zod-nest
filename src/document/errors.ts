@@ -1,9 +1,7 @@
 import { ZodNestError } from '../schema/errors.js';
 
 export type ZodNestDocumentErrorCode =
-  | 'AMBIGUOUS_RENAME'
-  | 'DANGLING_REF'
-  | 'UNEXPANDABLE_PARAM_DTO';
+  'AMBIGUOUS_RENAME' | 'DANGLING_REF' | 'UNEXPANDABLE_PARAM_DTO';
 
 /**
  * Thrown by `applyZodNest` when the doc cannot be processed cleanly. Surfaces
