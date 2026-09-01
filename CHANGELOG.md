@@ -1,3 +1,10 @@
+## [3.0.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.0.0...v3.0.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **deps-dev:** pin @commitlint/read to keep npm 10 able to run npm ci ([#134](https://github.com/rodrigowbazevedo/zod-nest/issues/134)) ([a148f62](https://github.com/rodrigowbazevedo/zod-nest/commit/a148f62afbcf92cf0ad16adf10afa61feb28ee47)), closes [#125](https://github.com/rodrigowbazevedo/zod-nest/issues/125)
+
 # [3.0.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.5...v3.0.0) (2026-09-01)
 
 
