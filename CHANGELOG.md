@@ -1,3 +1,10 @@
+## [2.1.5](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.4...v2.1.5) (2026-09-01)
+
+
+### Bug Fixes
+
+* **document:** keep a recursive anonymous body as a component ([#123](https://github.com/rodrigowbazevedo/zod-nest/issues/123)) ([fcadd06](https://github.com/rodrigowbazevedo/zod-nest/commit/fcadd06e2dd4ae5d0bc235329db47fbb1f8e25d0)), closes [#122](https://github.com/rodrigowbazevedo/zod-nest/issues/122)
+
 ## [2.1.4](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.3...v2.1.4) (2026-09-01)
 
 
