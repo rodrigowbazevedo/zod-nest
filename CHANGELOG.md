@@ -1,3 +1,10 @@
+## [2.1.4](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.3...v2.1.4) (2026-09-01)
+
+
+### Bug Fixes
+
+* **schema:** resolve '#' refs against the document root ([#121](https://github.com/rodrigowbazevedo/zod-nest/issues/121)) ([590677e](https://github.com/rodrigowbazevedo/zod-nest/commit/590677e9ae7330c353dc51b19c96326da6e5a721)), closes [#119](https://github.com/rodrigowbazevedo/zod-nest/issues/119)
+
 ## [2.1.3](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.2...v2.1.3) (2026-09-01)
 
 
