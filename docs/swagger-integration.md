@@ -106,9 +106,13 @@ class ZodNestDocumentError extends ZodNestError {
 
 ### `AMBIGUOUS_RENAME`
 
-Two distinct DTO classes target the same registry id with differing bodies. The rename pass can't write `components.schemas[id]` unambiguously — which body wins?
+Two distinct bodies target the same `components.schemas[id]` and the merge pass can't decide which wins. `details` is `{ key, preexisting }`.
 
-Typical cause: copy-pasted `createZodDto(otherSchema, { id: 'User' })` somewhere, or two `.meta({ id: 'User' })` calls on different schemas. Fix by giving each schema a unique id.
+`preexisting: true` means the key was already populated before zod-nest emitted anything. On NestJS 12+ the usual cause is the native Standard Schema path — `@Body({ schema })`, `@Query({ schema })`, `@ApiResponse({ standardSchema })` — which makes `@nestjs/swagger` register the component itself under the schema's `.meta({ id })`. Route the schema through `createZodDto` / `@ZodBody` / `@ZodResponse` instead, or skip `applyZodNest` and let Nest own the document. A hand-authored component or a doc pre-pass under the same name does this too.
+
+`preexisting: false` means two registered ids resolved to one key — in practice an `<Id>Output` sibling from a diverging input/output schema colliding with a DTO registered as `<Id>Output`. Rename one, or set a distinct `options.id`.
+
+Note that two schemas sharing one `.meta({ id })` is a _different_ failure and doesn't throw here: the id is decorated with `x-zod-nest-error: duplicate-id` so the broken contract stays visible in Swagger UI. See [`exceptions.md`](exceptions.md#code-ambiguous_rename).
 
 ### `UNEXPANDABLE_PARAM_DTO`
 

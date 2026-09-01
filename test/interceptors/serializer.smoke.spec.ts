@@ -14,6 +14,7 @@ import request from 'supertest';
 import { z } from 'zod';
 
 import type { INestApplication, LoggerService } from '@nestjs/common';
+import type { Mocked } from 'vitest';
 
 import { createZodDto, ZodNestModule, ZodResponse } from '../../src';
 
@@ -88,15 +89,15 @@ class UsersController {
   }
 }
 
-const makeFakeLogger = (): jest.Mocked<LoggerService> => ({
-  log: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-  debug: jest.fn(),
-  verbose: jest.fn(),
+const makeFakeLogger = (): Mocked<LoggerService> => ({
+  log: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  verbose: vi.fn(),
 });
 
-const logger: jest.Mocked<LoggerService> = makeFakeLogger();
+const logger: Mocked<LoggerService> = makeFakeLogger();
 
 @Module({
   imports: [ZodNestModule.forRoot({ validationLogs: { output: true }, logger })],

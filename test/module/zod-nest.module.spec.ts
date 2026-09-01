@@ -47,7 +47,7 @@ describe('ZodNestModule.forRoot()', () => {
   });
 
   it('passes the explicit options through to ZOD_NEST_OPTIONS', async () => {
-    const createSerializationException = jest.fn();
+    const createSerializationException = vi.fn();
     const moduleRef = await Test.createTestingModule({
       imports: [ZodNestModule.forRoot({ createSerializationException })],
     }).compile();

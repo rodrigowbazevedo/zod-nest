@@ -15,8 +15,8 @@ class CustomValidationError extends HttpException {
 
 describe('ZodValidationPipe — custom createValidationException', () => {
   it('invokes the factory with (zodError, argMetadata) on failure', async () => {
-    const factory = jest
-      .fn<unknown, [z.ZodError, ArgumentMetadata]>()
+    const factory = vi
+      .fn<(zodError: z.ZodError, argMetadata: ArgumentMetadata) => unknown>()
       .mockImplementation((err) => new CustomValidationError(err.issues.length));
 
     const schema = z.object({ x: z.string() });
@@ -37,7 +37,7 @@ describe('ZodValidationPipe — custom createValidationException', () => {
   });
 
   it('does not call the factory on valid input', async () => {
-    const factory = jest.fn();
+    const factory = vi.fn();
     const schema = z.object({ x: z.string() });
     const pipe = new ZodValidationPipe({ schema, createValidationException: factory });
 

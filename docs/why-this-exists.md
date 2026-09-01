@@ -76,6 +76,33 @@ The composition layer (`extend`, `getLineage`) is `@experimental`. The basic API
 
 Everything else — DTOs, validation, response stacking, doc post-processing — is intended to stay stable through v1.
 
+## NestJS 12's native Standard Schema support
+
+NestJS 12 added first-class [Standard Schema](https://standardschema.dev) support — a `schema` option on `@Body()` / `@Query()` / `@Param()`, a `StandardSchemaValidationPipe`, a `StandardSchemaSerializerInterceptor`, and `@ApiResponse({ standardSchema })`. Zod implements the spec, so all of it works with your existing schemas.
+
+**Pick one per document — they don't compose.** Nest's `schema` option makes `@nestjs/swagger` convert and emit the component itself, so a schema carrying `.meta({ id })` gets written to `components.schemas[id]` twice: once in Nest's 3.0 shape, once in `zod-nest`'s. `applyZodNest` refuses the conflict rather than picking a winner:
+
+```ts
+const CreateUserSchema = z.object({ /* … */ }).meta({ id: 'CreateUser' });
+
+@Post()
+create(@Body({ schema: CreateUserSchema }) body: z.infer<typeof CreateUserSchema>) {}
+
+// applyZodNest(...) throws:
+// ZodNestDocumentError AMBIGUOUS_RENAME: Two distinct schemas target `components.schemas[CreateUser]`
+```
+
+An anonymous schema (no `.meta({ id })`) doesn't collide, because Nest inlines it instead of registering a component — but the inlined body is still 3.0-shaped (`enum: ['admin']` where the rest of the document says `const: 'admin'`), so you get a quiet inconsistency instead of a loud one.
+
+So if you call `applyZodNest`, drive request bodies with `createZodDto` / `@ZodBody` and leave the `schema` option alone. If you'd rather use the native path, skip `applyZodNest` and accept an OpenAPI 3.0 document. Where `zod-nest` earns the difference:
+
+- **OpenAPI 3.1.** Nest's converter calls the schema library with `target: 'openapi-3.0'`, hardcoded — `z.literal('admin')` becomes `enum: ['admin']` rather than `const`, and `DocumentBuilder.setOpenAPIVersion('3.1.0')` only changes the version string, not the emitted bodies. `applyZodNest` emits 3.1 throughout.
+- **Unrepresentable types.** Nest passes no library options, so Zod's default `unrepresentable: 'throw'` applies: a `z.date()` anywhere in a documented schema throws during document generation. `zod-nest` maps `date` and `bigint` out of the box and gives you [`overrideJSONSchema`](recipes/custom-openapi-overrides.md) for the rest.
+- **Component naming and reuse.** Native conversion inlines anything without `.meta({ id })`, duplicates shared sub-schemas at every use site, and has no cross-handler collision detection. The [registry](dto.md#custom-registry) exists to give components stable names, one definition each, and a `DANGLING_REF` failure when the graph breaks.
+- **One declaration per response.** `@SerializeOptions({ schema })` drives runtime serialization but contributes nothing to the document; `@ApiResponse({ standardSchema })` documents but doesn't validate. [`@ZodResponse`](responses.md) is one decorator for both, and it also stacks per status, infers the status from `@HttpCode`, and handles arrays, tuples, content types and streams.
+
+None of this makes the native support wrong — it's a smaller tool for a smaller job, and for a service with a handful of hand-named schemas that's happy on OpenAPI 3.0, it's genuinely enough. It just isn't something to mix into the same document.
+
 ## The bigger picture
 
 `zod-nest` is a small library on a narrow problem. The goal isn't to subsume every Zod-related NestJS workflow; it's to give you one source of truth (the schema), a few well-placed extension points (exception factories, custom emission), and a final doc you can ship to clients without a checklist of post-process steps.

@@ -16,7 +16,7 @@ The `/schema-fixture` skill uses this mapping to auto-select where a new test ca
 | `test/schema/engine.override.spec.ts`      | Override-callback semantics — user override chain, composition override, built-in primitive overrides.                                                  | Snippet passes `override: ...` to `toOpenApi` or relies on a built-in override.                                     |
 | `test/schema/engine.strict.spec.ts`        | `strict: true` mode and `ZodNestUnrepresentableError`.                                                                                                  | Snippet expects an error throw (bigint outside override, transform without `pipe`, etc.).                           |
 | `test/schema/engine.build-options.spec.ts` | Internals of `buildToJsonSchemaOptions` — how the option bag is composed across single-schema vs bulk modes.                                            | Snippet asserts on the option bag itself, not the emitted schema. Rare.                                             |
-| `test/schema/engine.snapshot.spec.ts`      | Multi-feature composites whose emission is hard to assert in pieces — use Jest snapshot matching instead of `.toEqual()`.                               | User passes `expected: 'snapshot'`, OR the case combines 4+ Zod constructs.                                         |
+| `test/schema/engine.snapshot.spec.ts`      | Multi-feature composites whose emission is hard to assert in pieces — use snapshot matching instead of `.toEqual()`.                                    | User passes `expected: 'snapshot'`, OR the case combines 4+ Zod constructs.                                         |
 
 ## Tie-breaker order
 

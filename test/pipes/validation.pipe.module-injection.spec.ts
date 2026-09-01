@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import { z } from 'zod';
 
 import type { ArgumentMetadata, LoggerService } from '@nestjs/common';
+import type { Mocked } from 'vitest';
 
 import { createZodDto, ZodValidationPipe } from '../../src';
 import { normalizeZodNestOptions, ZOD_NEST_OPTIONS } from '../../src/module/options.js';
@@ -14,12 +15,12 @@ const body: ArgumentMetadata = { type: 'body', data: 'body', metatype: undefined
 const Schema = z.object({ name: z.string() });
 class ThingDto extends createZodDto(Schema, { id: 'ModuleInjection_Thing' }) {}
 
-const makeFakeLogger = (): jest.Mocked<LoggerService> => ({
-  log: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-  debug: jest.fn(),
-  verbose: jest.fn(),
+const makeFakeLogger = (): Mocked<LoggerService> => ({
+  log: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  verbose: vi.fn(),
 });
 
 class CustomException extends HttpException {
@@ -66,7 +67,7 @@ describe('ZodValidationPipe — ZodNestModule option injection', () => {
   });
 
   it('falls back to the module-level createValidationException factory when none on the per-instance arg', async () => {
-    const moduleFactory = jest.fn(() => new CustomException());
+    const moduleFactory = vi.fn(() => new CustomException());
     const moduleOpts = normalizeZodNestOptions({
       createValidationException: moduleFactory,
     });
@@ -77,8 +78,8 @@ describe('ZodValidationPipe — ZodNestModule option injection', () => {
   });
 
   it('per-instance createValidationException wins over module factory', async () => {
-    const moduleFactory = jest.fn(() => new CustomException());
-    const perInstanceFactory = jest.fn(
+    const moduleFactory = vi.fn(() => new CustomException());
+    const perInstanceFactory = vi.fn(
       () => new HttpException('per-instance', HttpStatus.I_AM_A_TEAPOT),
     );
     const moduleOpts = normalizeZodNestOptions({

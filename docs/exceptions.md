@@ -230,20 +230,29 @@ class ZodNestDocumentError extends ZodNestError {
 
 ### `code: 'AMBIGUOUS_RENAME'`
 
-Two distinct DTO classes target the same registry id with differing bodies. The rename pass can't write `components.schemas[id]` unambiguously — which body wins?
+Two distinct bodies target the same `components.schemas[id]` and the merge pass can't decide which wins. `details` is `{ key, preexisting }`, and `preexisting` tells the two causes apart.
+
+**`preexisting: true`** — the key was already populated before zod-nest emitted anything. On NestJS 12+ the usual cause is the native Standard Schema path: `@Body({ schema })`, `@Query({ schema })` and `@ApiResponse({ standardSchema })` make `@nestjs/swagger` convert and register the component itself, in its OpenAPI 3.0 shape, under the schema's `.meta({ id })`.
 
 ```ts
-const userA = z.object({ id: z.string() }).meta({ id: 'User' });
-const userB = z.object({ uuid: z.uuid() }).meta({ id: 'User' }); // collision
+const CreateUser = z.object({ role: z.literal('admin') }).meta({ id: 'CreateUser' });
 
-class UserDtoA extends createZodDto(userA) {}
-class UserDtoB extends createZodDto(userB) {}
+@Post()
+create(@Body({ schema: CreateUser }) body: z.infer<typeof CreateUser>) {}
 
 applyZodNest(raw);
-// → ZodNestDocumentError({ code: 'AMBIGUOUS_RENAME', details: { id: 'User', classes: [...] } })
+// → ZodNestDocumentError({ code: 'AMBIGUOUS_RENAME', details: { key: 'CreateUser', preexisting: true } })
 ```
 
-Fix: give each schema a distinct id.
+**Mitigation** — three options:
+
+- Route the schema through `createZodDto` / `@ZodBody` / `@ZodResponse` and drop the `schema` option. See [`why-this-exists.md`](why-this-exists.md#nestjs-12s-native-standard-schema-support).
+- Keep the native path and don't call `applyZodNest` — you get a valid OpenAPI 3.0 document that zod-nest has no part in.
+- If the component is hand-authored or written by a doc pre-pass, rename it so it doesn't shadow a registered id.
+
+**`preexisting: false`** — two registered ids resolved to one key. In practice this is an `<Id>Output` sibling from a diverging input/output schema colliding with a DTO explicitly registered as `<Id>Output`. Fix: rename one, or set a distinct `options.id`.
+
+> Two schemas sharing one `.meta({ id })` is a _different_ failure and does not throw here — the id is decorated with the `x-zod-nest-error: duplicate-id` marker so the broken contract stays visible in Swagger UI.
 
 ### `code: 'DANGLING_REF'`
 

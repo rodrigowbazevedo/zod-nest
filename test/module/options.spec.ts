@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { LoggerService } from '@nestjs/common';
+import type { Mocked } from 'vitest';
 
 import { noopLogValidationFailure } from '../../src/logging/validation-logger.js';
 import {
@@ -20,12 +21,12 @@ const failingError = (): z.ZodError => {
   return result.error;
 };
 
-const makeFakeLogger = (): jest.Mocked<LoggerService> => ({
-  log: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-  debug: jest.fn(),
-  verbose: jest.fn(),
+const makeFakeLogger = (): Mocked<LoggerService> => ({
+  log: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  verbose: vi.fn(),
 });
 
 describe('normalizeZodNestOptions', () => {
@@ -76,8 +77,8 @@ describe('normalizeZodNestOptions', () => {
   });
 
   it('passes-through the exception factories untouched', () => {
-    const inputFactory = jest.fn();
-    const outputFactory = jest.fn();
+    const inputFactory = vi.fn();
+    const outputFactory = vi.fn();
     const opts = normalizeZodNestOptions({
       createValidationException: inputFactory,
       createSerializationException: outputFactory,

@@ -23,7 +23,7 @@ Required:
 - **Zod snippet** — the schema construction. A single expression (`z.string().optional()`) or a small `const`-bound block.
 - **Expected** — one of:
   - A JSON Schema fragment (object) to assert via `.toEqual(...)`.
-  - The literal string `snapshot` to use Jest snapshot matching (drops into `engine.snapshot.spec.ts`).
+  - The literal string `snapshot` to use snapshot matching (drops into `engine.snapshot.spec.ts`).
   - A `Promise.rejects.toThrow(<ErrorCtor>)`-shaped expectation for unrepresentable cases (`engine.strict.spec.ts`).
 
 Optional:
@@ -68,12 +68,12 @@ Insert the block at the end of the file's main `describe`, just before the closi
 Run the targeted spec:
 
 ```bash
-npx jest --testPathPattern="engine\\.<spec>" --no-coverage
+npx vitest run test/schema/engine.<spec>.spec.ts
 ```
 
 If the assertion fails, the case is mis-specified — surface the actual emission and ask the user whether the expected should be updated (the spec is the ground truth) or whether the Zod snippet should change.
 
-Snapshot cases: if running for the first time, jest writes the snapshot. Confirm with the user that the captured output is correct before considering the task done.
+Snapshot cases: if running for the first time, Vitest writes the snapshot. Confirm with the user that the captured output is correct before considering the task done.
 
 ### Step 5: Confirm with a one-line summary
 

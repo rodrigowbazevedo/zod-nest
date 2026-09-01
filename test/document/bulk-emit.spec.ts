@@ -83,9 +83,8 @@ describe('bulkEmit', () => {
   });
 
   // Strict-mode tests pollute z.globalRegistry with an unrepresentable schema,
-  // which leaks into subsequent emissions in the same file. Keep them LAST so
-  // earlier representable tests aren't affected. (Jest isolates by file, not by
-  // test, so cross-file pollution is not a concern.)
+  // which leaks into later emissions in this file. Keep them LAST. Cross-file
+  // pollution is not a concern — the runner isolates by file.
   describe('strict-mode unrepresentable handling', () => {
     it('throws ZodNestUnrepresentableError on strict-unrepresentable schemas', () => {
       const registry = createRegistry();

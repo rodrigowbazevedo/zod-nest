@@ -525,7 +525,9 @@ See [`docs/recipes/custom-openapi-overrides.md`](docs/recipes/custom-openapi-ove
 
 ## Compatibility matrix
 
-`zod-nest` declares explicit min + max peer-dep ranges in `package.json`: `zod >=4.4.0 <5.0.0`, `@nestjs/common >=11.0.1 <12.0.0`, `@nestjs/core >=11.0.1 <12.0.0`, `@nestjs/swagger >=11.0.0 <12.0.0`, `rxjs >=7.6.0 <8.0.0`, `reflect-metadata >=0.2.0 <0.3.0`, Node `>=22`. CI validates those claims by running the full test suite against the cells below; a red cell is a real blocker. Upper bounds are deliberate — a new peer major has to land in a real PR with a `/check-upstream-updates` audit before consumers can install it against this library.
+`zod-nest` declares explicit min + max peer-dep ranges in `package.json`: `zod >=4.4.0 <5.0.0`, `@nestjs/common >=11.0.1 <13.0.0`, `@nestjs/core >=11.0.1 <13.0.0`, `@nestjs/swagger >=11.0.0 <13.0.0`, `rxjs >=7.6.0 <8.0.0`, `reflect-metadata >=0.2.0 <0.3.0`, Node `>=22.12`. CI validates those claims by running the full test suite against the cells below; a red cell is a real blocker. Upper bounds are deliberate — a new peer major has to land in a real PR with a `/check-upstream-updates` audit before consumers can install it against this library.
+
+NestJS 11 and 12 are both supported. The Node floor is `>=22.12` rather than `>=22` because NestJS 12 ships as ESM: a CommonJS app doing `require('zod-nest')` reaches `require('@nestjs/common')`, and unflagged `require(esm)` only landed in Node 22.12.0.
 
 | Cell                      | `zod`  | `@nestjs/common` | `@nestjs/core` | `@nestjs/swagger` | `rxjs` | `reflect-metadata` |
 | ------------------------- | ------ | ---------------- | -------------- | ----------------- | ------ | ------------------ |
@@ -533,13 +535,14 @@ See [`docs/recipes/custom-openapi-overrides.md`](docs/recipes/custom-openapi-ove
 | `zod-latest`              | latest | 11.0.1           | 11.0.1         | 11.0.0            | 7.6.0  | 0.2.0              |
 | `zod-4.5`                 | 4.5.4  | 11.0.1           | 11.0.1         | 11.0.0            | 7.6.0  | 0.2.0              |
 | `nest-latest`             | 4.4.0  | latest           | latest         | latest            | 7.6.0  | 0.2.0              |
+| `nest12`                  | 4.4.0  | 12.0.1           | 12.0.1         | 12.0.1            | 7.6.0  | 0.2.0              |
 | `rxjs-latest`             | 4.4.0  | 11.0.1           | 11.0.1         | 11.0.0            | latest | 0.2.0              |
 | `reflect-metadata-latest` | 4.4.0  | 11.0.1           | 11.0.1         | 11.0.0            | 7.6.0  | latest             |
 | `all-latest`              | latest | latest           | latest         | latest            | latest | latest             |
 
 One emission difference is visible across the supported `zod` range: from 4.5, a union of primitives — including `.nullable()` — emits `{ "type": ["string", "null"] }` where 4.4 emitted `{ "anyOf": [{ "type": "string" }, { "type": "null" }] }`. Both are valid OpenAPI 3.1 and validate identically; only the spelling changes. Everything else — `$ref` layout, composition `allOf`, input/output siblings, `paths` — is byte-identical across 4.4 and 4.5.
 
-Cell definitions live in [`.github/compat-matrix.json`](.github/compat-matrix.json). The CI workflow ([`.github/workflows/compat-matrix.yml`](.github/workflows/compat-matrix.yml)) runs on every push to `main` and weekly on Monday — when a cell fails, the workflow opens (or comments on) a GitHub issue labelled `compat-matrix-failure` so the regression is tracked outside the Actions UI. Editing the JSON is the formal way to extend or shrink supported ranges. Node is not matrixed — the `>=22` floor is enforced by `engines`.
+Cell definitions live in [`.github/compat-matrix.json`](.github/compat-matrix.json). The CI workflow ([`.github/workflows/compat-matrix.yml`](.github/workflows/compat-matrix.yml)) runs on every push to `main` and weekly on Monday — when a cell fails, the workflow opens (or comments on) a GitHub issue labelled `compat-matrix-failure` so the regression is tracked outside the Actions UI. Editing the JSON is the formal way to extend or shrink supported ranges. Node is not matrixed — the `>=22.12` floor is enforced by `engines`. Cells that move NestJS also pin `@nestjs/platform-express` and `@nestjs/testing` to the same major (omitted from the table above for width) — both peer-require matching `@nestjs/common` + `@nestjs/core` majors, so moving the others without them just produces a peer conflict.
 
 ## Migration from `nestjs-zod`
 

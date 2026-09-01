@@ -882,7 +882,7 @@ describe('applyZodNest — optional field in @Param() DTO is coerced to required
   }
 
   it('coerces `required: true` and emits a console.warn naming the field', async () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { app, raw } = await bootstrap([OptPathController]);
     const doc = applyZodNest(raw);
 

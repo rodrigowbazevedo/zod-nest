@@ -4,6 +4,23 @@
 
 This guide is for projects on the public [`nestjs-zod`](https://github.com/BenLorantfy/nestjs-zod) package migrating to `zod-nest`. The mechanical bits (uninstall, reinstall, swap imports) are quick; the behavioural changes (status resolution, I/O suffix, no `cleanupOpenApiDoc`) take a more careful read.
 
+## Upgrading `zod-nest` 2.x → 3.0
+
+Different audience from the rest of this guide: this section is for existing `zod-nest` users. Everything below it is for people coming from `nestjs-zod`.
+
+**One breaking change — the Node floor moved from `>=22` to `>=22.12`.**
+
+NestJS 12 ships as ESM. A CommonJS app doing `require('zod-nest')` transitively reaches `require('@nestjs/common')`, and unflagged `require(esm)` only landed in Node 22.12.0 — so the old `>=22` claim was false for anyone on Nest 12. Move to Node 22.12+ or 24. There are no code changes.
+
+Everything else in 3.0 is additive:
+
+- **NestJS 12 is supported.** Peers widen to `@nestjs/common` / `@nestjs/core` `>=11.0.1 <13.0.0` and `@nestjs/swagger` `>=11.0.0 <13.0.0`. Nest 11 keeps working — staying on it requires no change.
+- **No API changes.** No renamed or removed exports, no changed signatures, no difference in the emitted document.
+
+If you're on Nest 11 and Node 22.12+, this is a version bump and nothing else.
+
+> Wondering whether to switch to NestJS 12's built-in Standard Schema support (`@Body({ schema })`, `StandardSchemaValidationPipe`)? See [`docs/why-this-exists.md`](docs/why-this-exists.md#nestjs-12s-native-standard-schema-support) — short version: pick one per document. Using the `schema` option on a `.meta({ id })` schema makes `applyZodNest` throw `AMBIGUOUS_RENAME`, because both sides emit the same component.
+
 ## TL;DR — 5 bullets
 
 1. **Bump Zod to v4** (`zod@^4`). `zod-nest` is v4-only.
@@ -15,10 +32,10 @@ This guide is for projects on the public [`nestjs-zod`](https://github.com/BenLo
 ## Prerequisites
 
 - **Zod `>=4.4.0 <5.0.0`**. Migrate from v3 first if you haven't; [Zod's v3-to-v4 guide](https://zod.dev/v4) is the path.
-- **NestJS `>=11.0.1 <12.0.0`** (both `@nestjs/common` and `@nestjs/core`). **`@nestjs/swagger` `>=11.0.0 <12.0.0`** — swagger 11 was the first release to accept nest 11 as a peer.
+- **NestJS `>=11.0.1 <13.0.0`** (both `@nestjs/common` and `@nestjs/core`). **`@nestjs/swagger` `>=11.0.0 <13.0.0`** — swagger 11 was the first release to accept nest 11 as a peer. NestJS 11 and 12 are both supported.
 - **`rxjs` `>=7.6.0 <8.0.0`** (typically pulled in transitively by NestJS). The `>=7.6.0` floor matches the rxjs minor that added `types` to its `exports` map — earlier minors don't expose TypeScript declarations under `moduleResolution: 'Bundler'`, so compiling against `zod-nest`'s shipped `.d.ts` would fail.
 - **`reflect-metadata` `>=0.2.0 <0.3.0`** — this is now a declared peer; install it explicitly if your existing setup only had it transitively from NestJS 10.
-- **Node `>=22`**.
+- **Node `>=22.12`**.
 - **Drop `class-validator` / `class-transformer`** if you installed them only for `nestjs-zod` interop. If they're used elsewhere in your app (legacy DTOs, custom validators), leave them — `zod-nest` doesn't conflict, it just doesn't interoperate.
 
 > Coming from NestJS 10? `zod-nest >=0.13.0` requires NestJS 11. NestJS 10 was dropped because it conflicts at install with the `reflect-metadata` 0.2.x line — the prior peer-dep declaration was wrong about supporting it.

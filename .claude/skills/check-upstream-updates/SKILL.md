@@ -179,7 +179,7 @@ The summary is the only artifact left in the chat. No files are written to the r
 
 - **Applying the bumps.** This skill _audits_; it doesn't update `package.json` or run `npm install`.
 - **Scheduling.** Manual invocation only — no cron, no scheduled action.
-- **Non-npm dependencies.** Only the packages listed in `package.json`. Repo-shared tooling (eslint, prettier, jest) isn't audited unless explicitly in scope via `--target`.
+- **Non-npm dependencies.** Only the packages listed in `package.json`. Repo-shared tooling (eslint, prettier, vitest) isn't audited unless explicitly in scope via `--target`.
 - **Security advisory triage.** Findings get flagged; remediation is a separate concern.
 
 ## Notes

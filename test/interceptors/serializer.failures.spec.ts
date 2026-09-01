@@ -50,7 +50,7 @@ describe('ZodSerializerInterceptor — strict failure', () => {
         super('custom-serialization', HttpStatus.BAD_GATEWAY);
       }
     }
-    const factory = jest.fn(() => new CustomError());
+    const factory = vi.fn(() => new CustomError());
     const moduleOpts = normalizeZodNestOptions({ createSerializationException: factory });
     const interceptor = new ZodSerializerInterceptor(new Reflector(), moduleOpts);
     const handler = function customStrict(): void {};
@@ -97,7 +97,7 @@ describe('ZodSerializerInterceptor — soft failure (passthroughOnError: true)',
   });
 
   it('does NOT call the serialization-exception factory in soft mode', async () => {
-    const factory = jest.fn();
+    const factory = vi.fn();
     const moduleOpts = normalizeZodNestOptions({ createSerializationException: factory });
     const interceptor = new ZodSerializerInterceptor(new Reflector(), moduleOpts);
     const handler = function softNoFactory(): void {};

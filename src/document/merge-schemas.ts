@@ -55,17 +55,22 @@ export const mergeSchemas = (params: MergeSchemasParams): MergeSchemasResult => 
   const divergentOutputIds = new Set<string>();
 
   const exposedIds = new Set([...collected.inputExposedIds, ...collected.outputExposedIds]);
+  // Snapshot before any write, so a conflict can tell a body that was already
+  // in the doc (Nest's native Standard Schema converter, a hand-authored
+  // component, a pre-pass) from one zod-nest emitted earlier in this loop.
+  const foreignKeys = collectForeignKeys(schemas);
 
   for (const id of exposedIds) {
-    applyTruthTable(
+    applyTruthTable({
       schemas,
       id,
-      collected.inputExposedIds.has(id),
-      collected.outputExposedIds.has(id),
-      inputSchemas.get(id),
-      outputSchemas.get(id),
+      inputExposed: collected.inputExposedIds.has(id),
+      outputExposed: collected.outputExposedIds.has(id),
+      inputBody: inputSchemas.get(id),
+      outputBody: outputSchemas.get(id),
       divergentOutputIds,
-    );
+      foreignKeys,
+    });
   }
 
   for (const [className, dtoId] of collected.classToDtoId) {
@@ -89,37 +94,53 @@ const ensureComponentsSchemas = (doc: OpenAPIObject): Record<string, unknown> =>
   return schemas;
 };
 
-const applyTruthTable = (
-  schemas: Record<string, unknown>,
-  id: string,
-  inputExposed: boolean,
-  outputExposed: boolean,
-  inputBody: unknown,
-  outputBody: unknown,
-  divergentOutputIds: Set<string>,
-): void => {
+interface ApplyTruthTableParams {
+  schemas: Record<string, unknown>;
+  id: string;
+  inputExposed: boolean;
+  outputExposed: boolean;
+  inputBody: unknown;
+  outputBody: unknown;
+  divergentOutputIds: Set<string>;
+  foreignKeys: ReadonlySet<string>;
+}
+
+const applyTruthTable = (params: ApplyTruthTableParams): void => {
+  const { schemas, id, inputExposed, outputExposed, inputBody, outputBody } = params;
+  const { divergentOutputIds, foreignKeys } = params;
   if (inputExposed && !outputExposed) {
-    writeOrThrowAmbiguous(schemas, id, inputBody);
+    writeOrThrowAmbiguous(schemas, id, inputBody, foreignKeys);
     return;
   }
   if (!inputExposed && outputExposed) {
-    writeOrThrowAmbiguous(schemas, id, outputBody);
+    writeOrThrowAmbiguous(schemas, id, outputBody, foreignKeys);
     return;
   }
   // Both exposed.
   if (canonicalEqual(inputBody, outputBody)) {
-    writeOrThrowAmbiguous(schemas, id, inputBody);
+    writeOrThrowAmbiguous(schemas, id, inputBody, foreignKeys);
     return;
   }
-  writeOrThrowAmbiguous(schemas, id, inputBody);
-  writeOrThrowAmbiguous(schemas, `${id}${OUTPUT_SUFFIX}`, outputBody);
+  writeOrThrowAmbiguous(schemas, id, inputBody, foreignKeys);
+  writeOrThrowAmbiguous(schemas, `${id}${OUTPUT_SUFFIX}`, outputBody, foreignKeys);
   divergentOutputIds.add(id);
+};
+
+const collectForeignKeys = (schemas: Record<string, unknown>): ReadonlySet<string> => {
+  const foreign = new Set<string>();
+  for (const [key, body] of Object.entries(schemas)) {
+    if (!isMarkerPlaceholder(body)) {
+      foreign.add(key);
+    }
+  }
+  return foreign;
 };
 
 const writeOrThrowAmbiguous = (
   schemas: Record<string, unknown>,
   key: string,
   body: unknown,
+  foreignKeys: ReadonlySet<string>,
 ): void => {
   if (body === undefined) {
     return;
@@ -129,12 +150,30 @@ const writeOrThrowAmbiguous = (
     schemas[key] = body;
     return;
   }
+  const preexisting = foreignKeys.has(key);
   throw new ZodNestDocumentError(
     'AMBIGUOUS_RENAME',
     `Two distinct schemas target \`components.schemas[${key}]\` with differing bodies — ` +
-      'multiple createZodDto classes likely share the same dtoId. Set distinct `options.id` ' +
-      'values, or align the class names so renames are unambiguous.',
-    { key },
+      ambiguousRenameHint(key, preexisting),
+    { key, preexisting },
+  );
+};
+
+const ambiguousRenameHint = (key: string, preexisting: boolean): string => {
+  if (preexisting) {
+    return (
+      `\`${key}\` was already populated before zod-nest emitted anything. On NestJS 12+ the ` +
+      'usual cause is the native Standard Schema path — `@Body({ schema })`, `@Query({ schema })` ' +
+      'or `@ApiResponse({ standardSchema })` — which makes @nestjs/swagger emit the component ' +
+      'itself, in its OpenAPI 3.0 shape. Route the schema through `createZodDto` / `@ZodBody` / ' +
+      '`@ZodResponse` instead, or drop `applyZodNest` and let Nest own the whole document. ' +
+      'A hand-authored component or a doc pre-pass under the same name does this too.'
+    );
+  }
+  return (
+    'Two registered ids resolved to the same key — most often an `<Id>Output` sibling from a ' +
+    'diverging input/output schema colliding with a DTO explicitly registered as `<Id>Output`. ' +
+    'Rename one of them, or set a distinct `options.id`.'
   );
 };
 
