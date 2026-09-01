@@ -531,10 +531,13 @@ See [`docs/recipes/custom-openapi-overrides.md`](docs/recipes/custom-openapi-ove
 | ------------------------- | ------ | ---------------- | -------------- | ----------------- | ------ | ------------------ |
 | `floor`                   | 4.4.0  | 11.0.1           | 11.0.1         | 11.0.0            | 7.6.0  | 0.2.0              |
 | `zod-latest`              | latest | 11.0.1           | 11.0.1         | 11.0.0            | 7.6.0  | 0.2.0              |
+| `zod-4.5`                 | 4.5.4  | 11.0.1           | 11.0.1         | 11.0.0            | 7.6.0  | 0.2.0              |
 | `nest-latest`             | 4.4.0  | latest           | latest         | latest            | 7.6.0  | 0.2.0              |
 | `rxjs-latest`             | 4.4.0  | 11.0.1           | 11.0.1         | 11.0.0            | latest | 0.2.0              |
 | `reflect-metadata-latest` | 4.4.0  | 11.0.1           | 11.0.1         | 11.0.0            | 7.6.0  | latest             |
 | `all-latest`              | latest | latest           | latest         | latest            | latest | latest             |
+
+One emission difference is visible across the supported `zod` range: from 4.5, a union of primitives — including `.nullable()` — emits `{ "type": ["string", "null"] }` where 4.4 emitted `{ "anyOf": [{ "type": "string" }, { "type": "null" }] }`. Both are valid OpenAPI 3.1 and validate identically; only the spelling changes. Everything else — `$ref` layout, composition `allOf`, input/output siblings, `paths` — is byte-identical across 4.4 and 4.5.
 
 Cell definitions live in [`.github/compat-matrix.json`](.github/compat-matrix.json). The CI workflow ([`.github/workflows/compat-matrix.yml`](.github/workflows/compat-matrix.yml)) runs on every push to `main` and weekly on Monday — when a cell fails, the workflow opens (or comments on) a GitHub issue labelled `compat-matrix-failure` so the regression is tracked outside the Actions UI. Editing the JSON is the formal way to extend or shrink supported ranges. Node is not matrixed — the `>=22` floor is enforced by `engines`.
 

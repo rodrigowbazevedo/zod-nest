@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { createRegistry, toOpenApi } from '../../src';
+import { expectUnionOf } from './shape-matchers.js';
 
 describe('toOpenApi — modifiers', () => {
   const registry = createRegistry();
@@ -15,8 +16,7 @@ describe('toOpenApi — modifiers', () => {
 
   it('nullable → anyOf with null', () => {
     const schema = z.string().nullable();
-    const out = toOpenApi(schema, opts).schema;
-    expect(out.anyOf).toEqual([{ type: 'string' }, { type: 'null' }]);
+    expectUnionOf(toOpenApi(schema, opts).schema, ['string', 'null']);
   });
 
   it('default is preserved on output', () => {

@@ -42,6 +42,26 @@
       "reflect-metadata": "0.2.0"
     },
     {
+      "name": "zod-4.5-node22",
+      "node": "22",
+      "zod": "4.5.4",
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "7.6.0",
+      "reflect-metadata": "0.2.0"
+    },
+    {
+      "name": "zod-4.5-node24",
+      "node": "24",
+      "zod": "4.5.4",
+      "@nestjs/common": "11.0.1",
+      "@nestjs/core": "11.0.1",
+      "@nestjs/swagger": "11.0.0",
+      "rxjs": "7.6.0",
+      "reflect-metadata": "0.2.0"
+    },
+    {
       "name": "nest-latest-node22",
       "node": "22",
       "zod": "4.4.0",

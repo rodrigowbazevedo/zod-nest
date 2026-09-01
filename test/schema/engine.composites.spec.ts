@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { createRegistry, toOpenApi } from '../../src';
+import { expectIntersectionOf, expectUnionOf } from './shape-matchers.js';
 
 describe('toOpenApi — composites', () => {
   const registry = createRegistry();
@@ -31,9 +32,7 @@ describe('toOpenApi — composites', () => {
 
   it('union → anyOf', () => {
     const schema = z.union([z.string(), z.number()]);
-    expect(toOpenApi(schema, opts).schema).toEqual({
-      anyOf: [{ type: 'string' }, { type: 'number' }],
-    });
+    expectUnionOf(toOpenApi(schema, opts).schema, ['string', 'number']);
   });
 
   it('discriminatedUnion → oneOf', () => {
@@ -49,10 +48,7 @@ describe('toOpenApi — composites', () => {
 
   it('intersection → allOf', () => {
     const schema = z.intersection(z.object({ a: z.string() }), z.object({ b: z.number() }));
-    const out = toOpenApi(schema, opts).schema;
-    expect(out.allOf).toBeDefined();
-    expect(Array.isArray(out.allOf)).toBe(true);
-    expect(out.allOf?.length).toBe(2);
+    expectIntersectionOf(toOpenApi(schema, opts).schema, ['a', 'b']);
   });
 
   it('record → additionalProperties', () => {
