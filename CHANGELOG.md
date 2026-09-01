@@ -1,3 +1,15 @@
+# [3.0.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.5...v3.0.0) (2026-09-01)
+
+
+* feat!: support NestJS 12, raise Node floor to 22.12, migrate to Vitest ([#124](https://github.com/rodrigowbazevedo/zod-nest/issues/124)) ([addc55c](https://github.com/rodrigowbazevedo/zod-nest/commit/addc55c24b168a14510cd2418c16a7f085cc89b0))
+
+
+---
+
+### Migrating
+
+This release contains breaking changes. See [MIGRATION.md](https://github.com/rodrigowbazevedo/zod-nest/blob/main/MIGRATION.md) for the upgrade path.
+
 ## [2.1.5](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.4...v2.1.5) (2026-09-01)
 
 
