@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 import type { ToOpenApiResult } from '../../src/schema/engine.js';
+import type { SchemaObject } from '../../src/schema/openapi.types.js';
 
 import { createRegistry, toOpenApi, ZodNestError } from '../../src';
+import { postProcess } from '../../src/schema/post-process.js';
 
 const emit = (schema: z.ZodType): ToOpenApiResult =>
   toOpenApi(schema, { io: 'input', registry: createRegistry() });
@@ -184,5 +186,32 @@ describe("postProcess — '#' resolves to the document root", () => {
     });
 
     expect(refs.get('PP_LooseKid')?.properties?.owner).toEqual({ $ref: '#' });
+  });
+});
+
+describe('postProcess — inlined root that a def references', () => {
+  // Zod 4.4 emits a named root inline and spells the cycle back to it as '#'.
+  // Built by hand so the branch is covered whichever zod version is installed.
+  const raw = {
+    type: 'object',
+    properties: {
+      kids: { type: 'array', items: { $ref: '#/$defs/PP_RawLeaf' } },
+    },
+    $defs: {
+      PP_RawLeaf: { type: 'object', properties: { owner: { $ref: '#' } } },
+    },
+  } satisfies SchemaObject;
+
+  it('publishes the root under its id and returns a $ref', () => {
+    const { schema, refs } = postProcess(raw, { rootId: 'PP_RawNode' });
+
+    expect(schema).toEqual({ $ref: '#/components/schemas/PP_RawNode' });
+    expect(refs.get('PP_RawNode')?.properties?.kids).toEqual({
+      type: 'array',
+      items: { $ref: '#/components/schemas/PP_RawLeaf' },
+    });
+    expect(refs.get('PP_RawLeaf')?.properties?.owner).toEqual({
+      $ref: '#/components/schemas/PP_RawNode',
+    });
   });
 });

@@ -149,9 +149,7 @@ export const postProcess = (raw: SchemaObject, options?: PostProcessOptions): Po
   rewriteRefs(schema, rootRef);
 
   for (const body of refs.values()) {
-    if (body !== schema) {
-      rewriteRefs(body, rootRef);
-    }
+    rewriteRefs(body, rootRef);
   }
 
   return { schema, refs };
