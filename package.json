@@ -132,5 +132,8 @@
   },
   "dependencies": {
     "fast-json-stable-stringify": "^2.1.0"
+  },
+  "overrides": {
+    "@commitlint/read": "21.0.1"
   }
 }
