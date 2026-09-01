@@ -1,5 +1,5 @@
 import js from '@eslint/js';
-import jestPlugin from 'eslint-plugin-jest';
+import vitestPlugin from '@vitest/eslint-plugin';
 import prettierPlugin from 'eslint-plugin-prettier/recommended';
 import unicornPlugin from 'eslint-plugin-unicorn';
 import globals from 'globals';
@@ -49,15 +49,15 @@ export default tseslint.config(
   },
   {
     files: ['**/*.spec.ts', 'test/**/*.ts'],
-    plugins: { jest: jestPlugin },
+    plugins: { vitest: vitestPlugin },
     languageOptions: {
-      globals: jestPlugin.environments.globals.globals,
+      globals: vitestPlugin.environments.env.globals,
     },
     rules: {
-      'jest/no-disabled-tests': 'warn',
-      'jest/no-focused-tests': 'error',
-      'jest/no-identical-title': 'error',
-      'jest/valid-expect': 'error',
+      'vitest/no-disabled-tests': 'warn',
+      'vitest/no-focused-tests': 'error',
+      'vitest/no-identical-title': 'error',
+      'vitest/valid-expect': 'error',
     },
   },
   {

@@ -20,8 +20,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "noEmit": true,
-    "types": ["node", "jest"]
+    "types": ["node", "vitest/globals"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "*.config.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts", "*.config.ts", "*.config.mts"],
   "exclude": ["node_modules", "dist", "coverage"]
 }

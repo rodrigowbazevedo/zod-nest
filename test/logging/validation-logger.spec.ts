@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { LoggerService } from '@nestjs/common';
+import type { Mocked } from 'vitest';
 
 import {
   createValidationLogger,
@@ -16,12 +17,12 @@ const failingError = (): z.ZodError => {
   return result.error;
 };
 
-const makeFakeLogger = (): jest.Mocked<LoggerService> => ({
-  log: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-  debug: jest.fn(),
-  verbose: jest.fn(),
+const makeFakeLogger = (): Mocked<LoggerService> => ({
+  log: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  verbose: vi.fn(),
 });
 
 describe('createValidationLogger', () => {

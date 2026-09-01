@@ -107,7 +107,7 @@ describe('expandParamMarkers', () => {
   });
 
   it('forces `required: true` on optional path params and emits a warning', () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const doc = docOf({
       paths: { '/x/{id}': { get: { parameters: [markerParam('path', 'PathDto')] } } },
     });

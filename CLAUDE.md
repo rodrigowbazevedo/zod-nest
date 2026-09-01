@@ -41,18 +41,18 @@ NOTICE                        # attribution to nestjs-zod for lifted names
 
 Every command runs from the repo root with `npm`. The package manager is npm; please don't commit a different lockfile.
 
-| Command                  | What it does                                                      |
-| ------------------------ | ----------------------------------------------------------------- |
-| `npm install`            | Installs deps + sets up the husky pre-commit hook.                |
-| `npm run build`          | tsup build → `dist/` (CJS + ESM + `.d.ts`).                       |
-| `npm run build:watch`    | tsup in watch mode.                                               |
-| `npm test`               | Jest, full suite.                                                 |
-| `npm run test:cov`       | Jest with coverage report.                                        |
-| `npm run lint`           | ESLint over the tree.                                             |
-| `npm run lint:fix`       | ESLint with `--fix`.                                              |
-| `npm run format`         | Prettier write over the tree.                                     |
-| `npm run typecheck`      | `tsc --noEmit` against `tsconfig.json`.                           |
-| `npm run prepublishOnly` | Chains lint + typecheck + test + build. Runs as the release gate. |
+| Command               | What it does                                                 |
+| --------------------- | ------------------------------------------------------------ |
+| `npm install`         | Installs deps + sets up the husky pre-commit hook.           |
+| `npm run build`       | tsup build → `dist/` (CJS + ESM + `.d.ts`).                  |
+| `npm run build:watch` | tsup in watch mode.                                          |
+| `npm test`            | Vitest, full suite.                                          |
+| `npm run test:cov`    | Vitest with coverage report.                                 |
+| `npm run lint`        | ESLint over the tree.                                        |
+| `npm run lint:fix`    | ESLint with `--fix`.                                         |
+| `npm run format`      | Prettier write over the tree.                                |
+| `npm run typecheck`   | `tsc --noEmit` against `tsconfig.json`.                      |
+| `npm run verify`      | Chains lint + typecheck + test + build. Mirrors the CI gate. |
 
 `npm run release` (semantic-release) is **CI-only** — never run locally. The release path is push-to-`main` → semantic-release reads conventional commits → CI publishes to npm. Running it locally would attempt to publish from your machine.
 
@@ -63,7 +63,7 @@ Every command runs from the repo root with `npm`. The package manager is npm; pl
 - **PostToolUse chain runs on TS edits.** `.claude/settings.json` wires `tsc --noEmit` → `eslint --fix --cache` → `prettier --write` after every `Edit`/`Write`/`MultiEdit`. This is a speed-up for Claude Code sessions; the same checks run in CI either way.
 - **Don't commit without being asked.** Stage + show the diff, wait for explicit "commit". Same applies to pushing and PR-opening.
 - **Don't `npm publish` ever.** CI is the only publish path; running it locally bypasses semantic-release versioning.
-- **Run lint + typecheck + test + build before presenting changes.** `npm run prepublishOnly` is the convenience chain.
+- **Run lint + typecheck + test + build before presenting changes.** `npm run verify` is the convenience chain.
 - **Before `gh pr create`**: the `.claude/` PreToolUse hook runs two checks and blocks the PR if either fires. Run the relevant skill first to clear them:
   - If `src/` changed without README / docs / MIGRATION updates → run `/sync-docs`.
   - If `src/index.ts` or any `src/*/index.ts` changed → run `/api-surface-audit`.

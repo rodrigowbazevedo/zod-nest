@@ -2,13 +2,14 @@ import { lastValueFrom, of, throwError } from 'rxjs';
 
 import type { CallHandler, ContextType, ExecutionContext, LoggerService } from '@nestjs/common';
 import type { Observable } from 'rxjs';
+import type { Mocked } from 'vitest';
 
-export const makeFakeLogger = (): jest.Mocked<LoggerService> => ({
-  log: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-  debug: jest.fn(),
-  verbose: jest.fn(),
+export const makeFakeLogger = (): Mocked<LoggerService> => ({
+  log: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  verbose: vi.fn(),
 });
 
 export interface FakeContextOptions {

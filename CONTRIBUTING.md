@@ -27,15 +27,15 @@ That sets up the `husky` git hooks too. The pre-commit hook runs `prettier --wri
 
 | Script              | What it does                               |
 | ------------------- | ------------------------------------------ |
-| `npm test`          | Jest, full suite.                          |
-| `npm run test:cov`  | Jest with coverage report.                 |
+| `npm test`          | Vitest, full suite.                        |
+| `npm run test:cov`  | Vitest with coverage report.               |
 | `npm run typecheck` | `tsc --noEmit` against `tsconfig.json`.    |
 | `npm run lint`      | ESLint on the whole tree.                  |
 | `npm run lint:fix`  | ESLint with `--fix`.                       |
 | `npm run format`    | Prettier write over the whole tree.        |
 | `npm run build`     | tsup build to `dist/` (CJS + ESM + .d.ts). |
 
-`npm run prepublishOnly` chains lint + typecheck + test + build — that's the gate semantic-release uses, so running it locally is a good last check before pushing.
+`npm run verify` chains lint + typecheck + test + build — the same four steps `release.yml` runs before semantic-release, so it's a good last check before pushing.
 
 ## Working with Claude Code (optional)
 
@@ -119,7 +119,7 @@ If you're not sure whether a topic warrants a recipe or belongs as inline conten
 
 1. Fork the repo, branch from `main`. Name the branch after the change (`fix/dangling-refs-hint`, `feat/composition-pick`).
 2. Make the change. Add or update tests.
-3. Run `npm run prepublishOnly` locally — that's the same gate CI runs.
+3. Run `npm run verify` locally — the same four steps CI runs.
 4. Open the PR against `main`. Reference any related issues with `Closes #N` in the body.
 5. CI runs Node 22 + Node 24 + coverage. All three must be green before merge.
 

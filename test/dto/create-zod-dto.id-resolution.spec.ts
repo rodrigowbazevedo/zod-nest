@@ -28,7 +28,7 @@ describe('createZodDto — id resolution', () => {
   });
 
   it('falls back to _AnonZodDto_N with warning when class name is single-char (mangled)', () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const schema = z.object({ x: z.string() });
     // simulate minified class name: rename via Object.defineProperty
     const Anon = createZodDto(schema);

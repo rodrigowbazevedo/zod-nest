@@ -36,7 +36,7 @@ describe('toResponseDto', () => {
   });
 
   it('does not warn on an unnamed schema (anonymous schemas are inlined, not surfaced)', () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
       toResponseDto(z.object({ c: z.boolean() }));
       expect(warn).not.toHaveBeenCalled();

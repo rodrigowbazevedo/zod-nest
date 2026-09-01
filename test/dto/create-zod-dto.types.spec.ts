@@ -5,9 +5,8 @@ import type { ZodDto } from '../../src';
 
 import { createZodDto } from '../../src';
 
-// Compile-only checks. The runtime body uses `expect(true).toBe(true)` so the
-// suite stays valid for jest; the value is that the file fails to typecheck
-// when the inferred types drift.
+// Compile-only checks. The runtime body is `expect(true).toBe(true)`; the value
+// is that the file fails to typecheck when the inferred types drift.
 
 describe('createZodDto — TypeScript inference (compile-only)', () => {
   it('infers instance type as z.infer<TSchema>', () => {
