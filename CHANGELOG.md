@@ -1,3 +1,10 @@
+## [2.1.3](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.2...v2.1.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* **schema:** inline named roots that zod 4.5 lifts into $defs ([#118](https://github.com/rodrigowbazevedo/zod-nest/issues/118)) ([7c2858e](https://github.com/rodrigowbazevedo/zod-nest/commit/7c2858e0aff50456a784255bd240d443f857b236)), closes [#116](https://github.com/rodrigowbazevedo/zod-nest/issues/116)
+
 ## [2.1.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v2.1.1...v2.1.2) (2026-06-28)
 
 
