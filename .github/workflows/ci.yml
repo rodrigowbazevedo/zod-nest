@@ -12,11 +12,8 @@ concurrency:
 
 jobs:
   build:
-    # Node 24 is the build/release Node (see release.yml). Node 22 client
-    # compatibility is verified separately by the compat-matrix workflow,
-    # which cross-products peer-dep cells with Node 22 + Node 24 and runs
-    # pack-smoke under each. Keeping the standard PR gate to a single
-    # Node version keeps the gate fast.
+    # Node 24 is the build/release Node (see release.yml), so it carries the
+    # full gate. The Node 22 job below is deliberately narrow — see its comment.
     name: Node 24
     runs-on: ubuntu-latest
     env:
@@ -59,3 +56,25 @@ jobs:
           files: ./reports/junit.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  # The engines floor is >=22.12, and Node 22 bundles npm 10 while Node 24
+  # bundles npm 11. The two disagree on trees with conflicting optional peer
+  # deps, so a lockfile npm 11 accepts can still break `npm ci` on npm 10.
+  node22:
+    name: Node 22
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      # The regression gate: fails if the committed lockfile is not installable
+      # under npm 10. Everything else here is near-free once installed.
+      - run: npm ci
+
+      - run: npm test
