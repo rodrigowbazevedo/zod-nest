@@ -1,3 +1,10 @@
+## [3.0.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.0.1...v3.0.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* defer dependent discovery so z.lazy forward refs survive ESM ([#137](https://github.com/rodrigowbazevedo/zod-nest/issues/137)) ([8ae2764](https://github.com/rodrigowbazevedo/zod-nest/commit/8ae2764e0efb684865652b539fa66005cb9ab4df)), closes [#136](https://github.com/rodrigowbazevedo/zod-nest/issues/136)
+
 ## [3.0.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.0.0...v3.0.1) (2026-09-01)
 
 
