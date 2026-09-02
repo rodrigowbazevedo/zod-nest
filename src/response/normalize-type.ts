@@ -5,6 +5,7 @@ import { createZodDto } from '../dto/create-zod-dto.js';
 import { isZodDto, isZodSchema } from '../dto/predicates.js';
 import { ANON_RESPONSE_PREFIX, resolveAnonId } from '../schema/anon-id.js';
 import { defaultRegistry, registerSchema } from '../schema/registry.js';
+import { singleton } from '../schema/singleton.js';
 
 /**
  * Cache of `raw schema -> output DTO` so the same schema instance reused across
@@ -13,7 +14,7 @@ import { defaultRegistry, registerSchema } from '../schema/registry.js';
  * WeakMap so the synthesised DTO is GC'd once the schema is. Mirrors the
  * `outputCache` pattern in `src/dto/output-dto.ts`.
  */
-const responseDtoCache = new WeakMap<z.ZodType, ZodDto>();
+const responseDtoCache = singleton('response-dto-cache', () => new WeakMap<z.ZodType, ZodDto>());
 
 const schemaToOutputDto = (schema: z.ZodType): ZodDto => {
   const cached = responseDtoCache.get(schema);

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { discoverDependents } from './discover-dependents.js';
+import { singleton } from './singleton.js';
 
 /**
  * Per-registration flags carried alongside the id.
@@ -133,8 +134,8 @@ export const createRegistry = (): ZodNestRegistry => {
   };
 };
 
-/** Process-wide default registry, used when no explicit `options.registry` is passed. */
-export const defaultRegistry: ZodNestRegistry = createRegistry();
+/** Process-wide default registry. Shared so subpath ids reach `applyZodNest`. */
+export const defaultRegistry: ZodNestRegistry = singleton('default-registry', createRegistry);
 
 export interface RegisterSchemaOptions {
   /** Forces this id, overriding any `.meta({ id })` already on the schema. */

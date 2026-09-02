@@ -3,6 +3,8 @@ import type { $ZodType } from 'zod/v4/core';
 import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
 
+import { singleton } from './singleton.js';
+
 /**
  * Argument shape for {@link overrideJSONSchema}. Two forms:
  *
@@ -41,7 +43,10 @@ export interface StoredFragments {
  * Value holds the per-direction fragments separately so the override factory
  * can pick the right one without surfacing `io` on `OverrideContext`.
  */
-const customOverrideMap = new WeakMap<$ZodType, StoredFragments>();
+const customOverrideMap = singleton(
+  'custom-override-map',
+  () => new WeakMap<$ZodType, StoredFragments>(),
+);
 
 const isWrapper = (
   arg: OverrideJSONSchemaArg,

@@ -15,7 +15,8 @@
  *   2. Copy tarball into a fresh tempdir sandbox.
  *   3. `npm init -y` + install peer-deps + the tarball.
  *   4. Metadata grep: installed `dist/index.js` must carry `design:paramtypes`.
- *   5. CJS smoke: assert root + subpath exports + bootstrap `ZodNestModule.forRoot()` and
+ *   5. CJS smoke: assert root + subpath exports + cross-entry shared state +
+ *      bootstrap `ZodNestModule.forRoot()` and
  *      resolve `ZodSerializerInterceptor` via `NestFactory.createApplicationContext`.
  *   6. ESM smoke: same.
  *   7. Cleanup.
@@ -256,6 +257,54 @@ for (const [subpath, names] of Object.entries(subpaths)) {
   console.log('CJS: zod-nest/' + subpath + ':', names.length, 'exports present');
 }
 
+const main = m;
+const helpers = require('zod-nest/helpers');
+const expressEntry = require('zod-nest/express');
+const fastifyEntry = require('zod-nest/fastify');
+const zod = require('zod');
+const LABEL = 'CJS';
+
+// Cross-entry state: a subpath schema must emit through the main entry.
+// Asserting exports exist does not catch a duplicated override map --
+// only crossing the boundary with a real schema does.
+const crossEntry = [
+  ['zod-nest/helpers FileSchema', helpers.FileSchema],
+  ['zod-nest/express multerMemoryFile()', expressEntry.multerMemoryFile()],
+  ['zod-nest/fastify fastifyMultipartFile()', fastifyEntry.fastifyMultipartFile()],
+];
+for (const [label, schema] of crossEntry) {
+  let emitted;
+  try {
+    emitted = main.toOpenApi(schema, {
+      io: 'input',
+      registry: main.createRegistry(),
+      strict: true,
+    }).schema;
+  } catch (err) {
+    console.error('Cross-entry emission failed for ' + label + ': ' + (err && err.message));
+    console.error('  -> that subpath bundle does not share module state with the main entry.');
+    process.exit(1);
+  }
+  if (emitted.type !== 'string' || emitted.format !== 'binary') {
+    console.error('Cross-entry emission wrong for ' + label + ': ' + JSON.stringify(emitted));
+    process.exit(1);
+  }
+}
+console.log(LABEL + ': cross-entry override map shared (' + crossEntry.length + ' subpath schemas)');
+
+// The registry is the other half: ZodMultipart registers named components
+// into defaultRegistry, which applyZodNest reads from the main entry.
+const probeSchema = zod.z
+  .object({ file: expressEntry.multerMemoryFile() })
+  .meta({ id: 'PackSmokeCrossEntryProbe' });
+expressEntry.ZodMultipart(probeSchema)({}, 'upload', { value: function upload() {} });
+if (!main.defaultRegistry.ids().includes('PackSmokeCrossEntryProbe')) {
+  console.error('Cross-entry registry not shared: the main defaultRegistry does not see an id');
+  console.error('  registered by zod-nest/express. Named components would be silently dropped.');
+  process.exit(1);
+}
+console.log(LABEL + ': cross-entry defaultRegistry shared');
+
 class RootModule {}
 Module({ imports: [m.ZodNestModule.forRoot()] })(RootModule);
 
@@ -296,6 +345,54 @@ for (const [subpath, names] of Object.entries(subpaths)) {
   }
   console.log('ESM: zod-nest/' + subpath + ':', names.length, 'exports present');
 }
+
+const main = m;
+const helpers = await import('zod-nest/helpers');
+const expressEntry = await import('zod-nest/express');
+const fastifyEntry = await import('zod-nest/fastify');
+const zod = await import('zod');
+const LABEL = 'ESM';
+
+// Cross-entry state: a subpath schema must emit through the main entry.
+// Asserting exports exist does not catch a duplicated override map --
+// only crossing the boundary with a real schema does.
+const crossEntry = [
+  ['zod-nest/helpers FileSchema', helpers.FileSchema],
+  ['zod-nest/express multerMemoryFile()', expressEntry.multerMemoryFile()],
+  ['zod-nest/fastify fastifyMultipartFile()', fastifyEntry.fastifyMultipartFile()],
+];
+for (const [label, schema] of crossEntry) {
+  let emitted;
+  try {
+    emitted = main.toOpenApi(schema, {
+      io: 'input',
+      registry: main.createRegistry(),
+      strict: true,
+    }).schema;
+  } catch (err) {
+    console.error('Cross-entry emission failed for ' + label + ': ' + (err && err.message));
+    console.error('  -> that subpath bundle does not share module state with the main entry.');
+    process.exit(1);
+  }
+  if (emitted.type !== 'string' || emitted.format !== 'binary') {
+    console.error('Cross-entry emission wrong for ' + label + ': ' + JSON.stringify(emitted));
+    process.exit(1);
+  }
+}
+console.log(LABEL + ': cross-entry override map shared (' + crossEntry.length + ' subpath schemas)');
+
+// The registry is the other half: ZodMultipart registers named components
+// into defaultRegistry, which applyZodNest reads from the main entry.
+const probeSchema = zod.z
+  .object({ file: expressEntry.multerMemoryFile() })
+  .meta({ id: 'PackSmokeCrossEntryProbe' });
+expressEntry.ZodMultipart(probeSchema)({}, 'upload', { value: function upload() {} });
+if (!main.defaultRegistry.ids().includes('PackSmokeCrossEntryProbe')) {
+  console.error('Cross-entry registry not shared: the main defaultRegistry does not see an id');
+  console.error('  registered by zod-nest/express. Named components would be silently dropped.');
+  process.exit(1);
+}
+console.log(LABEL + ': cross-entry defaultRegistry shared');
 
 class RootModule {}
 Module({ imports: [m.ZodNestModule.forRoot()] })(RootModule);
