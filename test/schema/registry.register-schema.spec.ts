@@ -3,6 +3,26 @@ import { z } from 'zod';
 import { createRegistry, registerSchema } from '../../src/schema/registry.js';
 
 describe('registerSchema', () => {
+  // The equal-id branch skips a redundant `globalRegistry.add`. Re-registering
+  // must be idempotent and must not disturb sibling meta.
+  it('is idempotent when the schema already carries the same id', () => {
+    const registry = createRegistry();
+    const schema = z
+      .object({ x: z.string() })
+      .meta({ id: 'Idempotent', title: 'Idempotent', description: 'kept' });
+
+    expect(registerSchema(schema, registry, { id: 'Idempotent' })).toBe('Idempotent');
+    expect(registerSchema(schema, registry, { id: 'Idempotent' })).toBe('Idempotent');
+
+    expect(registry.ids()).toEqual(['Idempotent']);
+    expect(registry.hasCollision('Idempotent')).toBe(false);
+    expect(z.globalRegistry.get(schema)).toMatchObject({
+      id: 'Idempotent',
+      title: 'Idempotent',
+      description: 'kept',
+    });
+  });
+
   it('registers under .meta({ id }) when no explicit id is provided', () => {
     const Named = z.string().meta({ id: 'RegSch_FromMeta' });
     const registry = createRegistry();

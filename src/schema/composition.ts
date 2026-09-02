@@ -39,15 +39,6 @@ export interface LineageEntry {
 // own docs warn against long-running registries pinning short-lived schemas.
 const lineageMap = singleton('lineage-map', () => new WeakMap<$ZodType, LineageEntry>());
 
-// Parent flat-key cache, populated eagerly by `extend()` at registration.
-// `reused: 'inline'` inlines the parent's shape into the child rather than
-// firing the override on the parent as a separate node, so the override
-// can't be relied on to populate this — extend() does it eagerly.
-const propsMap = singleton(
-  'props-map',
-  () => new WeakMap<$ZodType, { properties: readonly string[]; required: readonly string[] }>(),
-);
-
 /** Zod's wrapper types that make a property optional in JSON Schema's `required` sense. */
 export const OPTIONAL_WRAPPER_TYPES: ReadonlySet<string> = new Set(['optional', 'default']);
 
@@ -57,13 +48,11 @@ export const isOptionalProp = (propSchema: z.ZodType): boolean =>
 const computeShapeKeys = (
   schema: z.ZodObject,
 ): { properties: readonly string[]; required: readonly string[] } => {
-  const { shape } = schema;
-  const properties = Object.keys(shape);
-  const required = properties.filter((key) => {
-    const propSchema = shape[key];
-    return propSchema !== undefined && !isOptionalProp(propSchema);
-  });
-  return { properties, required };
+  const entries = Object.entries(schema.shape);
+  return {
+    properties: entries.map(([key]) => key),
+    required: entries.filter(([, propSchema]) => !isOptionalProp(propSchema)).map(([key]) => key),
+  };
 };
 
 /**
@@ -102,9 +91,6 @@ export const extend = <P extends z.ZodObject, S extends z.ZodObject>(
     parent,
     overriddenKeys: computeOverriddenKeys(parent, result),
   });
-  if (!propsMap.has(parent)) {
-    propsMap.set(parent, computeShapeKeys(parent));
-  }
   // Auto-register named parent/result so their bodies land in
   // `components.schemas`. Zod's `.extend()` produces a flat object, so the
   // parent isn't a transitive descendant of the result — without this, a
@@ -156,12 +142,7 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
       return;
     }
 
-    const parentCache = propsMap.get(entry.parent);
-    if (parentCache === undefined) {
-      // Defensive: `extend()` pre-caches the parent at registration time, so
-      // by the time the child's override fires this should be set.
-      return;
-    }
+    const parentCache = computeShapeKeys(entry.parent);
 
     const parentId = registry.zodRegistry.get(entry.parent)?.id;
     if (parentId === undefined) {

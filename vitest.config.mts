@@ -15,13 +15,14 @@ export default defineConfig({
       // re-export expressions as uncalled "functions" produced false negatives.
       include: ['src/**/*.ts'],
       exclude: ['src/index.ts', 'src/**/index.ts', 'src/**/*.types.ts'],
-      // 90% global, 80% per-area. The per-area floor catches regressions in a
-      // single module without dragging the global by aggregation.
+      // 99% global, 80% per-area: the per-area floor catches one module
+      // regressing. 99 not 100, leaving room for type-driven fallbacks whose
+      // runtime invariant makes them unreachable (see `registry.ts`).
       thresholds: {
-        statements: 90,
-        branches: 90,
-        functions: 90,
-        lines: 90,
+        statements: 99,
+        branches: 99,
+        functions: 99,
+        lines: 99,
         'src/decorators/**/*.ts': { statements: 80, branches: 80, functions: 80, lines: 80 },
         'src/document/**/*.ts': { statements: 80, branches: 80, functions: 80, lines: 80 },
         'src/dto/**/*.ts': { statements: 80, branches: 80, functions: 80, lines: 80 },

@@ -87,6 +87,17 @@ interface UnrepresentableHit {
   zodSchema: $ZodType;
 }
 
+const descentTarget = ($in: $ZodType, out: $ZodType, io: 'input' | 'output'): $ZodType => {
+  if (io === 'output') {
+    return out;
+  }
+  // A transform emits its output shape, so its input side is never the target.
+  if ($in._zod.traits.has('$ZodTransform')) {
+    return out;
+  }
+  return $in;
+};
+
 /**
  * Mark a pipe's descent target as covered by an outer registration when
  * the override for the outer pipe fires. Recurses for nested
@@ -107,8 +118,7 @@ const markPipeCoverage = (
   if (def.type !== 'pipe' || def.in === undefined || def.out === undefined) {
     return;
   }
-  const target =
-    io === 'output' ? def.out : def.in._zod.traits.has('$ZodTransform') ? def.out : def.in;
+  const target = descentTarget(def.in, def.out, io);
   if (covered.has(target)) {
     return;
   }

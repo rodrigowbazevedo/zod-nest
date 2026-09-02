@@ -80,6 +80,37 @@ describe('expandParamMarkers', () => {
     expect((doc.components?.schemas as Record<string, unknown>).Object).toBeUndefined();
   });
 
+  // `applyZodNest` runs over a caller-supplied document, so a user pre-pass can
+  // hand it a `required` array carrying non-strings. Those are ignored rather
+  // than coerced into parameter names.
+  it('ignores non-string entries in a required array', () => {
+    const doc = docOf({
+      paths: {
+        '/templates': {
+          get: { parameters: [markerParam('query', 'MalformedRequired')] },
+        },
+      },
+      components: { schemas: { Object: objectMarkerSchema() } },
+    });
+    const inputSchemas = new Map<string, unknown>([
+      [
+        'MalformedRequired',
+        {
+          type: 'object',
+          properties: { limit: { type: 'number' }, cursor: { type: 'string' } },
+          required: ['limit', 42, null, { name: 'cursor' }],
+        },
+      ],
+    ]);
+
+    expandParamMarkers({ doc, inputSchemas, outputSchemas: new Map() });
+
+    expect(paramsOf(doc, '/templates', 'get')).toEqual([
+      { name: 'limit', in: 'query', required: true, schema: { type: 'number' } },
+      { name: 'cursor', in: 'query', required: false, schema: { type: 'string' } },
+    ]);
+  });
+
   it('keeps non-marker parameters in place and preserves their order', () => {
     const doc = docOf({
       paths: {
