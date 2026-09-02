@@ -30,46 +30,39 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.mts",
-        "default": "./dist/index.mjs"
-      },
-      "require": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     },
     "./helpers": {
-      "import": {
-        "types": "./dist/helpers/index.d.mts",
-        "default": "./dist/helpers/index.mjs"
-      },
-      "require": {
-        "types": "./dist/helpers/index.d.ts",
-        "default": "./dist/helpers/index.js"
-      }
+      "types": "./dist/helpers/index.d.ts",
+      "import": "./dist/helpers/index.mjs",
+      "require": "./dist/helpers/index.js"
     },
     "./express": {
-      "import": {
-        "types": "./dist/express/index.d.mts",
-        "default": "./dist/express/index.mjs"
-      },
-      "require": {
-        "types": "./dist/express/index.d.ts",
-        "default": "./dist/express/index.js"
-      }
+      "types": "./dist/express/index.d.ts",
+      "import": "./dist/express/index.mjs",
+      "require": "./dist/express/index.js"
     },
     "./fastify": {
-      "import": {
-        "types": "./dist/fastify/index.d.mts",
-        "default": "./dist/fastify/index.mjs"
-      },
-      "require": {
-        "types": "./dist/fastify/index.d.ts",
-        "default": "./dist/fastify/index.js"
-      }
+      "types": "./dist/fastify/index.d.ts",
+      "import": "./dist/fastify/index.mjs",
+      "require": "./dist/fastify/index.js"
     },
     "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "helpers": [
+        "dist/helpers/index.d.ts"
+      ],
+      "express": [
+        "dist/express/index.d.ts"
+      ],
+      "fastify": [
+        "dist/fastify/index.d.ts"
+      ]
+    }
   },
   "files": [
     "dist",
