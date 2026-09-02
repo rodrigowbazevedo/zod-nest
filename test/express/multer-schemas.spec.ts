@@ -68,11 +68,7 @@ describe('multer file schemas', () => {
     // $refs. Regression guard: `.meta()` clones, so the fragment has to be
     // re-registered on the renamed instance or the component emits empty.
     it('emits a reusable component when given an id', () => {
-      const csv = multerMemoryFile({
-        mimeTypes: ['text/csv'],
-        id: 'StoredCsv',
-        title: 'StoredCsv',
-      });
+      const csv = multerMemoryFile({ mimeTypes: ['text/csv'], id: 'StoredCsv' });
       const registry = createRegistry();
       const { schema, refs } = toOpenApi(z.object({ candidate: csv, reference: csv }), {
         io: 'input',
@@ -89,6 +85,24 @@ describe('multer file schemas', () => {
           candidate: { $ref: expect.stringContaining('StoredCsv') },
           reference: { $ref: expect.stringContaining('StoredCsv') },
         },
+      });
+    });
+
+    // `overrideJSONSchema` replaces the emitted body outright, so there is no
+    // `title` option — one would be silently discarded. `description` is
+    // carried into the fragment and is the way to annotate a file field.
+    it('inlines the fragment when no id is given', () => {
+      const anonymous = multerMemoryFile({ mimeTypes: ['image/png'] });
+      const { schema, refs } = toOpenApi(z.object({ avatar: anonymous }), {
+        io: 'input',
+        registry: createRegistry(),
+        strict: true,
+      });
+      expect(refs.size).toBe(0);
+      expect(schema.properties?.avatar).toEqual({
+        type: 'string',
+        format: 'binary',
+        contentMediaType: 'image/png',
       });
     });
 

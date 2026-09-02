@@ -7,24 +7,19 @@ import type { z } from 'zod';
  */
 const fileSchemas = new WeakSet<z.ZodType>();
 
-const WRAPPER_TYPES = new Set(['optional', 'nullable', 'default', 'array', 'readonly']);
-
+// Wrapper defs expose their inner schema as Zod's internal `$ZodType`, which
+// the `in` narrowing widens to `unknown`. Guarding is the cast-free way back
+// to the public type.
 const isZodType = (value: unknown): value is z.ZodType =>
   value !== null && typeof value === 'object' && '_zod' in value;
 
 const unwrapOnce = (schema: z.ZodType): z.ZodType | undefined => {
-  const def: unknown = schema._zod.def;
-  if (def === null || typeof def !== 'object' || !('type' in def)) {
-    return undefined;
+  const def = schema._zod.def;
+  if ('innerType' in def) {
+    return isZodType(def.innerType) ? def.innerType : undefined;
   }
-  if (typeof def.type !== 'string' || !WRAPPER_TYPES.has(def.type)) {
-    return undefined;
-  }
-  if ('innerType' in def && isZodType(def.innerType)) {
-    return def.innerType;
-  }
-  if ('element' in def && isZodType(def.element)) {
-    return def.element;
+  if ('element' in def) {
+    return isZodType(def.element) ? def.element : undefined;
   }
   return undefined;
 };

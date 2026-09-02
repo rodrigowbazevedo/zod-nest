@@ -18,7 +18,7 @@ import type { FastifyMultipartFileOptions } from '../../src/fastify/index.js';
 
 import { multerMemoryFile, MULTIPART_CONTENT_TYPE, ZodMultipart } from '../../src/express/index.js';
 import { fastifyMultipartFile } from '../../src/fastify/index.js';
-import { createRegistry } from '../../src/index.js';
+import { applyZodNest, createRegistry } from '../../src/index.js';
 
 const registry = createRegistry();
 
@@ -43,6 +43,22 @@ class OptionsController {
   @Post('optional-body')
   @ZodMultipart(UploadShape, { registry, required: false })
   optionalBody(): null {
+    return null;
+  }
+
+  // Named descendants of the shape have to reach the registry, or their
+  // `$ref`s dangle when `applyZodNest` assembles components.schemas.
+  @Post('named-parts')
+  @ZodMultipart(
+    {
+      report: multerMemoryFile({ mimeTypes: ['text/csv'], id: 'NamedReportFile' }),
+      options: z
+        .object({ dryRun: z.stringbool(), label: z.string() })
+        .meta({ id: 'NamedImportOptions' }),
+    },
+    { registry },
+  )
+  namedParts(): null {
     return null;
   }
 }
@@ -88,6 +104,24 @@ describe('@ZodMultipart options', () => {
   it('honours required: false', async () => {
     const doc = await bootstrap([OptionsController]);
     expect(requestBodyAt(doc, '/opts/optional-body').required).toBe(false);
+  });
+
+  it('registers named descendants so their $refs resolve', async () => {
+    const doc = applyZodNest(await bootstrap([OptionsController]), { registry });
+    const schema = requestBodyAt(doc, '/opts/named-parts').content['multipart/form-data'];
+    expect(schema).toMatchObject({
+      schema: {
+        properties: {
+          report: { $ref: '#/components/schemas/NamedReportFile' },
+          options: { $ref: '#/components/schemas/NamedImportOptions' },
+        },
+      },
+    });
+    expect(doc.components?.schemas?.NamedReportFile).toMatchObject({
+      type: 'string',
+      format: 'binary',
+    });
+    expect(doc.components?.schemas?.NamedImportOptions).toMatchObject({ type: 'object' });
   });
 
   it('types the per-platform option bags', () => {

@@ -33,10 +33,10 @@ const schemaFor = (metadata: MultipartMetadata, name: string, decorator: string)
 };
 
 const pick = (shape: MultipartShape, keys: readonly string[]): z.ZodType => {
+  const wanted = new Set(keys);
   const picked: Record<string, z.ZodType> = {};
-  for (const key of keys) {
-    const schema = shape[key];
-    if (schema !== undefined) {
+  for (const [key, schema] of Object.entries(shape)) {
+    if (wanted.has(key)) {
       picked[key] = schema;
     }
   }

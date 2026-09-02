@@ -12,11 +12,11 @@ export interface BaseFileOptions {
   /**
    * Registry id for the schema. Set it to get a reusable
    * `components.schemas` entry that every field `$ref`s, instead of the
-   * fragment being inlined at each use site.
+   * fragment being inlined at each use site. There is no `title` counterpart
+   * — `overrideJSONSchema` replaces the emitted body and does not carry
+   * `title` into it, so one would have no effect.
    */
   readonly id?: string;
-  /** OpenAPI `title`, surfaced by Swagger UI's 3.1 renderer next to the `$ref`. */
-  readonly title?: string;
   /** Allowed MIME types, matched case-insensitively against the client-supplied value. */
   readonly mimeTypes?: readonly string[];
   /** Allowed filename extensions, with or without a leading dot. */
@@ -65,24 +65,20 @@ const collectChecks = <TFile>(params: BuildFileSchemaParams<TFile>): Array<FileC
   return checks;
 };
 
-const withMeta = <TFile>(
+const withId = <TFile>(
   schema: z.ZodType<TFile, TFile>,
   options: BaseFileOptions | undefined,
   fragment: SchemaObject,
 ): z.ZodType<TFile, TFile> => {
-  if (options?.id === undefined && options?.title === undefined) {
+  if (options?.id === undefined) {
     return schema;
   }
-  const meta = {
-    ...(options.id !== undefined ? { id: options.id } : {}),
-    ...(options.title !== undefined ? { title: options.title } : {}),
-  };
-  return overrideJSONSchema(schema.meta(meta), fragment);
+  return overrideJSONSchema(schema.meta({ id: options.id }), fragment);
 };
 
 /**
  * Assemble a platform file schema: duck-typing predicate, the option checks,
- * then `.meta()` — re-registering the binary fragment after every step.
+ * then `.meta({ id })` — re-registering the binary fragment after every step.
  *
  * Each registration is load-bearing. `overrideJSONSchema` keys its fragment on
  * the schema *instance*, and both `.check()` and `.meta()` clone. Emission
@@ -97,5 +93,5 @@ export const buildFileSchema = <TFile>(
   const base = overrideJSONSchema(z.custom<TFile>(params.predicate), fragment);
   const checks = collectChecks(params);
   const checked = checks.length === 0 ? base : overrideJSONSchema(base.check(...checks), fragment);
-  return markFileSchema(withMeta(checked, params.options, fragment));
+  return markFileSchema(withId(checked, params.options, fragment));
 };

@@ -188,11 +188,7 @@ There is no `@ZodUploadedFile` on this entry point. With the files in the body, 
 By default a file schema is inlined at each use site. Pass `id` to get a reusable `components.schemas` entry that every field `$ref`s instead:
 
 ```ts
-const StoredCsv = multerMemoryFile({
-  mimeTypes: ['text/csv'],
-  id: 'StoredCsv',
-  title: 'StoredCsv',
-});
+const StoredCsv = multerMemoryFile({ mimeTypes: ['text/csv'], id: 'StoredCsv' });
 ```
 
 ```jsonc
@@ -210,8 +206,10 @@ Use `id` rather than calling `.meta({ id })` on the returned schema. `.meta()` c
 multerMemoryFile({ mimeTypes: ['text/csv'] }).meta({ id: 'StoredCsv', title: 'StoredCsv' });
 
 // ✅ the factory re-registers the fragment after naming
-multerMemoryFile({ mimeTypes: ['text/csv'], id: 'StoredCsv', title: 'StoredCsv' });
+multerMemoryFile({ mimeTypes: ['text/csv'], id: 'StoredCsv' });
 ```
+
+There is no `title` option to go with `id`. `overrideJSONSchema` replaces the emitted body outright and deliberately doesn't carry `title` into it, so one would be silently discarded — a named file component has no `title`, and no `$ref` sibling is generated for it. Use `description`, which *is* carried into the fragment.
 
 The same applies to any schema you name by hand after an `overrideJSONSchema` — re-wrap it, as [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md) describes. The `id` option exists so the file helpers don't make you think about it.
 
@@ -267,7 +265,7 @@ MulterModule.register({ limits: { fileSize: 2 * 1024 * 1024 } });
 | `multerDiskFile(options?)` | Disk-storage file schema with optional checks |
 | `MulterMemoryFileSchema` / `MulterDiskFileSchema` | Zero-option presets |
 | `MulterMemoryFileLike` / `MulterDiskFileLike` | Structural types for handler params |
-| `MulterFileOptions` | `{ id?, title?, maxSize?, mimeTypes?, extensions?, description?, contentMediaType? }` |
+| `MulterFileOptions` | `{ id?, maxSize?, mimeTypes?, extensions?, description?, contentMediaType? }` |
 | `@ZodMultipart(shape, options?)` | Declares the body; emits `requestBody` + `multipart/form-data` |
 | `@ZodUploadedFile(name)` | Validates `req.file` against `shape[name]` |
 | `@ZodUploadedFiles(name?)` | Validates `req.files` against `shape[name]`, or all file properties |
@@ -280,7 +278,7 @@ MulterModule.register({ limits: { fileSize: 2 * 1024 * 1024 } });
 | `fastifyMultipartFile(options?)` | `MultipartFile` schema with optional checks |
 | `FastifyMultipartFileSchema` | Zero-option preset |
 | `FastifyMultipartFileLike` | Structural type for handler params |
-| `FastifyMultipartFileOptions` | `{ id?, title?, mimeTypes?, extensions?, description?, contentMediaType? }` — no `maxSize` |
+| `FastifyMultipartFileOptions` | `{ id?, mimeTypes?, extensions?, description?, contentMediaType? }` — no `maxSize` |
 | `@ZodMultipart(shape, options?)` | Declares the body; defaults to `filesIn: 'body'` |
 | `@ZodMultipartBody()` | Validates `req.body` against the whole shape, files included |
 
