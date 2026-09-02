@@ -1,7 +1,7 @@
 ---
 name: api-surface-audit
 description: >
-  Audit the public API surface of the zod-nest library — verify every export in `src/index.ts` resolves to a file in `src/<area>/`, has a matching test in `test/<area>/<name>.spec.ts`, and follows the project's naming conventions (`<Name>Exception` for thrown classes, `x-zod-nest-*` for OpenAPI extension keys, `Symbol.for('zod-nest.*')` for symbols). Use this skill before cutting a release, after adding or renaming a public export, after refactoring a module, when reviewing a PR that touches `src/index.ts` or any per-area `index.ts`, or any time you suspect the public surface might have drifted from its tests or conventions. The skill emits a line-anchored checklist; a clean checklist is the gate for shipping.
+  Audit the public API surface of the zod-nest library — verify every export in `src/index.ts`, `src/helpers/index.ts`, `src/express/index.ts` and `src/fastify/index.ts` resolves to a file in `src/<area>/`, has a matching test in `test/<area>/<name>.spec.ts`, and follows the project's naming conventions (`<Name>Exception` for thrown classes, `x-zod-nest-*` for OpenAPI extension keys, `Symbol.for('zod-nest.*')` for symbols). Use this skill before cutting a release, after adding or renaming a public export, after refactoring a module, when reviewing a PR that touches any entry point or per-area `index.ts`, or any time you suspect the public surface might have drifted from its tests or conventions. The skill emits a line-anchored checklist; a clean checklist is the gate for shipping.
 ---
 
 # api-surface-audit
@@ -15,7 +15,7 @@ Verifies higher-level hygiene of the zod-nest public API surface — the kinds o
 - **Before cutting a release.** A clean audit = the surface ships consistently.
 - **After adding or renaming a public export.** Catches missing tests and convention drift at PR time, not at release.
 - **After refactoring a module.** Verifies per-area re-exports are still serving a purpose (no orphans).
-- **When reviewing a PR that touches `src/index.ts` or any `src/*/index.ts`.** The diff alone doesn't show convention adherence or test coverage.
+- **When reviewing a PR that touches any published entry point (`src/index.ts`, `src/helpers/index.ts`, `src/express/index.ts`, `src/fastify/index.ts`) or any `src/*/index.ts`.** The diff alone doesn't show convention adherence or test coverage.
 
 ## Output contract
 
@@ -32,7 +32,18 @@ A markdown checklist of diagnostics, grouped into 4 categories. Each item carrie
 
 ### Step 1: Collect the public surface
 
-Read `src/index.ts` and capture every exported name, grouped by area (which `./<area>/index.js` it came from). Because the skill assumes typecheck is already green, you don't need to verify the names resolve — `tsc` has done that. Just collect the inventory.
+The package publishes four entry points (`package.json#exports`). Audit all of them — a name is public if any entry point surfaces it:
+
+| Entry point         | Subpath             | Tests live in                       |
+| ------------------- | ------------------- | ----------------------------------- |
+| `src/index.ts`      | `zod-nest`          | `test/<area>/`                      |
+| `src/helpers/index.ts` | `zod-nest/helpers` | `test/helpers/`                    |
+| `src/express/index.ts` | `zod-nest/express` | `test/express/`, `test/multipart/`  |
+| `src/fastify/index.ts` | `zod-nest/fastify` | `test/fastify/`, `test/multipart/`  |
+
+Read each and capture every exported name, grouped by the module it came from. Because the skill assumes typecheck is already green, you don't need to verify the names resolve — `tsc` has done that. Just collect the inventory.
+
+The platform entry points re-export shared internals from `src/multipart/` under platform-bound names (`ZodMultipart` is `createZodMultipart(...)` bound to that platform's `filesIn` default). Treat the exported name as the public surface, not the internal factory.
 
 ### Step 2: Check naming conventions
 
@@ -110,7 +121,7 @@ Stop after emitting. The user reviews and decides per item.
 - **Deep type-shape audits.** Verifying that a function's parameter types haven't changed shape is `/check-upstream-updates` territory, not this skill.
 - **Doc coverage.** That's `/sync-docs`.
 - **Test quality.** This skill checks for _presence_ of a test, not whether the test is good.
-- **Internal-module-only refactors.** If `src/index.ts` doesn't change and no per-area `index.ts` changes, the public surface didn't shift — running this skill is optional.
+- **Internal-module-only refactors.** If no published entry point changes and no per-area `index.ts` changes, the public surface didn't shift — running this skill is optional.
 
 ## Notes
 

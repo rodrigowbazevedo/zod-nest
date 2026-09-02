@@ -499,6 +499,27 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 
 See [`docs/recipes/custom-openapi-overrides.md`](docs/recipes/custom-openapi-overrides.md) for the full catalog and usage patterns.
 
+**File uploads** (subpaths: `zod-nest/express`, `zod-nest/fastify`) — [`docs/file-uploads.md`](docs/file-uploads.md)
+
+Dedicated helpers per multipart parser, because multer and `@fastify/multipart` disagree on where files land, what they're named, and whether a size is even reported.
+
+- **Express / multer**: `multerMemoryFile(options?)`, `multerDiskFile(options?)`, `MulterMemoryFileSchema`, `MulterDiskFileSchema`, `MulterMemoryFileLike`, `MulterDiskFileLike`, `MulterFileOptions`
+- **Fastify / `@fastify/multipart`**: `fastifyMultipartFile(options?)`, `FastifyMultipartFileSchema`, `FastifyMultipartFileLike`, `FastifyMultipartFileOptions` (no `maxSize` — a `MultipartFile` reports no size)
+- **Decorators**: `@ZodMultipart(shape, options?)` declares the whole body and is the source of truth for `@ZodUploadedFile(name)`, `@ZodUploadedFiles(name?)`, and `@ZodMultipartBody()`
+
+```ts
+@Post('avatar')
+@UseInterceptors(FileInterceptor('avatar'))
+@ZodMultipart({
+  avatar: multerMemoryFile({ maxSize: 2 * 1024 * 1024, mimeTypes: ['image/png'] }),
+  name: z.string(),
+})
+upload(
+  @ZodUploadedFile('avatar') avatar: MulterMemoryFileLike,
+  @ZodMultipartBody() body: { name: string },
+) {}
+```
+
 ## Documentation
 
 | Topic                                      | Doc                                                          |
@@ -510,6 +531,7 @@ See [`docs/recipes/custom-openapi-overrides.md`](docs/recipes/custom-openapi-ove
 | Module options reference                   | [`docs/module-options.md`](docs/module-options.md)           |
 | Validation logging                         | [`docs/logging.md`](docs/logging.md)                         |
 | Swagger integration & custom emission      | [`docs/swagger-integration.md`](docs/swagger-integration.md) |
+| File uploads (multipart/form-data)         | [`docs/file-uploads.md`](docs/file-uploads.md)               |
 | Composition (experimental)                 | [`docs/composition.md`](docs/composition.md)                 |
 | Exception classes                          | [`docs/exceptions.md`](docs/exceptions.md)                   |
 | Recipes                                    | [`docs/recipes/`](docs/recipes/)                             |

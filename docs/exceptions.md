@@ -172,6 +172,7 @@ class ZodNestUnrepresentableError extends ZodNestError {
 ```
 
 - **Thrown by**: `toOpenApi` (single-schema mode) or `bulkEmit` (registry mode) in **strict mode** when a Zod construct can't be represented as JSON Schema.
+- **Also thrown** when the construct emits a body made *only* of annotations (`title`, `description`, `deprecated`, `examples`, `default`, …) with no type. Such a body describes nothing, so it's treated the same as an empty one. The usual cause is `.meta({ id, title })` on a schema whose `overrideJSONSchema` registration lives on the pre-`.meta()` instance — see mitigation 2 below.
 - **When**: schema emission — at first `Dto.id` read, at `applyZodNest`, or at any direct `toOpenApi` call.
 - **Carries**: `path` (where in the schema tree the unrepresentable construct lives), `zodType` (the Zod type name as a string — `'bigint'`, `'date'`, `'transform'`, …).
 
@@ -185,7 +186,7 @@ try {
 }
 ```
 
-**Mitigation** — four options, most-targeted first:
+**Mitigation** — five options, most-targeted first:
 
 1. **Drop in a shipped preset** from `zod-nest/helpers` — `FileSchema` / `BlobSchema` / `BufferSchema` cover the common `z.instanceof(File | Blob | Buffer)` cases without any registration of your own.
 
@@ -197,7 +198,19 @@ try {
    class UploadDto extends createZodDto(z.object({ file: FileSchema })) {}
    ```
 
-2. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema _instance_. Pair with the `zod-nest/helpers` fragment catalog (`binaryFragment`, `uuidFragment`, `opaqueFragment`, …) or the `binary()` / `opaque()` sugar functions so you don't have to hand-write the magic objects. Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes (coercion helpers). See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
+2. **For a multipart upload field, use the platform helper** from `zod-nest/express` or `zod-nest/fastify`. Neither multer nor `@fastify/multipart` produces a class, so `FileSchema` and friends don't apply — those parsers hand back plain objects, and a bare `z.custom` for one emits `{}`. See [`file-uploads.md`](file-uploads.md).
+
+   ```ts
+   import { multerMemoryFile } from 'zod-nest/express';
+
+   const Avatar = multerMemoryFile({ mimeTypes: ['image/png'] });
+   ```
+
+   The same error also fires when you add `.refine()`, `.check()` or `.meta()` to an already-overridden schema: the override is registered per schema *instance* and each of those clones, so the fragment is left behind on the discarded instance. Re-wrap the result (`overrideJSONSchema(schema.refine(...), binary())`), or move the constraint into the file factory's options — `id` and `title` included — which handles the ordering for you.
+
+   `.meta()` is the case worth knowing about, because the emitted body isn't empty: it carries the `title` you just set. Emission treats an annotation-only body as unrepresentable precisely so this surfaces as an error rather than shipping an empty `components.schemas` entry.
+
+3. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema _instance_. Pair with the `zod-nest/helpers` fragment catalog (`binaryFragment`, `uuidFragment`, `opaqueFragment`, …) or the `binary()` / `opaque()` sugar functions so you don't have to hand-write the magic objects. Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes (coercion helpers). See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
 
    ```ts
    import { z } from 'zod';
@@ -211,9 +224,9 @@ try {
    const UserId = overrideJSONSchema(z.custom<string>(), uuidFragment);
    ```
 
-3. **`override` callback** — pass a per-call `override` to `applyZodNest` / `toOpenApi` that mutates `ctx.jsonSchema` for matching types. Useful when the mapping should apply to _every_ schema of a given Zod type. See [`swagger-integration.md`](swagger-integration.md#override-callback) for the pattern.
+4. **`override` callback** — pass a per-call `override` to `applyZodNest` / `toOpenApi` that mutates `ctx.jsonSchema` for matching types. Useful when the mapping should apply to _every_ schema of a given Zod type. See [`swagger-integration.md`](swagger-integration.md#override-callback) for the pattern.
 
-4. **`strict: false`** — globally relax the check; unrepresentable constructs emit `{}`. Reach for this only when you're knowingly trading schema fidelity for a clean boot.
+5. **`strict: false`** — globally relax the check; unrepresentable constructs emit `{}`. Reach for this only when you're knowingly trading schema fidelity for a clean boot.
 
 ## `ZodNestDocumentError`
 
