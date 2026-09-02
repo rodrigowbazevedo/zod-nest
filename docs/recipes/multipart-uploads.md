@@ -122,6 +122,38 @@ import(
 
 The handler param is then `MulterMemoryFileLike | undefined`; `@ZodUploadedFile('avatar')` resolves `undefined` without throwing when no file was sent.
 
+## A composite body (intersection of unions)
+
+An endpoint that accepts *either* a set of files *or* a set of text fields, on each of two axes, is an intersection of unions — a shape no flat record can express. Pass the schema and flatten it:
+
+```ts
+const CandidateFiles = z.object({
+  candidate_trafficking: Csv,
+  candidate_list_values: Csv.optional(),
+});
+const CandidateTemplates = z.object({
+  candidate_templates: z.string().nonempty(),
+});
+
+const CreateTaxonomyTranslation = z.intersection(
+  z.union([CandidateTemplates, CandidateFiles]),
+  z.union([ReferenceTemplates, ReferenceFiles]),
+);
+
+@Post()
+@UseInterceptors(AnyFilesInterceptor())
+@ZodMultipart(CreateTaxonomyTranslation, { flatten: true })
+create(
+  @Body(new ZodValidationPipe(CreateTaxonomyTranslation))
+  body: z.infer<typeof CreateTaxonomyTranslation>,
+) {}
+```
+
+Two things to know:
+
+- **Every merged property is optional in the document.** No single property is guaranteed across the original variants, so the spec allows any subset. The `ZodValidationPipe` still enforces the real shape at runtime — the document is the lossy half, deliberately, so Swagger UI can render the form.
+- **The multipart param decorators don't apply here.** They split a flat shape into file and text fields, and a composite has none, so they throw rather than guess. Use `@Body(new ZodValidationPipe(schema))`, as above.
+
 ## Sharing a file schema across endpoints
 
 Nothing about these schemas is per-endpoint, so hoist the ones you reuse:

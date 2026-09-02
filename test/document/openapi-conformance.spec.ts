@@ -113,6 +113,54 @@ describe('OpenAPI 3.1 conformance', () => {
     }
   });
 
+  it('validates a named multipart body emitted as a $ref', async () => {
+    const Body = z
+      .object({ file: multerMemoryFile({ mimeTypes: ['text/csv'] }), label: z.string() })
+      .meta({ id: 'ConformNamedUpload', title: 'ConformNamedUpload' });
+
+    @Controller('named-uploads')
+    class NamedUploadsController {
+      @Post()
+      @UseInterceptors(FileInterceptor('file'))
+      @ZodMultipart(Body)
+      upload(): unknown {
+        return null;
+      }
+    }
+
+    const { app, doc } = await bootstrap([NamedUploadsController]);
+    try {
+      await expect(validate(doc)).resolves.toBeDefined();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('validates a flattened intersection-of-unions multipart body', async () => {
+    const Csv = multerMemoryFile({ mimeTypes: ['text/csv'], id: 'ConformCsv' });
+    const Body = z.intersection(
+      z.union([z.object({ templates: z.string() }), z.object({ trafficking: Csv })]),
+      z.object({ label: z.string() }),
+    );
+
+    @Controller('composite-uploads')
+    class CompositeUploadsController {
+      @Post()
+      @UseInterceptors(FileInterceptor('trafficking'))
+      @ZodMultipart(Body, { flatten: true })
+      upload(): unknown {
+        return null;
+      }
+    }
+
+    const { app, doc } = await bootstrap([CompositeUploadsController]);
+    try {
+      await expect(validate(doc)).resolves.toBeDefined();
+    } finally {
+      await app.close();
+    }
+  });
+
   it('validates a fastify multipart body with the file in the body', async () => {
     @Controller('documents')
     class DocumentsController {
