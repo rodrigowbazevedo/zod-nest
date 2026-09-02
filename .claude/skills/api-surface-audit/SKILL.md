@@ -34,12 +34,12 @@ A markdown checklist of diagnostics, grouped into 4 categories. Each item carrie
 
 The package publishes four entry points (`package.json#exports`). Audit all of them — a name is public if any entry point surfaces it:
 
-| Entry point         | Subpath             | Tests live in                       |
-| ------------------- | ------------------- | ----------------------------------- |
-| `src/index.ts`      | `zod-nest`          | `test/<area>/`                      |
+| Entry point            | Subpath            | Tests live in                      |
+| ---------------------- | ------------------ | ---------------------------------- |
+| `src/index.ts`         | `zod-nest`         | `test/<area>/`                     |
 | `src/helpers/index.ts` | `zod-nest/helpers` | `test/helpers/`                    |
-| `src/express/index.ts` | `zod-nest/express` | `test/express/`, `test/multipart/`  |
-| `src/fastify/index.ts` | `zod-nest/fastify` | `test/fastify/`, `test/multipart/`  |
+| `src/express/index.ts` | `zod-nest/express` | `test/express/`, `test/multipart/` |
+| `src/fastify/index.ts` | `zod-nest/fastify` | `test/fastify/`, `test/multipart/` |
 
 Read each and capture every exported name, grouped by the module it came from. Because the skill assumes typecheck is already green, you don't need to verify the names resolve — `tsc` has done that. Just collect the inventory.
 

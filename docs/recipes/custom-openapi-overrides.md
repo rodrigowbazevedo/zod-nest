@@ -144,6 +144,8 @@ For the symmetric case on the response side (binary downloads / streaming export
 
 **Idempotent.** Subsequent `overrideJSONSchema(sameInstance, newFragment)` calls overwrite the prior registration (last-write-wins). The registration is keyed by schema _identity_ — two separate `z.instanceof(File)` calls produce two separate schemas and would each need their own registration. If you want the same fragment everywhere, share the schema instance (or use the shipped preset).
 
+**Annotation clones inherit.** `.meta()`, `.describe()` and `z.compile()` share the underlying definition, so a fragment registered on the pre-clone instance still applies — `IsoDatetime.describe('Start date')` keeps its `format`. Constraint clones (`.refine()`, `.min()`, …) do not, because their emitted body is no longer the one the fragment describes. See [`../schema-identity.md`](../schema-identity.md#overridejsonschema-fragments).
+
 **Description inheritance.** If the schema has a `description` (via `.describe(...)` or `.meta({ description })`) and the fragment doesn't supply one, the schema's description is captured at registration time and applied to the emitted JSON Schema. Fragment-supplied `description` still wins. `title` is not inherited.
 
 ```ts

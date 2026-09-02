@@ -88,30 +88,38 @@ describe('toOpenApi — strict mode', () => {
     expect(out.properties).toEqual({ a: { type: 'integer' } });
   });
 
-  // `.meta()` clones, and `overrideJSONSchema` is instance-keyed, so naming an
-  // overridden schema leaves the clone unregistered. It then emits only the
-  // metadata Zod wrote — a body with no type, which used to slip past the
-  // emptiness check and ship an annotation-only component.
-  it('flags a schema whose emitted body is annotation-only', () => {
+  // `.meta()` is an annotation clone — it shares the def, so the fragment
+  // registered on the pre-clone instance resolves through the chain.
+  it('inherits the fragment when naming an overridden schema', () => {
     const base = overrideJSONSchema(
       z.custom<{ a: string }>(() => true),
       binaryFragment,
     );
     const named = base.meta({ id: 'AnnotationOnly', title: 'AnnotationOnly' });
 
-    expect(() => toOpenApi(z.object({ f: named }), { io: 'input', registry })).toThrow(
-      ZodNestUnrepresentableError,
-    );
+    const { refs } = toOpenApi(z.object({ f: named }), { io: 'input', registry });
+    expect(refs.get('AnnotationOnly')).toMatchObject({ type: 'string', format: 'binary' });
   });
 
-  it('flags an annotation-only body under description alone', () => {
+  it('keeps the clone own description over the ancestor captured one', () => {
     const base = overrideJSONSchema(
       z.custom<{ a: string }>(() => true),
       binaryFragment,
     );
     const described = base.meta({ id: 'DescribedOnly', description: 'a file' });
 
-    expect(() => toOpenApi(z.object({ f: described }), { io: 'input', registry })).toThrow(
+    const { refs } = toOpenApi(z.object({ f: described }), { io: 'input', registry });
+    expect(refs.get('DescribedOnly')).toMatchObject({
+      type: 'string',
+      format: 'binary',
+      description: 'a file',
+    });
+  });
+
+  it('still flags a genuinely unregistered annotation-only body', () => {
+    const orphan = z.custom<{ a: string }>(() => true).meta({ id: 'Orphan', title: 'Orphan' });
+
+    expect(() => toOpenApi(z.object({ f: orphan }), { io: 'input', registry })).toThrow(
       ZodNestUnrepresentableError,
     );
   });
@@ -128,14 +136,12 @@ describe('toOpenApi — strict mode', () => {
     expect(refs.get('Annotated')).toMatchObject({ type: 'string', format: 'binary' });
   });
 
-  it('strict: false still emits the annotation-only body rather than throwing', () => {
-    const base = overrideJSONSchema(
-      z.custom<{ a: string }>(() => true),
-      binaryFragment,
-    );
-    const named = base.meta({ id: 'LooseAnnotation', title: 'LooseAnnotation' });
+  it('strict: false still emits an unregistered annotation-only body rather than throwing', () => {
+    const orphan = z
+      .custom<{ a: string }>(() => true)
+      .meta({ id: 'LooseAnnotation', title: 'LooseAnnotation' });
 
-    const { refs } = toOpenApi(z.object({ f: named }), {
+    const { refs } = toOpenApi(z.object({ f: orphan }), {
       io: 'input',
       registry,
       strict: false,

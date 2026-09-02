@@ -533,6 +533,7 @@ upload(
 | Swagger integration & custom emission      | [`docs/swagger-integration.md`](docs/swagger-integration.md) |
 | File uploads (multipart/form-data)         | [`docs/file-uploads.md`](docs/file-uploads.md)               |
 | Composition (experimental)                 | [`docs/composition.md`](docs/composition.md)                 |
+| Schema identity & clones                   | [`docs/schema-identity.md`](docs/schema-identity.md)         |
 | Exception classes                          | [`docs/exceptions.md`](docs/exceptions.md)                   |
 | Recipes                                    | [`docs/recipes/`](docs/recipes/)                             |
 

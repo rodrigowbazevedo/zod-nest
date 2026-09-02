@@ -20,7 +20,7 @@ The builder receives the parent schema and is expected to return a `z.ZodObject`
 
 ## Apply every schema change inside the builder
 
-The lineage is recorded against the **exact schema instance** the builder returns. Any Zod operator chained on the result of `extend(...)` — `.meta(...)`, `.describe(...)`, `.refine(...)`, `.passthrough()`, `.strict()` — produces a **new** schema instance, which has no lineage entry. The emission silently falls back to a flat body.
+The lineage is recorded against the **exact schema instance** the builder returns. Any Zod operator chained on the result of `extend(...)` — `.meta(...)`, `.describe(...)`, `.refine(...)`, `.passthrough()`, `.strict()` — produces a **new** schema instance, which has no lineage entry. The emission silently falls back to a flat body. Unlike schema ids and `overrideJSONSchema` fragments, lineage is **not** resolved through the clone chain; see [`schema-identity.md`](schema-identity.md#what-is-still-keyed-to-the-exact-instance).
 
 ```ts
 // ✅ Right — `.meta({ id })` is inside the builder.

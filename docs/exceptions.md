@@ -172,7 +172,7 @@ class ZodNestUnrepresentableError extends ZodNestError {
 ```
 
 - **Thrown by**: `toOpenApi` (single-schema mode) or `bulkEmit` (registry mode) in **strict mode** when a Zod construct can't be represented as JSON Schema.
-- **Also thrown** when the construct emits a body made *only* of annotations (`title`, `description`, `deprecated`, `examples`, `default`, …) with no type. Such a body describes nothing, so it's treated the same as an empty one. The usual cause is `.meta({ id, title })` on a schema whose `overrideJSONSchema` registration lives on the pre-`.meta()` instance — see mitigation 2 below.
+- **Also thrown** when the construct emits a body made _only_ of annotations (`title`, `description`, `deprecated`, `examples`, `default`, …) with no type. Such a body describes nothing, so it's treated the same as an empty one. The usual cause is `.meta({ id, title })` on a schema whose `overrideJSONSchema` registration lives on the pre-`.meta()` instance — see mitigation 2 below.
 - **When**: schema emission — at first `Dto.id` read, at `applyZodNest`, or at any direct `toOpenApi` call.
 - **Carries**: `path` (where in the schema tree the unrepresentable construct lives), `zodType` (the Zod type name as a string — `'bigint'`, `'date'`, `'transform'`, …).
 
@@ -206,9 +206,9 @@ try {
    const Avatar = multerMemoryFile({ mimeTypes: ['image/png'] });
    ```
 
-   The same error also fires when you add `.refine()`, `.check()` or `.meta()` to an already-overridden schema: the override is registered per schema *instance* and each of those clones, so the fragment is left behind on the discarded instance. Re-wrap the result (`overrideJSONSchema(schema.refine(...), binary())`), or move the constraint into the file factory's options — `id` and `title` included — which handles the ordering for you.
+   The same error also fires when you add `.refine()` or `.check()` to an already-overridden schema: those clones change the emitted body, so the fragment does not carry over. Re-wrap the result (`overrideJSONSchema(schema.refine(...), binary())`), or move the constraint into the file factory's options — `id` and `title` included — which handles the ordering for you.
 
-   `.meta()` is the case worth knowing about, because the emitted body isn't empty: it carries the `title` you just set. Emission treats an annotation-only body as unrepresentable precisely so this surfaces as an error rather than shipping an empty `components.schemas` entry.
+   `.meta()` and `.describe()` are annotation clones and **do** inherit the fragment — they share the underlying definition. See [`schema-identity.md`](schema-identity.md#overridejsonschema-fragments).
 
 3. **`overrideJSONSchema(schema, fragment)`** — register a fixed JSON Schema fragment for a specific schema _instance_. Pair with the `zod-nest/helpers` fragment catalog (`binaryFragment`, `uuidFragment`, `opaqueFragment`, …) or the `binary()` / `opaque()` sugar functions so you don't have to hand-write the magic objects. Pass `{ input, output }` instead of a raw fragment when the request and response sides need different shapes (coercion helpers). See [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md#per-instance-registration-with-overridejsonschema).
 
@@ -277,6 +277,8 @@ A `$ref` in the doc points at a `components.schemas` key that no longer exists a
 - _Unknown_ → likely a `.meta({ id })` typo or an entirely unregistered DTO.
 
 Fix: register the DTO via `createZodDto` to the correct registry, or correct the `.meta({ id })` typo.
+
+A named schema nested through a clone — `Base.describe(...)`, `Base.refine(...)`, `z.compile(Base)` — resolves to its named ancestor and no longer dangles. See [`schema-identity.md`](schema-identity.md).
 
 ### `code: 'UNEXPANDABLE_PARAM_DTO'`
 
