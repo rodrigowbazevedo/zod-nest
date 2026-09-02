@@ -17,7 +17,13 @@ export type MultipartFilesIn = (typeof MultipartFilesIn)[keyof typeof MultipartF
 export type MultipartShape = Readonly<Record<string, z.ZodType>>;
 
 export interface MultipartMetadata {
-  readonly shape: MultipartShape;
+  /**
+   * Flat shape the param decorators validate against. `undefined` when the
+   * body is a composite (`z.intersection` / `z.union`) with no single flat
+   * shape to split — the document still emits, but `@ZodUploadedFile` and
+   * friends have nothing to resolve and say so.
+   */
+  readonly shape: MultipartShape | undefined;
   readonly fileKeys: readonly string[];
   readonly textKeys: readonly string[];
   readonly filesIn: MultipartFilesIn;

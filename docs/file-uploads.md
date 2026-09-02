@@ -213,6 +213,46 @@ There is no `title` option to go with `id`. `overrideJSONSchema` replaces the em
 
 The same applies to any schema you name by hand after an `overrideJSONSchema` — re-wrap it, as [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md) describes. The `id` option exists so the file helpers don't make you think about it.
 
+## Naming the request body
+
+`@ZodMultipart` accepts either a flat shape record or a Zod schema. The record form emits the body **inline**; a named schema emits a **`$ref`** to `components.schemas`, exactly like `@ZodBody`.
+
+```ts
+const CopilotUploadRequest = z
+  .object({ file: multerMemoryFile({ description: 'File to upload' }) })
+  .meta({ id: 'CopilotUploadRequest', title: 'CopilotUploadRequest' });
+
+@ZodMultipart(CopilotUploadRequest)
+// → requestBody: { $ref: '#/components/schemas/CopilotUploadRequest' }
+```
+
+`id` names an anonymous schema without a `.meta()` call, and overrides an existing id:
+
+```ts
+@ZodMultipart(z.object({ file: multerMemoryFile() }), { id: 'MediaPlanUploadRequest' })
+```
+
+**Which to pick.** Inline keeps Swagger UI's `try-it-out` form working — its `multipart/form-data` form generator doesn't follow `$ref` and renders a referenced body as a single stub field instead of file pickers. A `$ref` gives client generators a stable interface name: `swagger-typescript-api` and friends emit a named type per component, so inlining a previously-named body silently deletes that type downstream.
+
+Rule of thumb: **inline unless a client generator consumes your spec.**
+
+### Composite bodies
+
+A shape record can't express `z.intersection` or `z.union`. Pass the schema and set `flatten: true`, which merges the object arms into one flat inline body — the same mechanism [`@ZodBody({ flatten: true })`](recipes/intersection-with-union.md#swagger-ui--multipartform-data--flatten-true) uses, and the only form Swagger UI can render:
+
+```ts
+const CreateTaxonomyTranslation = z.intersection(
+  z.union([CandidateTemplates, CandidateFiles]),
+  z.union([ReferenceTemplates, ReferenceFiles]),
+);
+
+@ZodMultipart(CreateTaxonomyTranslation, { flatten: true })
+```
+
+Every merged property becomes **optional** — no single one is guaranteed across the original variants. Runtime validation against the unmerged schema still enforces the precise shape.
+
+The param decorators need a flat shape to split file fields from text fields, and a composite has none. `@ZodUploadedFile`, `@ZodUploadedFiles` and `@ZodMultipartBody` throw a message saying so; validate a composite body with `@Body(new ZodValidationPipe(schema))` instead.
+
 ## Text fields are strings
 
 Every non-file part of a multipart request arrives as a string, whichever parser you use. Declare the coercion in the shape and both halves stay correct — the document says `number`, the handler receives a `number`:
@@ -286,7 +326,8 @@ MulterModule.register({ limits: { fileSize: 2 * 1024 * 1024 } });
 
 | Export | Purpose |
 | --- | --- |
-| `ZodMultipartOptions` | `{ filesIn?, registry?, description?, required? }` — the second argument to `@ZodMultipart` |
+| `ZodMultipartOptions` | `{ id?, flatten?, filesIn?, registry?, description?, required? }` — the second argument to `@ZodMultipart` |
+| `MultipartBody` | `MultipartShape \| z.ZodType` — what `@ZodMultipart` accepts as its first argument |
 | `MultipartShape` | `Readonly<Record<string, z.ZodType>>` — the shape argument, for hoisting a shared declaration |
 | `MULTIPART_CONTENT_TYPE` | `'multipart/form-data'`, the key `@ZodMultipart` emits the body under |
 

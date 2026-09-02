@@ -22,11 +22,26 @@ const readMetadata = (ctx: ExecutionContext, decorator: string): MultipartMetada
 const isMultipartMetadata = (value: unknown): value is MultipartMetadata =>
   value !== null && typeof value === 'object' && 'shape' in value && 'filesIn' in value;
 
+/**
+ * The declared shape, or a pointed error when the body is a composite. An
+ * intersection / union has no single flat shape to split, so there is nothing
+ * for these decorators to resolve a field against.
+ */
+const requireShape = (metadata: MultipartMetadata, decorator: string): MultipartShape => {
+  if (metadata.shape !== undefined) {
+    return metadata.shape;
+  }
+  throw new Error(
+    `[zod-nest] ${decorator} needs a flat body shape, but @ZodMultipart was given a composite schema (an intersection or union). Validate it with @Body(new ZodValidationPipe(schema)) instead.`,
+  );
+};
+
 const schemaFor = (metadata: MultipartMetadata, name: string, decorator: string): z.ZodType => {
-  const schema = metadata.shape[name];
+  const shape = requireShape(metadata, decorator);
+  const schema = shape[name];
   if (schema === undefined) {
     throw new Error(
-      `[zod-nest] ${decorator}('${name}') has no matching property in the @ZodMultipart shape. Declared: ${Object.keys(metadata.shape).join(', ')}.`,
+      `[zod-nest] ${decorator}('${name}') has no matching property in the @ZodMultipart shape. Declared: ${Object.keys(shape).join(', ')}.`,
     );
   }
   return schema;
@@ -83,7 +98,7 @@ export const resolveUploadedFiles = async (
   const request: { files?: unknown } = ctx.switchToHttp().getRequest();
   const schema =
     name === undefined
-      ? pick(metadata.shape, metadata.fileKeys)
+      ? pick(requireShape(metadata, '@ZodUploadedFiles'), metadata.fileKeys)
       : schemaFor(metadata, name, '@ZodUploadedFiles');
   return validate(schema, request.files, 'custom');
 };
@@ -93,10 +108,10 @@ export const resolveMultipartBody = async (
   ctx: ExecutionContext,
 ): Promise<unknown> => {
   const metadata = readMetadata(ctx, '@ZodMultipartBody');
+  const shape = requireShape(metadata, '@ZodMultipartBody');
   const request: { body?: unknown } = ctx.switchToHttp().getRequest();
-  const keys =
-    metadata.filesIn === MultipartFilesIn.Body ? Object.keys(metadata.shape) : metadata.textKeys;
-  return validate(pick(metadata.shape, keys), request.body, 'body');
+  const keys = metadata.filesIn === MultipartFilesIn.Body ? Object.keys(shape) : metadata.textKeys;
+  return validate(pick(shape, keys), request.body, 'body');
 };
 
 /**

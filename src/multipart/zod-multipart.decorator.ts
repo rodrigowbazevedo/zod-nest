@@ -4,13 +4,22 @@ import { z } from 'zod';
 import type { ZodNestRegistry } from '../schema/registry.js';
 import type { MultipartFilesIn, MultipartMetadata, MultipartShape } from './metadata.js';
 
-import { discoverDependents } from '../schema/discover-dependents.js';
-import { toOpenApi } from '../schema/engine.js';
+import { flattenObjectIntersection } from '../decorators/internal/flatten-intersection.js';
+import { isZodObject } from '../decorators/internal/zod-param-expand.js';
+import { resolveSchemaRef } from '../decorators/internal/zod-schema-ref.js';
+import { isZodSchema } from '../dto/predicates.js';
 import { defaultRegistry } from '../schema/registry.js';
 import { isFileSchema } from './file-marker.js';
 import { ZOD_MULTIPART_METADATA_KEY } from './metadata.js';
 
 export const MULTIPART_CONTENT_TYPE = 'multipart/form-data';
+
+/**
+ * Body declaration accepted by `@ZodMultipart`: a flat shape record, or any
+ * Zod schema. A record is the common case; a schema covers named bodies
+ * (`.meta({ id })` → `$ref`) and composites an object literal can't express.
+ */
+export type MultipartBody = MultipartShape | z.ZodType;
 
 export interface ZodMultipartOptions {
   /**
@@ -19,6 +28,19 @@ export interface ZodMultipartOptions {
    * `zod-nest/fastify`.
    */
   readonly filesIn?: MultipartFilesIn;
+  /**
+   * Forces this id, overriding any `.meta({ id })` on the schema. A named body
+   * is emitted as a `$ref` to `components.schemas`, which keeps a stable name
+   * for client generators — at the cost of Swagger UI's `try-it-out` form,
+   * which doesn't follow `$ref` for `multipart/form-data`.
+   */
+  readonly id?: string;
+  /**
+   * Merge an intersection / union of `z.object` arms into one flat inline
+   * object. Needed for composite bodies whose `try-it-out` form must render.
+   * All merged properties become optional. See `@ZodBody`'s `flatten`.
+   */
+  readonly flatten?: boolean;
   /** Registry to register named descendants into. Defaults to `defaultRegistry`. */
   readonly registry?: ZodNestRegistry;
   /** OpenAPI `description` for the request body. */
@@ -27,10 +49,27 @@ export interface ZodMultipartOptions {
   readonly required?: boolean;
 }
 
-const partitionKeys = (shape: MultipartShape): { fileKeys: string[]; textKeys: string[] } => {
+const toSchema = (body: MultipartBody): z.ZodType =>
+  isZodSchema(body) ? body : z.object({ ...body });
+
+/**
+ * The flat shape the param decorators split on. A record is already flat and a
+ * `z.object` exposes one; a composite has none, and the decorators report that
+ * rather than guessing.
+ */
+const toShape = (body: MultipartBody): MultipartShape | undefined => {
+  if (!isZodSchema(body)) {
+    return body;
+  }
+  return isZodObject(body) ? body.shape : undefined;
+};
+
+const partitionKeys = (
+  shape: MultipartShape | undefined,
+): { fileKeys: string[]; textKeys: string[] } => {
   const fileKeys: string[] = [];
   const textKeys: string[] = [];
-  for (const [key, schema] of Object.entries(shape)) {
+  for (const [key, schema] of Object.entries(shape ?? {})) {
     if (isFileSchema(schema)) {
       fileKeys.push(key);
       continue;
@@ -41,21 +80,24 @@ const partitionKeys = (shape: MultipartShape): { fileKeys: string[]; textKeys: s
 };
 
 /**
- * Emits the body inline rather than as a `$ref`. Swagger UI's
- * `multipart/form-data` try-it-out form generator doesn't follow `$ref`, so a
- * referenced body renders as a single stub field instead of file pickers.
- * Same trade-off `@ZodBody({ flatten: true })` documents.
+ * Resolves the operation's body. Anonymous bodies emit inline because Swagger
+ * UI's `multipart/form-data` form generator doesn't follow `$ref` — a
+ * referenced body renders one stub field instead of file pickers. Naming the
+ * body (`id` or `.meta({ id })`) opts into the `$ref` and that trade-off.
  */
-const emitInlineBody = (
-  shape: MultipartShape,
+const resolveBody = (
+  schema: z.ZodType,
+  options: ZodMultipartOptions | undefined,
   registry: ZodNestRegistry,
-): Record<string, unknown> => {
-  const object = z.object({ ...shape });
-  for (const [child, childId] of discoverDependents(object)) {
-    registry.register(child, childId);
+): Record<string, unknown> | { readonly $ref: string } => {
+  if (options?.flatten === true) {
+    return flattenObjectIntersection(schema, registry, '@ZodMultipart');
   }
-  const { schema } = toOpenApi(object, { io: 'input', registry });
-  return schema;
+  const resolved = resolveSchemaRef(schema, {
+    ...(options?.id !== undefined ? { id: options.id } : {}),
+    registry,
+  });
+  return resolved.kind === 'ref' ? resolved.ref : resolved.schema;
 };
 
 export const createZodMultipart = (defaultFilesIn: MultipartFilesIn) => {
@@ -64,16 +106,15 @@ export const createZodMultipart = (defaultFilesIn: MultipartFilesIn) => {
    * text fields together — as the single source of truth for both the OpenAPI
    * document and the multipart param decorators.
    */
-  return (shape: MultipartShape, options?: ZodMultipartOptions): MethodDecorator => {
+  return (body: MultipartBody, options?: ZodMultipartOptions): MethodDecorator => {
     const registry = options?.registry ?? defaultRegistry;
-    const { fileKeys, textKeys } = partitionKeys(shape);
+    const shape = toShape(body);
     const metadata: MultipartMetadata = {
       shape,
-      fileKeys,
-      textKeys,
+      ...partitionKeys(shape),
       filesIn: options?.filesIn ?? defaultFilesIn,
     };
-    const body = emitInlineBody(shape, registry);
+    const schema = resolveBody(toSchema(body), options, registry);
 
     return (target, propertyKey, descriptor) => {
       const handler = descriptor.value;
@@ -88,7 +129,7 @@ export const createZodMultipart = (defaultFilesIn: MultipartFilesIn) => {
       const swaggerDescriptor = descriptor as TypedPropertyDescriptor<unknown>;
       ApiConsumes(MULTIPART_CONTENT_TYPE)(target, propertyKey, swaggerDescriptor);
       ApiBody({
-        schema: body,
+        schema,
         ...(options?.description !== undefined ? { description: options.description } : {}),
         required: options?.required ?? true,
       })(target, propertyKey, swaggerDescriptor);
