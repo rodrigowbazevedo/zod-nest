@@ -1,3 +1,10 @@
+## [3.2.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.1...v3.2.2) (2026-09-02)
+
+
+### Bug Fixes
+
+* make subpath types resolvable without the exports map ([#145](https://github.com/rodrigowbazevedo/zod-nest/issues/145)) ([dc2b4e2](https://github.com/rodrigowbazevedo/zod-nest/commit/dc2b4e2310be6ddc736b2dcacdf73850353cf730))
+
 ## [3.2.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.0...v3.2.1) (2026-09-02)
 
 
