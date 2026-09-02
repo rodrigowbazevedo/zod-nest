@@ -1,3 +1,10 @@
+# [3.2.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.1.0...v3.2.0) (2026-09-02)
+
+
+### Features
+
+* accept a Zod schema in @ZodMultipart, with id and flatten ([#140](https://github.com/rodrigowbazevedo/zod-nest/issues/140)) ([9206779](https://github.com/rodrigowbazevedo/zod-nest/commit/920677939ca6676a350316c409ca910848dabe8d))
+
 # [3.1.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.0.2...v3.1.0) (2026-09-02)
 
 
