@@ -1,3 +1,10 @@
+# [3.1.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.0.2...v3.1.0) (2026-09-02)
+
+
+### Features
+
+* native NestJS file-upload support for multer and @fastify/multipart ([#139](https://github.com/rodrigowbazevedo/zod-nest/issues/139)) ([4601fbf](https://github.com/rodrigowbazevedo/zod-nest/commit/4601fbf41012f539513b960a855f93661cff5f8e)), closes [#138](https://github.com/rodrigowbazevedo/zod-nest/issues/138)
+
 ## [3.0.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.0.1...v3.0.2) (2026-09-01)
 
 
