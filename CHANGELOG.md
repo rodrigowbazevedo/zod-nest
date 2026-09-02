@@ -1,3 +1,10 @@
+## [3.2.3](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.2...v3.2.3) (2026-09-02)
+
+
+### Bug Fixes
+
+* resolve schema ids and override fragments through Zod clone chains ([#146](https://github.com/rodrigowbazevedo/zod-nest/issues/146)) ([7ea4d6b](https://github.com/rodrigowbazevedo/zod-nest/commit/7ea4d6b77e65ec6e66d6a299fd9e991790e5e62e))
+
 ## [3.2.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.1...v3.2.2) (2026-09-02)
 
 
