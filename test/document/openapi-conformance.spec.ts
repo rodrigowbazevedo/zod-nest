@@ -1,16 +1,28 @@
 import 'reflect-metadata';
 
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { Body, Controller, Get, Post, Query, Type } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Type, UseInterceptors } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { z } from 'zod';
 
 import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
+import type { MulterMemoryFileLike } from '../../src/express/index.js';
 
 import { applyZodNest, createZodDto, extend, ZodResponse } from '../../src';
+import {
+  multerMemoryFile,
+  ZodMultipart,
+  ZodMultipartBody,
+  ZodUploadedFile,
+} from '../../src/express/index.js';
+import {
+  fastifyMultipartFile,
+  ZodMultipart as ZodMultipartFastify,
+} from '../../src/fastify/index.js';
 
 // OpenAPI 3.1 conformance check. The validator catches anything that drifts
 // from the 3.1 schema (invalid $refs, malformed schema objects, missing
@@ -64,6 +76,58 @@ describe('OpenAPI 3.1 conformance', () => {
     const { app, doc } = await bootstrap([UsersController]);
     try {
       expect(doc.openapi).toBe('3.1.0');
+      await expect(validate(doc)).resolves.toBeDefined();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('validates a multipart/form-data body emitted by @ZodMultipart', async () => {
+    @Controller('uploads')
+    class UploadsController {
+      @Post('avatar')
+      @UseInterceptors(FileInterceptor('avatar'))
+      @ZodMultipart({
+        avatar: multerMemoryFile({
+          maxSize: 2048,
+          mimeTypes: ['image/png'],
+          description: 'PNG only',
+        }),
+        name: z.string().min(1),
+        age: z.coerce.number().int(),
+      })
+      upload(
+        @ZodUploadedFile('avatar') avatar: MulterMemoryFileLike,
+        @ZodMultipartBody() body: { name: string; age: number },
+      ): unknown {
+        return { avatar, body };
+      }
+    }
+
+    const { app, doc } = await bootstrap([UploadsController]);
+    try {
+      expect(doc.openapi).toBe('3.1.0');
+      await expect(validate(doc)).resolves.toBeDefined();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('validates a fastify multipart body with the file in the body', async () => {
+    @Controller('documents')
+    class DocumentsController {
+      @Post()
+      @ZodMultipartFastify({
+        document: fastifyMultipartFile({ mimeTypes: ['application/pdf'] }),
+        title: z.string().min(1),
+      })
+      upload(@ZodMultipartBody() body: unknown): unknown {
+        return body;
+      }
+    }
+
+    const { app, doc } = await bootstrap([DocumentsController]);
+    try {
       await expect(validate(doc)).resolves.toBeDefined();
     } finally {
       await app.close();

@@ -26,6 +26,7 @@ Each is self-contained — a reader landing here from a README link doesn't need
 | `src/logging/`                                          | `docs/logging.md`                                                                                                                                    | When logging fires, payload shape (input-only vs output-only fields), DTO labels, redaction (case-insensitive, deep, structural), `[CIRCULAR]` guard, truncation envelope, pino adapter example, performance notes. |
 | `src/schema/composition.ts`                             | `docs/composition.md`                                                                                                                                | `extend` + `getLineage`, builder-only schema-change rule, `allOf` emission, anonymous-parent fallback, multi-level chains, current limitations, `@experimental` rationale.                                          |
 | `src/exceptions/`                                       | `docs/exceptions.md`                                                                                                                                 | Class hierarchy, response bodies, "why the 500 has no `errors` field" policy, custom filter patterns, factory inheritance recipe.                                                                                   |
+| `src/multipart/`, `src/express/`, `src/fastify/`         | `docs/file-uploads.md`                                                                                                                               | Per-parser file schemas (`multerMemoryFile`, `multerDiskFile`, `fastifyMultipartFile`), `@ZodMultipart` / `@ZodUploadedFile` / `@ZodUploadedFiles` / `@ZodMultipartBody`, the request-vs-body split, documented parser limitations.                            |
 | `src/schema/` (engine + registry + override)            | _no dedicated companion_ — the engine surface is documented through `docs/dto.md` (consumers) and `docs/swagger-integration.md` (override callback). |
 
 ## Recipes (`docs/recipes/`)
@@ -41,6 +42,7 @@ One recipe per concrete usage pattern. Cross-linked from the relevant companion 
 | `docs/recipes/recursive-schemas.md`              | `z.lazy` + `.meta({ id })` pattern, mutually recursive schemas, tree-shaped generics, what doesn't work.                        |
 | `docs/recipes/discriminated-unions.md`           | `z.discriminatedUnion` → `oneOf` + `discriminator` mapping, three-branch job-state example, what doesn't work.                  |
 | `docs/recipes/custom-openapi-overrides.md`       | File uploads, opaque blobs, `z.date` → `format: date-time`, `z.bigint` → string with pattern, composing multiple overrides.     |
+| `docs/recipes/multipart-uploads.md`              | Replacing a hand-rolled `z.custom` file schema, replacing `ParseFilePipe`, composing `FileTypeValidator` as a pipe, coerced text fields, optional files. |
 
 ## Cross-cutting docs
 

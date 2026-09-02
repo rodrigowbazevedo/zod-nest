@@ -328,4 +328,37 @@ describe('overrideJSONSchema', () => {
       });
     });
   });
+
+  // The full re-wrap chain a consumer writes by hand when naming an
+  // overridden runtime type: register, name, constrain, name again,
+  // re-registering at each clone. Guards that stacking these stays valid.
+  describe('re-registration across clone chains', () => {
+    class StoredFile {
+      mimeType = 'text/csv';
+    }
+
+    it('survives instanceof → meta → refine → meta when each step re-registers', () => {
+      const raw = overrideJSONSchema(z.instanceof(StoredFile), {
+        type: 'string',
+        format: 'binary',
+      });
+      const named = overrideJSONSchema(raw.meta({ id: 'StoredFile', title: 'StoredFile' }), {
+        type: 'string',
+        format: 'binary',
+      });
+      const csv = overrideJSONSchema(
+        named
+          .refine((file) => file.mimeType === 'text/csv')
+          .meta({ id: 'StoredCsvFile', title: 'StoredCsvFile' }),
+        { type: 'string', format: 'binary', contentMediaType: 'text/csv' },
+      );
+
+      const { refs } = toOpenApi(z.object({ upload: csv }), { io: 'input', registry });
+      expect(refs.get('StoredCsvFile')).toEqual({
+        type: 'string',
+        format: 'binary',
+        contentMediaType: 'text/csv',
+      });
+    });
+  });
 });

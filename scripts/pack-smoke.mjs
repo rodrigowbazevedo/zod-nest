@@ -15,7 +15,7 @@
  *   2. Copy tarball into a fresh tempdir sandbox.
  *   3. `npm init -y` + install peer-deps + the tarball.
  *   4. Metadata grep: installed `dist/index.js` must carry `design:paramtypes`.
- *   5. CJS smoke: assert exports + bootstrap `ZodNestModule.forRoot()` and
+ *   5. CJS smoke: assert root + subpath exports + bootstrap `ZodNestModule.forRoot()` and
  *      resolve `ZodSerializerInterceptor` via `NestFactory.createApplicationContext`.
  *   6. ESM smoke: same.
  *   7. Cleanup.
@@ -65,6 +65,54 @@ const EXPECTED_EXPORTS = [
   'applyZodNest',
   'ZodNestDocumentError',
 ];
+
+// Value exports per subpath entry in `package.json#exports`. Type-only exports
+// are skipped because they don't resolve at runtime. Keep these lists in sync
+// when adding a new public value export to a subpath.
+const EXPECTED_SUBPATH_EXPORTS = {
+  helpers: [
+    'binary',
+    'binaryFragment',
+    'byteFragment',
+    'dateFragment',
+    'dateTimeFragment',
+    'doubleFragment',
+    'emailFragment',
+    'enrich',
+    'floatFragment',
+    'hostnameFragment',
+    'int32Fragment',
+    'int64Fragment',
+    'ipv4Fragment',
+    'ipv6Fragment',
+    'opaque',
+    'opaqueFragment',
+    'timeFragment',
+    'uriFragment',
+    'uuidFragment',
+    'BlobSchema',
+    'BufferSchema',
+    'FileSchema',
+  ],
+  express: [
+    'MULTIPART_CONTENT_TYPE',
+    'MulterDiskFileSchema',
+    'MulterMemoryFileSchema',
+    'multerDiskFile',
+    'multerMemoryFile',
+    'ZodMultipart',
+    'ZodMultipartBody',
+    'ZodUploadedFile',
+    'ZodUploadedFiles',
+  ],
+  fastify: [
+    'MULTIPART_CONTENT_TYPE',
+    'FastifyMultipartFileSchema',
+    'fastifyMultipartFile',
+    'ZodMultipart',
+    'ZodMultipartBody',
+  ],
+};
 
 const log = (msg) => console.log(`[pack-smoke] ${msg}`);
 
@@ -163,6 +211,7 @@ try {
   }
 
   const exportsJSON = JSON.stringify(EXPECTED_EXPORTS);
+  const subpathExportsJSON = JSON.stringify(EXPECTED_SUBPATH_EXPORTS);
 
   // Scripts written to files (not `node -e` strings) so newlines survive
   // intact — `node -e` passes its arg through shell interpolation and
@@ -196,6 +245,17 @@ if (missing.length) {
 }
 console.log('CJS:', expected.length, 'exports present');
 
+const subpaths = ${subpathExportsJSON};
+for (const [subpath, names] of Object.entries(subpaths)) {
+  const mod = require('zod-nest/' + subpath);
+  const absent = names.filter((n) => mod[n] === undefined);
+  if (absent.length) {
+    console.error('Missing CJS exports from zod-nest/' + subpath + ':', absent);
+    process.exit(1);
+  }
+  console.log('CJS: zod-nest/' + subpath + ':', names.length, 'exports present');
+}
+
 class RootModule {}
 Module({ imports: [m.ZodNestModule.forRoot()] })(RootModule);
 
@@ -225,6 +285,17 @@ if (missing.length) {
   process.exit(1);
 }
 console.log('ESM:', expected.length, 'exports present');
+
+const subpaths = ${subpathExportsJSON};
+for (const [subpath, names] of Object.entries(subpaths)) {
+  const mod = await import('zod-nest/' + subpath);
+  const absent = names.filter((n) => mod[n] === undefined);
+  if (absent.length) {
+    console.error('Missing ESM exports from zod-nest/' + subpath + ':', absent);
+    process.exit(1);
+  }
+  console.log('ESM: zod-nest/' + subpath + ':', names.length, 'exports present');
+}
 
 class RootModule {}
 Module({ imports: [m.ZodNestModule.forRoot()] })(RootModule);

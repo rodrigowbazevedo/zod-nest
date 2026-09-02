@@ -32,11 +32,35 @@ const STRICT_REQUIRES_OVERRIDE: ReadonlySet<string> = new Set([
   'custom',
 ]);
 
+/**
+ * Keywords that annotate a schema without describing its shape. A body made
+ * only of these has no type, so it's as unrepresentable as an empty one —
+ * `.meta({ title })` on an unregistered schema emits exactly that, and
+ * checking emptiness alone let it through as a valid annotation-only body.
+ *
+ * Deliberately an allow-list of annotations rather than a deny-list of
+ * structural keywords: an unrecognised keyword counts as structural, so a
+ * future JSON Schema addition can't turn into a spurious build failure.
+ */
+const ANNOTATION_ONLY_KEYS: ReadonlySet<string> = new Set([
+  'title',
+  'description',
+  'deprecated',
+  'examples',
+  'default',
+  'readOnly',
+  'writeOnly',
+  '$id',
+  '$schema',
+  '$comment',
+  'id',
+]);
+
 const isStrictlyUnrepresentable = (jsonSchema: SchemaObject, zodSchema: $ZodTypes): boolean => {
   if (!STRICT_REQUIRES_OVERRIDE.has(zodSchema._zod.def.type)) {
     return false;
   }
-  return Object.keys(jsonSchema).length === 0;
+  return Object.keys(jsonSchema).every((key) => ANNOTATION_ONLY_KEYS.has(key));
 };
 
 export interface ToOpenApiOptions {
