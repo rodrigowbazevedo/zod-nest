@@ -1,3 +1,10 @@
+## [3.2.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.0...v3.2.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* share module state across entry points ([#142](https://github.com/rodrigowbazevedo/zod-nest/issues/142)) ([9df42d3](https://github.com/rodrigowbazevedo/zod-nest/commit/9df42d340229ed894d6b4fe276c33263bc015d2e))
+
 # [3.2.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.1.0...v3.2.0) (2026-09-02)
 
 
