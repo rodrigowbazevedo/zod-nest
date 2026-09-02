@@ -124,7 +124,7 @@ The handler param is then `MulterMemoryFileLike | undefined`; `@ZodUploadedFile(
 
 ## A composite body (intersection of unions)
 
-An endpoint that accepts *either* a set of files *or* a set of text fields, on each of two axes, is an intersection of unions — a shape no flat record can express. Pass the schema and flatten it:
+An endpoint that accepts _either_ a set of files _or_ a set of text fields, on each of two axes, is an intersection of unions — a shape no flat record can express. Pass the schema and flatten it:
 
 ```ts
 const CandidateFiles = z.object({

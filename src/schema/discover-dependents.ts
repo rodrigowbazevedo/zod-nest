@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import type { $ZodType, $ZodTypes } from 'zod/v4/core';
 
+import { findRefTarget } from './clone-chain.js';
+
 const INNER_TYPE_WRAPPERS = new Set([
   'optional',
   'nullable',
@@ -13,15 +15,6 @@ const INNER_TYPE_WRAPPERS = new Set([
   'readonly',
   'promise',
 ]);
-
-const readId = (schema: z.ZodType): string | undefined => {
-  const meta = z.globalRegistry.get(schema);
-  if (meta === undefined) {
-    return undefined;
-  }
-  const id = (meta as { id?: unknown }).id;
-  return typeof id === 'string' ? id : undefined;
-};
 
 // A `z.lazy` getter can close over a `const` still in its temporal dead zone
 // (mutual recursion under ESM). Treat that as "no child yet" — `toOpenApi`
@@ -109,9 +102,11 @@ export const discoverDependents = (schema: z.ZodType): ReadonlyArray<[z.ZodType,
       if (child === undefined || visited.has(child)) {
         continue;
       }
-      const id = readId(child);
-      if (id !== undefined) {
-        out.push([child, id]);
+      // Zod emits `$ref` to a named *ancestor* of a `.describe()` / `.refine()`
+      // / `z.compile()` clone, so the ancestor is the document dependency.
+      const named = findRefTarget(child);
+      if (named !== undefined) {
+        out.push([named.owner, named.id]);
       }
       stack.push(child);
     }

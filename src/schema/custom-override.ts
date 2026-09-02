@@ -3,6 +3,7 @@ import type { $ZodType } from 'zod/v4/core';
 import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
 
+import { resolveThroughClones } from './clone-chain.js';
 import { singleton } from './singleton.js';
 
 /**
@@ -102,7 +103,7 @@ export const overrideJSONSchema = <T extends z.ZodType>(
  * underlying WeakMap.
  */
 export const peekRegistration = (schema: $ZodType): StoredFragments | undefined =>
-  customOverrideMap.get(schema);
+  resolveThroughClones(schema, (candidate) => customOverrideMap.get(candidate));
 
 /**
  * Internal override factory consulted by the engine. Closes over the current
@@ -126,7 +127,9 @@ export const peekRegistration = (schema: $ZodType): StoredFragments | undefined 
  */
 export const createCustomOverride = (io: 'input' | 'output'): Override => {
   return ({ zodSchema, jsonSchema }) => {
-    const record = customOverrideMap.get(zodSchema);
+    const own = customOverrideMap.get(zodSchema);
+    const record =
+      own ?? resolveThroughClones(zodSchema, (candidate) => customOverrideMap.get(candidate));
     if (record === undefined) {
       return;
     }
@@ -134,12 +137,25 @@ export const createCustomOverride = (io: 'input' | 'output'): Override => {
     if (fragment === undefined) {
       return;
     }
+    const isInherited = own === undefined;
+    // An inherited record on a `$ref` body would inline a duplicate of the
+    // component the ref already points at. A schema's own record still wins:
+    // Zod stamps the ancestor's `$ref` onto it before overrides run.
+    if (isInherited && jsonSchema.$ref !== undefined) {
+      return;
+    }
+    // Only when inherited: the clone's own `.describe()` outranks the
+    // ancestor's. A schema's own record keeps its capture-at-call-time value.
+    const ownDescription = isInherited ? jsonSchema.description : undefined;
     for (const key of Object.keys(jsonSchema)) {
       Reflect.deleteProperty(jsonSchema, key);
     }
     Object.assign(jsonSchema, fragment);
-    if (fragment.description === undefined && record.description !== undefined) {
-      jsonSchema.description = record.description;
+    if (fragment.description === undefined) {
+      const inherited = ownDescription ?? record.description;
+      if (inherited !== undefined) {
+        jsonSchema.description = inherited;
+      }
     }
   };
 };

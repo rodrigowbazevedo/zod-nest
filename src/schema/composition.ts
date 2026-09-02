@@ -144,15 +144,14 @@ export const createCompositionOverride = (opts: CreateCompositionOverrideOptions
 
     const parentCache = computeShapeKeys(entry.parent);
 
-    const parentId = registry.zodRegistry.get(entry.parent)?.id;
+    // Backstop the eager `extend()` registration above: that only writes to
+    // `defaultRegistry`, so custom-registry users need the parent surfaced
+    // here too. Idempotent against the eager call.
+    const parentId = registerSchema(entry.parent, registry);
     if (parentId === undefined) {
       // Anonymous parent — fall back to Zod's flat emission.
       return;
     }
-    // Backstop the eager `extend()` registration above: that only writes to
-    // `defaultRegistry`, so custom-registry users need the parent surfaced
-    // here too. Idempotent against the eager call.
-    registerSchema(entry.parent, registry);
 
     const childProps = jsonSchema.properties ?? {};
     const childRequired = jsonSchema.required ?? [];

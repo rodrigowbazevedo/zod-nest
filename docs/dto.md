@@ -40,10 +40,11 @@ Resolution order, applied lazily on the first read of `Dto.id`:
 
 1. `options.id` from the second argument, if set.
 2. `schema.meta({ id })` read from the registry.
-3. The class name (`UserDto`, `WidgetDto`, …).
-4. A generated `_AnonZodDto_<n>` with a one-time `console.warn`.
+3. The `.meta({ id })` of the schema this one was annotation-cloned from — `.meta()`, `.describe()` or `z.compile()`. See [`schema-identity.md`](schema-identity.md).
+4. The class name (`UserDto`, `WidgetDto`, …).
+5. A generated `_AnonZodDto_<n>` with a one-time `console.warn`.
 
-Step 4 is the minification trap — class names become single-character identifiers and collide. Set an explicit id either way for production builds. The warning fires at most once per process.
+Step 5 is the minification trap — class names become single-character identifiers and collide. Set an explicit id either way for production builds. The warning fires at most once per process.
 
 **When `options.id` and `schema.meta.id` both exist, `options.id` wins.** This is by design: a caller passing an explicit id is making a deliberate per-DTO override decision.
 

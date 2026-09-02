@@ -1,17 +1,17 @@
 # File uploads
 
-`multipart/form-data` endpoints are the one place where the request the framework parses and the request the OpenAPI document describes genuinely disagree. The document sees one body — file fields and text fields together. The parser sees two things, and *which* two depends on which parser you run.
+`multipart/form-data` endpoints are the one place where the request the framework parses and the request the OpenAPI document describes genuinely disagree. The document sees one body — file fields and text fields together. The parser sees two things, and _which_ two depends on which parser you run.
 
 `zod-nest` ships a dedicated entry point per platform rather than one abstraction over both, because the two parsers differ in ways that can't be papered over honestly:
 
-| | `zod-nest/express` (multer) | `zod-nest/fastify` (`@fastify/multipart`) |
-| --- | --- | --- |
-| Where files land | `req.file` / `req.files` | `req.body`, with `attachFieldsToBody: true` |
-| Where text fields land | `req.body` | `req.body` |
-| Client filename | `originalname` | `filename` |
-| Bytes | `buffer` (memory storage) or `path` (disk storage) | `toBuffer(): Promise<Buffer>` |
-| Reported size | `size` | none — it's still a stream |
-| Size validation | `maxSize` option | not possible; use `limits.fileSize` |
+|                        | `zod-nest/express` (multer)                        | `zod-nest/fastify` (`@fastify/multipart`)   |
+| ---------------------- | -------------------------------------------------- | ------------------------------------------- |
+| Where files land       | `req.file` / `req.files`                           | `req.body`, with `attachFieldsToBody: true` |
+| Where text fields land | `req.body`                                         | `req.body`                                  |
+| Client filename        | `originalname`                                     | `filename`                                  |
+| Bytes                  | `buffer` (memory storage) or `path` (disk storage) | `toBuffer(): Promise<Buffer>`               |
+| Reported size          | `size`                                             | none — it's still a stream                  |
+| Size validation        | `maxSize` option                                   | not possible; use `limits.fileSize`         |
 
 Import from the entry point that matches your platform adapter. The wrong one won't quietly half-work: the shapes reject each other at runtime.
 
@@ -25,15 +25,14 @@ Import from the entry point that matches your platform adapter. The wrong one wo
 import { Controller, Post, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { z } from 'zod';
-
-import type { MulterMemoryFileLike } from 'zod-nest/express';
-
 import {
   multerMemoryFile,
   ZodMultipart,
   ZodMultipartBody,
   ZodUploadedFile,
 } from 'zod-nest/express';
+
+import type { MulterMemoryFileLike } from 'zod-nest/express';
 
 @Controller('users')
 export class UsersController {
@@ -73,16 +72,16 @@ The emitted operation:
             "avatar": {
               "type": "string",
               "format": "binary",
-              "description": "Profile picture, 2 MB max"
+              "description": "Profile picture, 2 MB max",
             },
             "name": { "type": "string", "minLength": 1 },
-            "age": { "type": "integer" }
+            "age": { "type": "integer" },
           },
-          "required": ["avatar", "name", "age"]
-        }
-      }
-    }
-  }
+          "required": ["avatar", "name", "age"],
+        },
+      },
+    },
+  },
 }
 ```
 
@@ -94,7 +93,7 @@ Multer's file object depends on the storage engine, so there are two shapes rath
 import { multerDiskFile, multerMemoryFile } from 'zod-nest/express';
 
 multerMemoryFile(); // { fieldname, originalname, encoding, mimetype, size, buffer }
-multerDiskFile();   // { fieldname, originalname, encoding, mimetype, size, destination, filename, path }
+multerDiskFile(); // { fieldname, originalname, encoding, mimetype, size, destination, filename, path }
 ```
 
 `MulterMemoryFileLike.buffer` is `Buffer`, not `Buffer | undefined` — no narrowing at every read site. The trade-off is that you pick the shape that matches your `MulterModule` configuration; a disk-storage file fails a `multerMemoryFile()` schema at runtime, which is the intended signal.
@@ -158,10 +157,9 @@ Then one decorator covers the whole body, files included:
 ```ts
 import { Controller, Post } from '@nestjs/common';
 import { z } from 'zod';
+import { fastifyMultipartFile, ZodMultipart, ZodMultipartBody } from 'zod-nest/fastify';
 
 import type { FastifyMultipartFileLike } from 'zod-nest/fastify';
-
-import { fastifyMultipartFile, ZodMultipart, ZodMultipartBody } from 'zod-nest/fastify';
 
 @Controller('documents')
 export class DocumentsController {
@@ -170,9 +168,7 @@ export class DocumentsController {
     document: fastifyMultipartFile({ mimeTypes: ['application/pdf'] }),
     title: z.string().min(1),
   })
-  async upload(
-    @ZodMultipartBody() body: { document: FastifyMultipartFileLike; title: string },
-  ) {
+  async upload(@ZodMultipartBody() body: { document: FastifyMultipartFileLike; title: string }) {
     const bytes = await body.document.toBuffer();
     return { title: body.title, size: bytes.length };
   }
@@ -199,19 +195,22 @@ const StoredCsv = multerMemoryFile({ mimeTypes: ['text/csv'], id: 'StoredCsv' })
 "candidate_trafficking": { "$ref": "#/components/schemas/StoredCsv" }
 ```
 
-Use `id` rather than calling `.meta({ id })` on the returned schema. `.meta()` clones the instance, and `overrideJSONSchema` keys its fragment per-instance — so the fragment stays on the pre-`.meta()` instance and the named component emits **empty**:
+Prefer `id` over naming the returned schema by hand — it keeps the id and `title` together. Naming with `.meta({ id })` also works, because annotation clones inherit the fragment; a constraint clone like `.refine()` does not ([`schema-identity.md`](schema-identity.md#overridejsonschema-fragments)):
 
 ```ts
-// ❌ component emits { "title": "StoredCsv" } — the binary fragment is lost
-multerMemoryFile({ mimeTypes: ['text/csv'] }).meta({ id: 'StoredCsv', title: 'StoredCsv' });
-
-// ✅ the factory re-registers the fragment after naming
+// ✅ preferred — the factory handles id and title together
 multerMemoryFile({ mimeTypes: ['text/csv'], id: 'StoredCsv' });
+
+// Also works — `.meta()` is an annotation clone, so the fragment carries over.
+multerMemoryFile({ mimeTypes: ['text/csv'] }).meta({ id: 'StoredCsv' });
+
+// ❌ `.refine()` changes the emitted body — the fragment does not carry over.
+multerMemoryFile({ mimeTypes: ['text/csv'] }).refine((file) => file.size < 1e6);
 ```
 
-There is no `title` option to go with `id`. `overrideJSONSchema` replaces the emitted body outright and deliberately doesn't carry `title` into it, so one would be silently discarded — a named file component has no `title`, and no `$ref` sibling is generated for it. Use `description`, which *is* carried into the fragment.
+There is no `title` option to go with `id`. `overrideJSONSchema` replaces the emitted body outright and deliberately doesn't carry `title` into it, so one would be silently discarded — a named file component has no `title`, and no `$ref` sibling is generated for it. Use `description`, which _is_ carried into the fragment.
 
-The same applies to any schema you name by hand after an `overrideJSONSchema` — re-wrap it, as [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md) describes. The `id` option exists so the file helpers don't make you think about it.
+The same applies to any schema you constrain after an `overrideJSONSchema` — re-wrap it, as [`recipes/custom-openapi-overrides.md`](recipes/custom-openapi-overrides.md) describes. The `id` option exists so the file helpers don't make you think about it.
 
 ## Naming the request body
 
@@ -299,37 +298,37 @@ MulterModule.register({ limits: { fileSize: 2 * 1024 * 1024 } });
 
 ### `zod-nest/express`
 
-| Export | Purpose |
-| --- | --- |
-| `multerMemoryFile(options?)` | Memory-storage file schema with optional checks |
-| `multerDiskFile(options?)` | Disk-storage file schema with optional checks |
-| `MulterMemoryFileSchema` / `MulterDiskFileSchema` | Zero-option presets |
-| `MulterMemoryFileLike` / `MulterDiskFileLike` | Structural types for handler params |
-| `MulterFileOptions` | `{ id?, maxSize?, mimeTypes?, extensions?, description?, contentMediaType? }` |
-| `@ZodMultipart(shape, options?)` | Declares the body; emits `requestBody` + `multipart/form-data` |
-| `@ZodUploadedFile(name)` | Validates `req.file` against `shape[name]` |
-| `@ZodUploadedFiles(name?)` | Validates `req.files` against `shape[name]`, or all file properties |
-| `@ZodMultipartBody()` | Validates `req.body` against the text properties |
+| Export                                            | Purpose                                                                       |
+| ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `multerMemoryFile(options?)`                      | Memory-storage file schema with optional checks                               |
+| `multerDiskFile(options?)`                        | Disk-storage file schema with optional checks                                 |
+| `MulterMemoryFileSchema` / `MulterDiskFileSchema` | Zero-option presets                                                           |
+| `MulterMemoryFileLike` / `MulterDiskFileLike`     | Structural types for handler params                                           |
+| `MulterFileOptions`                               | `{ id?, maxSize?, mimeTypes?, extensions?, description?, contentMediaType? }` |
+| `@ZodMultipart(shape, options?)`                  | Declares the body; emits `requestBody` + `multipart/form-data`                |
+| `@ZodUploadedFile(name)`                          | Validates `req.file` against `shape[name]`                                    |
+| `@ZodUploadedFiles(name?)`                        | Validates `req.files` against `shape[name]`, or all file properties           |
+| `@ZodMultipartBody()`                             | Validates `req.body` against the text properties                              |
 
 ### `zod-nest/fastify`
 
-| Export | Purpose |
-| --- | --- |
-| `fastifyMultipartFile(options?)` | `MultipartFile` schema with optional checks |
-| `FastifyMultipartFileSchema` | Zero-option preset |
-| `FastifyMultipartFileLike` | Structural type for handler params |
-| `FastifyMultipartFileOptions` | `{ id?, mimeTypes?, extensions?, description?, contentMediaType? }` — no `maxSize` |
-| `@ZodMultipart(shape, options?)` | Declares the body; defaults to `filesIn: 'body'` |
-| `@ZodMultipartBody()` | Validates `req.body` against the whole shape, files included |
+| Export                           | Purpose                                                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------- |
+| `fastifyMultipartFile(options?)` | `MultipartFile` schema with optional checks                                        |
+| `FastifyMultipartFileSchema`     | Zero-option preset                                                                 |
+| `FastifyMultipartFileLike`       | Structural type for handler params                                                 |
+| `FastifyMultipartFileOptions`    | `{ id?, mimeTypes?, extensions?, description?, contentMediaType? }` — no `maxSize` |
+| `@ZodMultipart(shape, options?)` | Declares the body; defaults to `filesIn: 'body'`                                   |
+| `@ZodMultipartBody()`            | Validates `req.body` against the whole shape, files included                       |
 
 ### Shared by both
 
-| Export | Purpose |
-| --- | --- |
-| `ZodMultipartOptions` | `{ id?, flatten?, filesIn?, registry?, description?, required? }` — the second argument to `@ZodMultipart` |
-| `MultipartBody` | `MultipartShape \| z.ZodType` — what `@ZodMultipart` accepts as its first argument |
-| `MultipartShape` | `Readonly<Record<string, z.ZodType>>` — the shape argument, for hoisting a shared declaration |
-| `MULTIPART_CONTENT_TYPE` | `'multipart/form-data'`, the key `@ZodMultipart` emits the body under |
+| Export                   | Purpose                                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `ZodMultipartOptions`    | `{ id?, flatten?, filesIn?, registry?, description?, required? }` — the second argument to `@ZodMultipart` |
+| `MultipartBody`          | `MultipartShape \| z.ZodType` — what `@ZodMultipart` accepts as its first argument                         |
+| `MultipartShape`         | `Readonly<Record<string, z.ZodType>>` — the shape argument, for hoisting a shared declaration              |
+| `MULTIPART_CONTENT_TYPE` | `'multipart/form-data'`, the key `@ZodMultipart` emits the body under                                      |
 
 `description` and `required` land on the OpenAPI `requestBody`; `registry` scopes named descendants the way it does elsewhere. `filesIn` defaults to `'request'` from `zod-nest/express` and `'body'` from `zod-nest/fastify` — override it only if you've configured a parser against its platform's convention.
 

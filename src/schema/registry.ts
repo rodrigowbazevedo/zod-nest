@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { findIdOwner } from './clone-chain.js';
 import { discoverDependents } from './discover-dependents.js';
 import { singleton } from './singleton.js';
 
@@ -180,11 +181,12 @@ export const registerSchema = (
     registry.register(schema, explicit, flags);
     return explicit;
   }
-  const meta = registry.zodRegistry.get(schema);
-  const metaId = meta === undefined ? undefined : (meta as { id?: unknown }).id;
-  if (typeof metaId !== 'string' || metaId === '') {
+  // Registers the *owner*, never the clone: two instances under one id read as
+  // a collision (`recordOnce`), and the clone already emits `$ref` to the owner.
+  const named = findIdOwner(schema, registry.zodRegistry);
+  if (named === undefined) {
     return undefined;
   }
-  registry.register(schema, metaId, flags);
-  return metaId;
+  registry.register(named.owner, named.id, flags);
+  return named.id;
 };

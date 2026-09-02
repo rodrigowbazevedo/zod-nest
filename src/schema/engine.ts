@@ -5,6 +5,7 @@ import type { SchemaObject } from './openapi.types.js';
 import type { Override } from './override.js';
 import type { ZodNestRegistry } from './registry.js';
 
+import { findIdOwner } from './clone-chain.js';
 import { createCompositionOverride, DEFAULT_BUILD_REF } from './composition.js';
 import { ZOD_NEST_ERROR_DUPLICATE_ID, ZOD_NEST_ERROR_EXTENSION } from './constants.js';
 import { createCustomOverride, peekRegistration } from './custom-override.js';
@@ -228,10 +229,8 @@ export const buildToJsonSchemaOptions = (
 
 // Covers both `.meta({ id })` and `registry.register(schema, id)` — the latter
 // writes the id through to the zod registry.
-const resolveRootId = (schema: z.ZodType, registry: ZodNestRegistry): string | undefined => {
-  const id = registry.zodRegistry.get(schema)?.id;
-  return typeof id === 'string' && id !== '' ? id : undefined;
-};
+const resolveRootId = (schema: z.ZodType, registry: ZodNestRegistry): string | undefined =>
+  findIdOwner(schema, registry.zodRegistry)?.id;
 
 export const toOpenApi = (schema: z.ZodType, opts: ToOpenApiOptions): ToOpenApiResult => {
   const built = buildToJsonSchemaOptions({
