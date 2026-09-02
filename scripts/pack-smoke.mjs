@@ -24,7 +24,7 @@
  * Failure exits non-zero; CI fails the job.
  */
 import { execSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -176,7 +176,8 @@ try {
 
   log('npm init + install peers + tarball');
   execSync('npm init -y', { cwd: sandbox, stdio: 'ignore' });
-  execSync(`npm install --no-audit --no-fund reflect-metadata ${peerArgs}`, {
+  const nodeTypes = `'@types/node@${pkg.devDependencies['@types/node']}'`;
+  execSync(`npm install --no-audit --no-fund reflect-metadata ${nodeTypes} ${peerArgs}`, {
     cwd: sandbox,
     stdio: 'inherit',
   });
@@ -404,7 +405,123 @@ await ctx.close();
   writeFileSync(join(sandbox, 'esm-smoke.mjs'), esmScript);
   execSync('node esm-smoke.mjs', { cwd: sandbox, stdio: 'inherit' });
 
-  log('✅ exports + DI bootstrap green in both CJS and ESM');
+  log('types smoke: subpath types resolve + name portably in declaration emit');
+
+  // Declaration emit is where a types-resolution gap bites: the subpath type
+  // must be nameable through a specifier valid in the consumer's resolution
+  // mode, or tsc writes a raw `node_modules/…/dist` path and rejects it (#144).
+  const typesSandbox = join(sandbox, 'types-smoke');
+  mkdirSync(join(typesSandbox, 'src', 'shared'), { recursive: true });
+  mkdirSync(join(typesSandbox, 'src', 'api'), { recursive: true });
+
+  // The schemas must reach the consumer through a local module, not a direct
+  // `zod-nest/express` import — with the import in scope tsc reuses its
+  // specifier and the gap stays hidden.
+  writeFileSync(
+    join(typesSandbox, 'src', 'shared', 'file-schemas.ts'),
+    `import { createRegistry } from 'zod-nest';
+import { multerMemoryFile } from 'zod-nest/express';
+import { fastifyMultipartFile } from 'zod-nest/fastify';
+import { FileSchema } from 'zod-nest/helpers';
+
+export const UploadedFileSchema = multerMemoryFile();
+export const UploadedMultipartSchema = fastifyMultipartFile();
+export const UploadedBlobSchema = FileSchema;
+export const registry = createRegistry();
+`,
+  );
+  writeFileSync(
+    join(typesSandbox, 'src', 'api', 'schemas.ts'),
+    `import { z } from 'zod';
+
+import {
+  registry,
+  UploadedBlobSchema,
+  UploadedFileSchema,
+  UploadedMultipartSchema,
+} from '../shared/file-schemas.js';
+
+export const ExpressBody = z.object({ file: UploadedFileSchema });
+export const FastifyBody = z.object({ file: UploadedMultipartSchema });
+export const HelperBody = z.object({ file: UploadedBlobSchema });
+export const sharedRegistry = registry;
+`,
+  );
+
+  // `commonjs` + `bundler` is the NestJS CLI default under TypeScript 6 and the
+  // cell #144 reported; `node10` is the other half of that report.
+  const TYPES_SMOKE_CELLS = [
+    { module: 'commonjs', moduleResolution: 'bundler', consumer: 'commonjs' },
+    { module: 'commonjs', moduleResolution: 'node10', consumer: 'commonjs' },
+    { module: 'nodenext', moduleResolution: 'nodenext', consumer: 'commonjs' },
+    { module: 'nodenext', moduleResolution: 'nodenext', consumer: 'module' },
+  ];
+  const EXPECTED_TYPE_SPECIFIERS = ['zod-nest', 'zod-nest/express', 'zod-nest/fastify'];
+  const tsc = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
+
+  for (const { module, moduleResolution, consumer } of TYPES_SMOKE_CELLS) {
+    const label = `${module}/${moduleResolution} (${consumer} consumer)`;
+    const outDir = `dts-${module}-${moduleResolution}-${consumer}`;
+    writeFileSync(
+      join(typesSandbox, 'package.json'),
+      JSON.stringify({ name: 'types-smoke', private: true, type: consumer }, null, 2),
+    );
+    writeFileSync(
+      join(typesSandbox, 'tsconfig.json'),
+      JSON.stringify(
+        {
+          compilerOptions: {
+            module,
+            moduleResolution,
+            target: 'esnext',
+            ignoreDeprecations: '6.0',
+            declaration: true,
+            strict: true,
+            skipLibCheck: true,
+            types: ['node'],
+            rootDir: 'src',
+            outDir,
+          },
+          include: ['src'],
+        },
+        null,
+        2,
+      ),
+    );
+
+    try {
+      execSync(`node ${JSON.stringify(tsc)} -p tsconfig.json`, {
+        cwd: typesSandbox,
+        stdio: 'pipe',
+        encoding: 'utf-8',
+      });
+    } catch (err) {
+      throw new Error(
+        `tsc failed for ${label} — the published types don't resolve or don't ` +
+          `emit portably under that config (#144):\n${err.stdout ?? err.message}`,
+        { cause: err },
+      );
+    }
+
+    const emitted = readFileSync(join(typesSandbox, outDir, 'api', 'schemas.d.ts'), 'utf-8');
+    if (emitted.includes('node_modules')) {
+      throw new Error(
+        `Declaration emit for ${label} named a type through a raw node_modules ` +
+          `path instead of a package specifier — not portable (#144):\n${emitted}`,
+      );
+    }
+    const named = new Set([...emitted.matchAll(/import\("([^"]+)"\)/g)].map((match) => match[1]));
+    const unnamed = EXPECTED_TYPE_SPECIFIERS.filter((specifier) => !named.has(specifier));
+    if (unnamed.length > 0) {
+      throw new Error(
+        `Declaration emit for ${label} never named a type through ${unnamed.join(', ')} — ` +
+          `expected every entry point to be reachable by specifier (#144):\n${emitted}`,
+      );
+    }
+    log(`types: ${label} OK`);
+  }
+
+  log('✅ exports + DI bootstrap + declaration emit green in both CJS and ESM');
 } finally {
   rmSync(sandbox, { recursive: true, force: true });
   if (tarballPathInRoot) {
