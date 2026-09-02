@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type { Io, ZodDto } from './dto.types.js';
 
 import { ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
+import { singleton } from '../schema/singleton.js';
 import { makeZodDtoMarker } from './marker.js';
 import { ZOD_DTO_SYMBOL } from './symbols.js';
 
@@ -9,7 +10,10 @@ import { ZOD_DTO_SYMBOL } from './symbols.js';
  * Cache of `parent -> output-sibling` so repeated reads of `Dto.Output` return
  * the same class instance. WeakMap so the sibling can be GC'd if the parent is.
  */
-const outputCache = new WeakMap<ZodDto<z.ZodType>, ZodDto<z.ZodType>>();
+const outputCache = singleton(
+  'output-dto-cache',
+  () => new WeakMap<ZodDto<z.ZodType>, ZodDto<z.ZodType>>(),
+);
 
 /**
  * `.Output` is always a distinct sibling class — it carries `io: 'output'` so

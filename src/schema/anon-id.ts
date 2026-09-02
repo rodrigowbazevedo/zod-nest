@@ -1,5 +1,7 @@
 import type { z } from 'zod';
 
+import { singleton } from './singleton.js';
+
 /** Synthetic-id prefix for an anonymous `@ZodResponse` body. */
 export const ANON_RESPONSE_PREFIX = '_AnonResponseSchema_';
 /** Synthetic-id prefix for an anonymous `@ZodBody` body. */
@@ -17,16 +19,16 @@ export const ANON_BODY_PREFIX = '_AnonBodySchema_';
  * `@ZodBody` and `@ZodResponse` keeps whichever id it got first — harmless,
  * since the id is internal and inlined away.
  */
-const anonIdCache = new WeakMap<z.ZodType, string>();
-let counter = 0;
+const anonIdCache = singleton('anon-id-cache', () => new WeakMap<z.ZodType, string>());
+const counterRef = singleton('anon-id-counter', () => ({ value: 0 }));
 
 export const resolveAnonId = (schema: z.ZodType, prefix: string): string => {
   const cached = anonIdCache.get(schema);
   if (cached !== undefined) {
     return cached;
   }
-  counter += 1;
-  const id = `${prefix}${counter}`;
+  counterRef.value += 1;
+  const id = `${prefix}${counterRef.value}`;
   anonIdCache.set(schema, id);
   return id;
 };

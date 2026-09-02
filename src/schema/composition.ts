@@ -13,6 +13,7 @@ import type { ZodNestRegistry } from './registry.js';
 
 import { DEFS_PREFIX } from './constants.js';
 import { registerSchema } from './registry.js';
+import { singleton } from './singleton.js';
 
 /**
  * Lineage record for a composition-derived schema. Read by the override to
@@ -36,16 +37,16 @@ export interface LineageEntry {
 
 // `WeakMap` (not `z.registry`) so transient derived schemas can GC — Zod's
 // own docs warn against long-running registries pinning short-lived schemas.
-const lineageMap = new WeakMap<$ZodType, LineageEntry>();
+const lineageMap = singleton('lineage-map', () => new WeakMap<$ZodType, LineageEntry>());
 
 // Parent flat-key cache, populated eagerly by `extend()` at registration.
 // `reused: 'inline'` inlines the parent's shape into the child rather than
 // firing the override on the parent as a separate node, so the override
 // can't be relied on to populate this — extend() does it eagerly.
-const propsMap = new WeakMap<
-  $ZodType,
-  { properties: readonly string[]; required: readonly string[] }
->();
+const propsMap = singleton(
+  'props-map',
+  () => new WeakMap<$ZodType, { properties: readonly string[]; required: readonly string[] }>(),
+);
 
 /** Zod's wrapper types that make a property optional in JSON Schema's `required` sense. */
 export const OPTIONAL_WRAPPER_TYPES: ReadonlySet<string> = new Set(['optional', 'default']);

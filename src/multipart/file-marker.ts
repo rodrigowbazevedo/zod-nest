@@ -1,11 +1,13 @@
 import type { z } from 'zod';
 
+import { singleton } from '../schema/singleton.js';
+
 /**
  * Per-instance tag for schemas produced by the platform file factories.
  * WeakSet rather than `z.registry` because this is transient per-instance
  * annotation, not stable id-keyed metadata (CLAUDE.md).
  */
-const fileSchemas = new WeakSet<z.ZodType>();
+const fileSchemas = singleton('file-schemas', () => new WeakSet<z.ZodType>());
 
 // Wrapper defs expose their inner schema as Zod's internal `$ZodType`, which
 // `in` narrowing widens to `unknown`. One guard converts back to the public

@@ -4,21 +4,23 @@ import type { CreateZodDtoOptions, Io, ZodDto } from './dto.types.js';
 
 import { ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
 import { defaultRegistry, registerSchema } from '../schema/registry.js';
+import { singleton } from '../schema/singleton.js';
 import { makeZodDtoMarker } from './marker.js';
 import { resolveOutput } from './output-dto.js';
 import { ZOD_DTO_SYMBOL } from './symbols.js';
 
-let anonCounter = 0;
-let warnedOnAnonymous = false;
+// Shared, not module-local: two copies of the package would each start at 0
+// and mint the same `_AnonZodDto_<n>` id for different DTOs.
+const anonState = singleton('anon-dto-state', () => ({ counter: 0, warned: false }));
 
 const resolveFallbackId = (className: string): string => {
   if (className !== '' && className.length > 1) {
     return className;
   }
-  anonCounter += 1;
-  const fallback = `_AnonZodDto_${anonCounter}`;
-  if (!warnedOnAnonymous) {
-    warnedOnAnonymous = true;
+  anonState.counter += 1;
+  const fallback = `_AnonZodDto_${anonState.counter}`;
+  if (!anonState.warned) {
+    anonState.warned = true;
     // eslint-disable-next-line no-console
     console.warn(
       `[zod-nest] Could not resolve a DTO id from class name (got "${className}"). ` +

@@ -10,7 +10,10 @@ export default defineConfig({
   entry: ['src/index.ts', 'src/helpers/index.ts', 'src/express/index.ts', 'src/fastify/index.ts'],
   format: ['cjs', 'esm'],
   dts: true,
-  splitting: false,
+  // Keep `true`: without it each entry duplicates the engine (165KB of CJS
+  // across entries vs 119KB shared). Correctness is handled by
+  // `schema/singleton.ts`, not by this.
+  splitting: true,
   clean: true,
   sourcemap: true,
   target: 'node22',
