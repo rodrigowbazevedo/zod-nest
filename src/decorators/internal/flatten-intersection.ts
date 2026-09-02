@@ -155,11 +155,8 @@ export const flattenObjectIntersection = (
     // across the original union variants, so the merged spec must allow any
     // subset. Runtime validation against the original schema still enforces
     // the precise variant shape.
-    for (const key of Object.keys(mergedShape)) {
-      const value = mergedShape[key];
-      if (value !== undefined) {
-        mergedShape[key] = value.optional();
-      }
+    for (const [key, value] of Object.entries(mergedShape)) {
+      mergedShape[key] = value.optional();
     }
   }
   const merged = z.object(mergedShape);

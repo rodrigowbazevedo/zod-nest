@@ -40,13 +40,8 @@ const resolveLazyTarget = (getter: () => $ZodType): z.ZodType[] => {
 const collectChildren = (schema: z.ZodType): z.ZodType[] => {
   const def = (schema as unknown as $ZodTypes)._zod.def;
   if (def.type === 'object') {
-    const out: z.ZodType[] = [];
-    const shape = def.shape as Record<string, z.ZodType> | undefined;
-    if (shape !== undefined) {
-      for (const value of Object.values(shape)) {
-        out.push(value);
-      }
-    }
+    const shape = def.shape as Record<string, z.ZodType>;
+    const out: z.ZodType[] = [...Object.values(shape)];
     if (def.catchall !== undefined) {
       out.push(def.catchall as unknown as z.ZodType);
     }

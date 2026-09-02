@@ -94,9 +94,11 @@ export const createRegistry = (): ZodNestRegistry => {
       // local entry, and writing that back here would freeze the
       // inherited fields against the schema.
       if (z.globalRegistry.has(schema)) {
-        const existing = z.globalRegistry.get(schema);
-        if (existing?.id !== id) {
-          z.globalRegistry.add(schema, { ...(existing ?? {}), id });
+        // `?? {}` is unreachable — the `has` gate guarantees a local entry —
+        // but the return type is optional, so the fallback satisfies it.
+        const existing = z.globalRegistry.get(schema) ?? {};
+        if (existing.id !== id) {
+          z.globalRegistry.add(schema, { ...existing, id });
         }
       } else {
         z.globalRegistry.add(schema, { id });

@@ -36,6 +36,58 @@ describe('toOpenApi — strict mode', () => {
     expect(out).toEqual({});
   });
 
+  // `markPipeCoverage` walks a registered pipe's descent target so the inner
+  // schema isn't reported unrepresentable. The visited set is per-emission, so
+  // two registered pipes over the same inner schema exercise its cycle guard.
+  it('handles two registered pipes sharing one inner schema', () => {
+    const shared = z.string();
+    const asInteger = overrideJSONSchema(z.pipe(shared, z.string().min(1)), { type: 'integer' });
+    const asNumber = overrideJSONSchema(z.pipe(shared, z.string().min(2)), { type: 'number' });
+
+    const out = toOpenApi(z.object({ a: asInteger, b: asNumber }), {
+      io: 'input',
+      registry: createRegistry(),
+      strict: true,
+    }).schema;
+
+    expect(out.properties).toEqual({ a: { type: 'integer' }, b: { type: 'number' } });
+  });
+
+  // A registered pipe's descent target differs per side: the output side when
+  // emitting output, or when the input side is itself a bare transform.
+  it('descends the output side when emitting output', () => {
+    const piped = overrideJSONSchema(z.pipe(z.string(), z.string().min(1)), {
+      input: { type: 'string' },
+      output: { type: 'integer' },
+    });
+
+    const out = toOpenApi(z.object({ a: piped }), {
+      io: 'output',
+      registry: createRegistry(),
+      strict: true,
+    }).schema;
+
+    expect(out.properties).toEqual({ a: { type: 'integer' } });
+  });
+
+  it('descends the output side when the input side is a bare transform', () => {
+    const piped = overrideJSONSchema(
+      z.pipe(
+        z.transform((value: string) => value.length),
+        z.number(),
+      ),
+      { type: 'integer' },
+    );
+
+    const out = toOpenApi(z.object({ a: piped }), {
+      io: 'input',
+      registry: createRegistry(),
+      strict: true,
+    }).schema;
+
+    expect(out.properties).toEqual({ a: { type: 'integer' } });
+  });
+
   // `.meta()` clones, and `overrideJSONSchema` is instance-keyed, so naming an
   // overridden schema leaves the clone unregistered. It then emits only the
   // metadata Zod wrote — a body with no type, which used to slip past the
