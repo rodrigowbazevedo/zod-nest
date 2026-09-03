@@ -9,7 +9,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Gates the publish, so a version that breaks a declared peer-dep range
+  # can't reach npm.
+  compat:
+    name: Compatibility matrix
+    uses: ./.github/workflows/compat-matrix.yml
+    permissions:
+      contents: read
+      issues: write
+
   release:
+    needs: compat
     name: semantic-release
     runs-on: ubuntu-latest
     environment: packages
