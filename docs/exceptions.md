@@ -174,6 +174,7 @@ class ZodNestUnrepresentableError extends ZodNestError {
 - **Thrown by**: `toOpenApi` (single-schema mode) or `bulkEmit` (registry mode) in **strict mode** when a Zod construct can't be represented as JSON Schema.
 - **Also thrown** when the construct emits a body made _only_ of annotations (`title`, `description`, `deprecated`, `examples`, `default`, …) with no type. Such a body describes nothing, so it's treated the same as an empty one. The usual cause is `.meta({ id, title })` on a schema whose `overrideJSONSchema` registration lives on the pre-`.meta()` instance — see mitigation 2 below.
 - **When**: schema emission — at first `Dto.id` read, at `applyZodNest`, or at any direct `toOpenApi` call.
+- **Not thrown for** schemas that merely sit in `z.globalRegistry`. Bulk emission is scoped to the ids `zod-nest` registered (plus their `.meta({ id })` descendants), so a `.meta({ id })` schema no DTO reaches — a wire codec, a third-party library's schema — is never checked. Only what the document actually emits can fail the build.
 - **Carries**: `path` (where in the schema tree the unrepresentable construct lives), `zodType` (the Zod type name as a string — `'bigint'`, `'date'`, `'transform'`, …).
 
 ```ts

@@ -40,6 +40,22 @@ describe('bulkEmit', () => {
     expect(inputSchemas.has('BulkOutsider_NotMine')).toBe(false);
   });
 
+  it("keeps Zod's virtual `__shared` defs table out of the emitted maps", () => {
+    // An anonymous cycle is extracted into `__shared` rather than a component,
+    // so Zod adds that key alongside the real ids.
+    const anonymousNode: z.ZodType = z.object({
+      next: z.lazy(() => anonymousNode).optional(),
+    });
+
+    const registry = createRegistry();
+    registry.register(z.object({ root: anonymousNode }), 'BulkShared_Root');
+
+    const { inputSchemas, outputSchemas } = bulkEmit({ registry });
+
+    expect([...inputSchemas.keys()]).toEqual(['BulkShared_Root']);
+    expect([...outputSchemas.keys()]).toEqual(['BulkShared_Root']);
+  });
+
   it('diverges input vs output for schemas with `.default()` (input optional / output required)', () => {
     const registry = createRegistry();
     // .default() makes a property optional on input (default fills in) but
@@ -82,9 +98,6 @@ describe('bulkEmit', () => {
     );
   });
 
-  // Strict-mode tests pollute z.globalRegistry with an unrepresentable schema,
-  // which leaks into later emissions in this file. Keep them LAST. Cross-file
-  // pollution is not a concern — the runner isolates by file.
   describe('strict-mode unrepresentable handling', () => {
     it('throws ZodNestUnrepresentableError on strict-unrepresentable schemas', () => {
       const registry = createRegistry();
@@ -98,6 +111,18 @@ describe('bulkEmit', () => {
       registry.register(z.object({ s: z.symbol() }), 'BulkUnrep_NonStrict');
 
       expect(() => bulkEmit({ registry, strict: false })).not.toThrow();
+    });
+
+    it('ignores unrepresentable globalRegistry schemas this registry never registered', () => {
+      z.object({ unset: z.undefined() }).meta({ id: 'BulkUnrep_Outsider' });
+
+      const registry = createRegistry();
+      registry.register(z.object({ a: z.string() }), 'BulkUnrep_Mine');
+
+      const { inputSchemas, outputSchemas } = bulkEmit({ registry });
+
+      expect([...inputSchemas.keys()]).toEqual(['BulkUnrep_Mine']);
+      expect([...outputSchemas.keys()]).toEqual(['BulkUnrep_Mine']);
     });
   });
 });
