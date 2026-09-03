@@ -1,3 +1,10 @@
+## [3.2.4](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.3...v3.2.4) (2026-09-03)
+
+
+### Bug Fixes
+
+* scope bulk strict-mode detection to zod-nest-known ids ([#159](https://github.com/rodrigowbazevedo/zod-nest/issues/159)) ([b45a503](https://github.com/rodrigowbazevedo/zod-nest/commit/b45a503dfad03183fd8f3ae8fbbc9423ee8f449b)), closes [#158](https://github.com/rodrigowbazevedo/zod-nest/issues/158)
+
 ## [3.2.3](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.2...v3.2.3) (2026-09-02)
 
 
