@@ -13,9 +13,9 @@ export interface BulkEmitOptions {
 }
 
 export interface BulkEmitResult {
-  /** Schemas emitted with `io: 'input'`. Filtered to zod-nest-known ids only. */
+  /** Schemas emitted with `io: 'input'`. Scoped to zod-nest-known ids only. */
   inputSchemas: Map<string, unknown>;
-  /** Schemas emitted with `io: 'output'`. Filtered to zod-nest-known ids only. */
+  /** Schemas emitted with `io: 'output'`. Scoped to zod-nest-known ids only. */
   outputSchemas: Map<string, unknown>;
 }
 
@@ -23,9 +23,9 @@ const URI = (id: string): string => `#/components/schemas/${id}`;
 
 /**
  * Two-pass bulk emission against the registry's underlying `z.globalRegistry`.
- * Returns one map per io. Result is filtered to the ids zod-nest itself
- * registered (via `registry.ids()`) — `z.globalRegistry` may hold third-party
- * entries we don't own.
+ * Returns one map per io, scoped to the ids zod-nest itself registered (via
+ * `registry.ids()`) — `z.globalRegistry` may hold third-party entries we
+ * don't own.
  *
  * Uses `buildToJsonSchemaOptions` so emission semantics (override chain,
  * cycles, unrepresentable detection, metadata) match the single-schema
@@ -43,6 +43,22 @@ export const bulkEmit = (opts: BulkEmitOptions): BulkEmitResult => {
   };
 };
 
+// Scoping the input — not just filtering the output — keeps a third-party
+// `.meta({ id })` schema from being strict-checked on its way to being
+// discarded. `_idmap` so the instance per id matches Zod's own bulk pick.
+const scopeToKnownIds = (
+  zodRegistry: typeof z.globalRegistry,
+  knownIds: ReadonlySet<string>,
+): typeof z.globalRegistry => {
+  const scoped = z.registry<z.core.GlobalMeta>();
+  for (const [id, schema] of zodRegistry._idmap) {
+    if (knownIds.has(id)) {
+      scoped.add(schema, { id });
+    }
+  }
+  return scoped;
+};
+
 const runPass = (
   opts: BulkEmitOptions,
   io: 'input' | 'output',
@@ -58,16 +74,17 @@ const runPass = (
   });
   // Zod v4's bulk-mode emission always returns `{ schemas: Record<...> }` —
   // even for an empty registry the `schemas` key is present with `{}`.
-  const raw = z.toJSONSchema(opts.registry.zodRegistry, built.options) as {
+  const raw = z.toJSONSchema(
+    scopeToKnownIds(opts.registry.zodRegistry, knownIds),
+    built.options,
+  ) as {
     schemas: Record<string, unknown>;
   };
   built.consumeUnrepresentable();
 
-  // Iterate Zod's emission (the source of truth for what was actually
-  // emitted) and keep only the ids we registered. Inverts the older
-  // `for (knownIds) { if (raw.schemas has id) ... }` shape so the filter
-  // branches are naturally covered by the existing "filter outside ids"
-  // test instead of a defensive guard that was never exercised.
+  // The scoped registry bounds every other key to `knownIds`; Zod still
+  // appends a virtual `__shared` defs table when it extracts an anonymous
+  // sub-schema, and that key must not reach `components.schemas`.
   const filtered = new Map<string, unknown>();
   for (const [id, schema] of Object.entries(raw.schemas)) {
     if (knownIds.has(id)) {

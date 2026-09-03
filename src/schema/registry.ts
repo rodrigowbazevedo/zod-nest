@@ -35,8 +35,9 @@ export interface ZodNestRegistry {
   /**
    * Snapshot of every id registered through this `ZodNestRegistry`. The
    * underlying Zod registry is `z.globalRegistry`, which may hold third-party
-   * entries — bulk emission filters its output against this snapshot to keep
-   * only zod-nest-known ids.
+   * entries — bulk emission scopes both its input registry and its output to
+   * this snapshot, so third-party entries are neither emitted nor
+   * strict-checked.
    *
    * Includes ids discovered transitively via `.meta({ id })` on descendants
    * of explicitly-registered schemas.
