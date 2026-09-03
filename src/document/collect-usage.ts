@@ -151,8 +151,8 @@ const collectRefFromSchema = (
   if (!isPlainRecord(schema)) {
     return;
   }
-  // Deep-walk so refs nested inside an inline body (e.g. `@ZodBody` with
-  // `flatten: true` emits `{ type: 'object', properties: { p: { $ref } } }`)
+  // Deep-walk so refs nested inside an inline body (e.g. `@ZodQuery` /
+  // `@ZodHeaders` emit `{ type: 'object', properties: { p: { $ref } } }`)
   // are seeded too — the closure pass `extendExposureViaRefs` only walks
   // emitted bodies, not inline operation bodies, so it can't pick up
   // nested refs that never lived in `inputSchemas` / `outputSchemas`.

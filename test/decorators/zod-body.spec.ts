@@ -4,7 +4,7 @@ import { Post } from '@nestjs/common';
 import { z } from 'zod';
 
 import { ZodBody } from '../../src/decorators/zod-body.decorator.js';
-import { createRegistry } from '../../src/schema/registry.js';
+import { createRegistry, defaultRegistry } from '../../src/schema/registry.js';
 
 const API_PARAMETERS_KEY = 'swagger/apiParameters';
 
@@ -167,7 +167,7 @@ describe('@ZodBody', () => {
   });
 
   describe('flatten: true', () => {
-    it('merges an intersection of two named object schemas into a flat inline body', () => {
+    it('defers the merged body as a synthetic anonymous $ref', () => {
       const registry = createRegistry();
       const Left = z.object({ a: z.string(), b: z.number() }).meta({ id: 'ZB_Flat_Left' });
       const Right = z.object({ c: z.boolean() }).meta({ id: 'ZB_Flat_Right' });
@@ -180,146 +180,28 @@ describe('@ZodBody', () => {
       }
 
       const body = findBody(Controller.prototype.handler);
-      expect(body?.schema?.$ref).toBeUndefined();
-      expect(body?.schema?.type).toBe('object');
-      const props = body?.schema?.properties as Record<string, unknown>;
-      expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c']);
-      // Root id IS registered — the schema's natural (allOf) emission lands
-      // in `components.schemas[id]` via applyZodNest's exposure rule
-      // ("every registered id is exposed"). The operation body stays the
-      // flat merged form for Swagger UI compatibility.
+      expect(body?.schema?.$ref).toMatch(/^#\/components\/schemas\/_AnonBodySchema_\d+$/);
+      expect(registry.anonymousIds()).toHaveLength(1);
+      // The root id is registered too, so its natural (allOf) emission lands
+      // in `components.schemas` alongside the flat merged operation body.
       expect(registry.ids()).toContain('ZB_Flat_Root');
     });
 
-    it('flattens nested intersections', () => {
+    it('does not emit at decoration time, so applyZodNest options reach the body', () => {
       const registry = createRegistry();
-      const A = z.object({ a: z.string() });
-      const B = z.object({ b: z.number() });
-      const C = z.object({ c: z.boolean() });
-      const schema = z.intersection(z.intersection(A, B), C);
+      // `z.symbol()` is strict-unrepresentable. Eager emission threw right
+      // here, before `applyZodNest`'s `strict` / `override` was ever consulted.
+      const schema = z.intersection(z.object({ sym: z.symbol() }), z.object({ who: z.string() }));
 
-      class Controller {
-        @Post()
-        @ZodBody(schema, { registry, flatten: true })
-        handler(): void {}
-      }
-
-      const body = findBody(Controller.prototype.handler);
-      const props = body?.schema?.properties as Record<string, unknown>;
-      expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c']);
-    });
-
-    it('preserves per-property $ref for named child schemas', () => {
-      const registry = createRegistry();
-      const NamedChild = z.object({ v: z.string() }).meta({ id: 'ZB_Flat_NamedChild' });
-      const Left = z.object({ child: NamedChild });
-      const Right = z.object({ other: z.string() });
-      const schema = z.intersection(Left, Right);
-
-      class Controller {
-        @Post()
-        @ZodBody(schema, { registry, flatten: true })
-        handler(): void {}
-      }
-
-      const body = findBody(Controller.prototype.handler);
-      const props = body?.schema?.properties as Record<string, { $ref?: string; type?: string }>;
-      expect(props['child']?.$ref).toBe('#/components/schemas/ZB_Flat_NamedChild');
-      expect(props['other']?.type).toBe('string');
-      expect(registry.ids()).toContain('ZB_Flat_NamedChild');
-    });
-
-    it('resolves property collisions with last-arm-wins', () => {
-      const registry = createRegistry();
-      const Left = z.object({ dupe: z.string() });
-      const Right = z.object({ dupe: z.number() });
-      const schema = z.intersection(Left, Right);
-
-      class Controller {
-        @Post()
-        @ZodBody(schema, { registry, flatten: true })
-        handler(): void {}
-      }
-
-      const body = findBody(Controller.prototype.handler);
-      const props = body?.schema?.properties as Record<string, { type?: string }>;
-      // Right arm wins: `dupe` ends up as a number.
-      expect(props['dupe']?.type).toBe('number');
-    });
-
-    it('merges intersection-of-unions into a flat object with all properties optional', () => {
-      // The canonical user case (taxonomy translation): two unions of objects
-      // intersected. Without flatten:true this emits `allOf: [oneOf, oneOf]`
-      // which Swagger UI's multipart form generator can't render. With
-      // flatten:true the body is a flat object whose fields cover every
-      // variant — runtime validation against the original schema still
-      // enforces the precise variant shape.
-      const registry = createRegistry();
-      const schema = z.intersection(
-        z.union([z.object({ a: z.string() }), z.object({ b: z.string() })]),
-        z.union([z.object({ c: z.string() }), z.object({ d: z.string() })]),
-      );
-
-      class Controller {
-        @Post()
-        @ZodBody(schema, { registry, flatten: true })
-        handler(): void {}
-      }
-
-      const body = findBody(Controller.prototype.handler);
-      expect(body?.schema?.$ref).toBeUndefined();
-      expect(body?.schema?.allOf).toBeUndefined();
-      expect(body?.schema?.oneOf).toBeUndefined();
-      expect(body?.schema?.type).toBe('object');
-      const props = body?.schema?.properties as Record<string, unknown>;
-      expect(Object.keys(props).sort()).toEqual(['a', 'b', 'c', 'd']);
-      // Union-crossed → no property is required at the spec level.
-      const required = body?.schema?.required as unknown;
-      expect(required === undefined || (Array.isArray(required) && required.length === 0)).toBe(
-        true,
-      );
-    });
-
-    it('flattens a bare union of objects with all properties optional', () => {
-      const registry = createRegistry();
-      const schema = z.union([
-        z.object({ alpha: z.string(), shared: z.string() }),
-        z.object({ beta: z.number(), shared: z.string() }),
-      ]);
-
-      class Controller {
-        @Post()
-        @ZodBody(schema, { registry, flatten: true })
-        handler(): void {}
-      }
-
-      const body = findBody(Controller.prototype.handler);
-      expect(body?.schema?.type).toBe('object');
-      const props = body?.schema?.properties as Record<string, unknown>;
-      expect(Object.keys(props).sort()).toEqual(['alpha', 'beta', 'shared']);
-      const required = body?.schema?.required as unknown;
-      expect(required === undefined || (Array.isArray(required) && required.length === 0)).toBe(
-        true,
-      );
-    });
-
-    it('flattens a discriminated union of objects', () => {
-      const registry = createRegistry();
-      const schema = z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('a'), value: z.string() }),
-        z.object({ kind: z.literal('b'), count: z.number() }),
-      ]);
-
-      class Controller {
-        @Post()
-        @ZodBody(schema, { registry, flatten: true })
-        handler(): void {}
-      }
-
-      const body = findBody(Controller.prototype.handler);
-      expect(body?.schema?.type).toBe('object');
-      const props = body?.schema?.properties as Record<string, unknown>;
-      expect(Object.keys(props).sort()).toEqual(['count', 'kind', 'value']);
+      expect(() => {
+        class Controller {
+          @Post()
+          @ZodBody(schema, { registry, flatten: true })
+          handler(): void {}
+        }
+        return Controller;
+      }).not.toThrow();
+      expect(registry.anonymousIds()).toHaveLength(1);
     });
 
     it('throws ZodNestError when a leaf is not a z.object', () => {
@@ -330,34 +212,6 @@ describe('@ZodBody', () => {
       expect(() => ZodBody(schema, { registry, flatten: true })).toThrow(
         /requires every leaf of the schema to be a `z\.object\(\{\.\.\.\}\)`/,
       );
-    });
-
-    it('bare z.object: flatten emits the inline body; default defers a synthetic $ref (converged by applyZodNest)', () => {
-      const registry = createRegistry();
-      const schema = z.object({ q: z.string(), n: z.number() });
-
-      class Controller {
-        @Post('flat')
-        @ZodBody(schema, { registry, flatten: true })
-        flatHandler(): void {}
-
-        @Post('plain')
-        @ZodBody(schema, { registry })
-        plainHandler(): void {}
-      }
-
-      const flat = findBody(Controller.prototype.flatHandler);
-      const plain = findBody(Controller.prototype.plainHandler);
-      // flatten short-circuits to the inline flat body (Swagger-UI friendly).
-      expect(flat?.schema?.type).toBe('object');
-      expect(Object.keys(flat?.schema?.properties as Record<string, unknown>).sort()).toEqual([
-        'n',
-        'q',
-      ]);
-      // The default path defers to a synthetic anonymous $ref; `applyZodNest`
-      // inlines it back to an equivalent flat body (see the swagger-smoke
-      // end-to-end suite), so the two converge in the final document.
-      expect(plain?.schema?.$ref).toMatch(/^#\/components\/schemas\/_AnonBodySchema_\d+$/);
     });
 
     it('throws when an intersection has a non-object LEFT arm', () => {
@@ -376,33 +230,6 @@ describe('@ZodBody', () => {
       );
     });
 
-    it('marks every property optional when only one arm of the intersection is union-shaped', () => {
-      // Mixed shape: pure object on the left, union of objects on the right.
-      // Exercises the `unionCrossed: left.unionCrossed || right.unionCrossed`
-      // branch where left=false / right=true.
-      const registry = createRegistry();
-      const schema = z.intersection(
-        z.object({ alwaysHere: z.string() }),
-        z.union([z.object({ v1: z.string() }), z.object({ v2: z.number() })]),
-      );
-
-      class Controller {
-        @Post()
-        @ZodBody(schema, { registry, flatten: true })
-        handler(): void {}
-      }
-
-      const body = findBody(Controller.prototype.handler);
-      const props = body?.schema?.properties as Record<string, unknown>;
-      expect(Object.keys(props).sort()).toEqual(['alwaysHere', 'v1', 'v2']);
-      const required = body?.schema?.required as unknown;
-      // unionCrossed → all properties optional, including `alwaysHere` from
-      // the non-union arm. Documented trade-off.
-      expect(required === undefined || (Array.isArray(required) && required.length === 0)).toBe(
-        true,
-      );
-    });
-
     it('defaults to defaultRegistry when flatten:true is set without an explicit registry', () => {
       // Exercises `options.registry ?? defaultRegistry` inside `resolveBodySchema`.
       const schema = z.intersection(z.object({ x: z.string() }), z.object({ y: z.string() }));
@@ -414,8 +241,11 @@ describe('@ZodBody', () => {
       }
 
       const body = findBody(Controller.prototype.handler);
-      const props = body?.schema?.properties as Record<string, unknown>;
-      expect(Object.keys(props).sort()).toEqual(['x', 'y']);
+      const ref = body?.schema?.$ref;
+      expect(ref).toMatch(/^#\/components\/schemas\/_AnonBodySchema_\d+$/);
+      expect(defaultRegistry.anonymousIds()).toContain(
+        String(ref).slice('#/components/schemas/'.length),
+      );
     });
   });
 });

@@ -3,7 +3,6 @@ import { z } from 'zod';
 import type { ZodNestRegistry } from '../../schema/registry.js';
 
 import { discoverDependents } from '../../schema/discover-dependents.js';
-import { toOpenApi } from '../../schema/engine.js';
 import { ZodNestError } from '../../schema/errors.js';
 import { registerSchema } from '../../schema/registry.js';
 import { isZodObject } from './zod-param-expand.js';
@@ -98,11 +97,12 @@ const collectObjectShapes = (schema: z.ZodType): CollectedShapes | null => {
 
 /**
  * Merge an intersection / union tree of `z.object` arms into a single
- * anonymous `z.object`, emit it inline, and return the JSON Schema body.
- * Used by `@ZodBody({ flatten: true })` so Swagger UI's
- * `multipart/form-data` `try-it-out` form renders correctly — the UI
- * doesn't follow `$ref` or unwrap `allOf` / `oneOf`, so it needs a flat
- * object literal at the operation's `schema` site.
+ * anonymous `z.object`. Callers register it as an anonymous body, so
+ * `applyZodNest` emits it under the document's `strict` / `override` and
+ * inlines it at the operation. Used by `@ZodBody({ flatten: true })` so
+ * Swagger UI's `multipart/form-data` `try-it-out` form renders correctly —
+ * the UI doesn't follow `$ref` or unwrap `allOf` / `oneOf`, so it needs a
+ * flat object literal at the operation's `schema` site.
  *
  * Supported shapes:
  * - `z.object({...})` — single-arm case, identity merge.
@@ -125,7 +125,7 @@ const collectObjectShapes = (schema: z.ZodType): CollectedShapes | null => {
  * - The original schema's `.meta({ id })` on the root is *not* preserved —
  *   the merged object is anonymous and lives only in the operation body.
  * - Per-property `.meta({ id })` schemas keep their `$ref` emission via
- *   normal `toOpenApi` traversal.
+ *   normal traversal.
  * - The spec emission becomes less precise (a union arm's "you must supply
  *   variant A or variant B" becomes "any subset of all variants' fields").
  *   This is the documented trade-off for Swagger UI compatibility — runtime
@@ -136,7 +136,7 @@ export const flattenObjectIntersection = (
   schema: z.ZodType,
   registry: ZodNestRegistry,
   decoratorName: string,
-): Record<string, unknown> => {
+): z.ZodObject => {
   const collected = collectObjectShapes(schema);
   if (collected === null) {
     throw new ZodNestError(
@@ -159,21 +159,15 @@ export const flattenObjectIntersection = (
       mergedShape[key] = value.optional();
     }
   }
-  const merged = z.object(mergedShape);
   // Register the root if it has a `.meta({ id })` so the schema's natural
   // (non-flattened) emission lands in `components.schemas[id]` via the
-  // exposure-by-registration rule in `applyZodNest`. The inline operation
-  // body remains the flat merged form for Swagger UI compatibility — the
-  // catalog gets the structural composition (`allOf` / `oneOf`). No-op
-  // when the schema is anonymous.
+  // exposure-by-registration rule in `applyZodNest`. No-op when anonymous.
   registerSchema(schema, registry);
   // Walk named descendants of the *original* schema so per-property $refs
-  // resolve when bulk-emit runs. `toOpenApi` below will also register
-  // descendants of the merged shape, but the original may carry meta entries
-  // on nodes that the merged object's shape doesn't directly reference.
+  // resolve at emission — the merged shape may miss meta entries carried on
+  // nodes it doesn't directly reference.
   for (const [child, childId] of discoverDependents(schema)) {
     registry.register(child, childId);
   }
-  const { schema: body } = toOpenApi(merged, { io: 'input', registry });
-  return body as Record<string, unknown>;
+  return z.object(mergedShape);
 };
