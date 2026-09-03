@@ -3,32 +3,22 @@ name: Compatibility Matrix
 # Validates that the declared peer-dep ranges (zod, @nestjs/common,
 # @nestjs/core, @nestjs/swagger) actually hold by running the full test
 # suite against each cell of .github/compat-matrix.json.
-#
-# Triggers:
-#   - push to main: catches regressions on every merge.
-#   - schedule (Mondays, 12:00 UTC): catches breakage from upstream
-#     releases that happened between merges.
-#   - workflow_dispatch: manual trigger when investigating peer-dep
-#     churn.
-#
-# No PR trigger. The existing ci.yml gate runs on PRs; the matrix is
-# scoped to main + scheduled cadence so PRs stay fast.
-#
-# Failure handling: when a cell fails on a `push` or `schedule` run,
-# the job opens (or comments on) a GitHub issue labelled
-# `compat-matrix-failure` so the regression can't be silently lost in
-# the Actions UI. Manual `workflow_dispatch` runs do NOT auto-file
-# issues — manual runs are usually investigative.
 on:
-  push:
-    branches: [main]
+  # Pinned cells only: a `latest` cell can go red from upstream churn
+  # alone, and unrelated red teaches people to ignore red.
+  pull_request:
+  # Every cell, called by release.yml. No `push` trigger — the release
+  # owns the on-merge run rather than racing it.
+  workflow_call:
   schedule:
     - cron: '0 12 * * 1'
   workflow_dispatch:
 
 concurrency:
   group: compat-matrix-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  # Superseded PR pushes are worth cancelling; a release or scheduled run
+  # must always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -46,8 +36,17 @@ jobs:
       - id: gen
         # Expose the `cells` array as a JSON-encoded workflow output so the
         # downstream `test-cell` job's matrix can consume it via fromJson.
+        #
+        # A cell is PR-eligible iff none of its pins is `latest` — derived
+        # from the cell's own values so adding a cell can't forget a flag.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          CELLS=$(jq -c '.cells' .github/compat-matrix.json)
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            CELLS=$(jq -c '.cells | map(select([.[]] | index("latest") | not))' .github/compat-matrix.json)
+          else
+            CELLS=$(jq -c '.cells' .github/compat-matrix.json)
+          fi
           echo "cells=$CELLS" >> "$GITHUB_OUTPUT"
 
   test-cell:

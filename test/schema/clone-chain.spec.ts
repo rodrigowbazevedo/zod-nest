@@ -10,6 +10,8 @@ import { findIdOwner, findRefTarget } from '../../src/schema/clone-chain.js';
 import { toOpenApi } from '../../src/schema/engine.js';
 import { createRegistry, registerSchema } from '../../src/schema/registry.js';
 
+const supportsCompile = typeof z.compile === 'function';
+
 const buildDoc = (dtoId: string) => ({
   openapi: '3.1.0',
   info: { title: 't', version: '1' },
@@ -35,26 +37,37 @@ const emitNested = (inner: z.ZodType, outerId: string): Record<string, SchemaObj
   return (doc.components?.schemas ?? {}) as Record<string, SchemaObject>;
 };
 
+type AnnotationClone = [label: string, clone: (base: z.ZodObject) => z.ZodType];
+
+const compileClone: AnnotationClone[] = supportsCompile
+  ? [['z.compile()', (base) => z.compile(base)]]
+  : [];
+
+const annotationClones: AnnotationClone[] = [
+  ['.describe()', (base) => base.describe('a base')],
+  ['.refine()', (base) => base.refine(() => true)],
+  ['.meta() alias', (base) => base.meta({ title: 'Aliased' })],
+  ...compileClone,
+];
+
 describe('clone chain — document dependencies', () => {
-  it.each([
-    ['.describe()', (base: z.ZodObject) => base.describe('a base')],
-    ['.refine()', (base: z.ZodObject) => base.refine(() => true)],
-    ['.meta() alias', (base: z.ZodObject) => base.meta({ title: 'Aliased' })],
-    ['z.compile()', (base: z.ZodObject) => z.compile(base)],
-  ])('resolves the $ref a %s clone emits to its named ancestor', (label, clone) => {
-    const outerId = `DR_Outer_${label.replace(/\W/g, '')}`;
-    const baseId = `DR_Base_${label.replace(/\W/g, '')}`;
-    const Base = z.object({ a: z.string() }).meta({ id: baseId });
+  it.each(annotationClones)(
+    'resolves the $ref a %s clone emits to its named ancestor',
+    (label, clone) => {
+      const outerId = `DR_Outer_${label.replace(/\W/g, '')}`;
+      const baseId = `DR_Base_${label.replace(/\W/g, '')}`;
+      const Base = z.object({ a: z.string() }).meta({ id: baseId });
 
-    const schemas = emitNested(clone(Base), outerId);
+      const schemas = emitNested(clone(Base), outerId);
 
-    // A clone may carry its own annotation alongside the `$ref` (`.describe()`
-    // emits `description`, `.meta({ title })` emits `title`) — both are correct.
-    expect(schemas[baseId]).toMatchObject({ type: 'object' });
-    expect(schemas[outerId]?.properties?.inner).toMatchObject({
-      $ref: `#/components/schemas/${baseId}`,
-    });
-  });
+      // A clone may carry its own annotation alongside the `$ref` (`.describe()`
+      // emits `description`, `.meta({ title })` emits `title`) — both are correct.
+      expect(schemas[baseId]).toMatchObject({ type: 'object' });
+      expect(schemas[outerId]?.properties?.inner).toMatchObject({
+        $ref: `#/components/schemas/${baseId}`,
+      });
+    },
+  );
 
   it('still emits a plainly nested named schema', () => {
     const Base = z.object({ a: z.string() }).meta({ id: 'DR_Plain_Base' });
@@ -64,13 +77,13 @@ describe('clone chain — document dependencies', () => {
 });
 
 describe('clone chain — id adoption', () => {
-  it('keeps the id of a compiled DTO schema', () => {
+  it.skipIf(!supportsCompile)('keeps the id of a compiled DTO schema', () => {
     const registry = createRegistry();
     const User = z.object({ id: z.string() }).meta({ id: 'CC_User' });
     expect(createZodDto(z.compile(User), { registry }).id).toBe('CC_User');
   });
 
-  it('does not collide two compiled DTOs onto one fallback id', () => {
+  it.skipIf(!supportsCompile)('does not collide two compiled DTOs onto one fallback id', () => {
     const registry = createRegistry();
     const User = z.object({ id: z.string() }).meta({ id: 'CC_ColUser' });
     const Order = z.object({ total: z.number() }).meta({ id: 'CC_ColOrder' });
@@ -83,13 +96,16 @@ describe('clone chain — id adoption', () => {
     expect(registry.hasCollision('CC_ColUser')).toBe(false);
   });
 
-  it('registers the owner, not the clone, so no false collision is reported', () => {
-    const registry = createRegistry();
-    const Base = z.object({ a: z.string() }).meta({ id: 'CC_Owner' });
-    registerSchema(Base, registry);
-    registerSchema(z.compile(Base), registry);
-    expect(registry.hasCollision('CC_Owner')).toBe(false);
-  });
+  it.skipIf(!supportsCompile)(
+    'registers the owner, not the clone, so no false collision is reported',
+    () => {
+      const registry = createRegistry();
+      const Base = z.object({ a: z.string() }).meta({ id: 'CC_Owner' });
+      registerSchema(Base, registry);
+      registerSchema(z.compile(Base), registry);
+      expect(registry.hasCollision('CC_Owner')).toBe(false);
+    },
+  );
 });
 
 describe('clone chain — overrideJSONSchema fragments', () => {
@@ -195,7 +211,9 @@ describe('clone chain — constraint clones must not adopt', () => {
 
   it('adopts across def-identical clones only', () => {
     const Base = z.object({ a: z.string() }).meta({ id: 'CC_DefShared' });
-    expect(findIdOwner(z.compile(Base))?.id).toBe('CC_DefShared');
+    if (supportsCompile) {
+      expect(findIdOwner(z.compile(Base))?.id).toBe('CC_DefShared');
+    }
     expect(findIdOwner(Base.describe('d'))?.id).toBe('CC_DefShared');
     expect(findIdOwner(Base.describe('d'))?.owner).toBe(Base);
   });
