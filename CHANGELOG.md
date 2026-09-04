@@ -1,3 +1,10 @@
+## [3.2.5](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.4...v3.2.5) (2026-09-04)
+
+
+### Bug Fixes
+
+* defer anonymous and flattened body emission to applyZodNest ([#160](https://github.com/rodrigowbazevedo/zod-nest/issues/160)) ([0519339](https://github.com/rodrigowbazevedo/zod-nest/commit/0519339e6c85f0a63c01281be13a3fde2ac6e352)), closes [#141](https://github.com/rodrigowbazevedo/zod-nest/issues/141)
+
 ## [3.2.4](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.3...v3.2.4) (2026-09-03)
 
 
