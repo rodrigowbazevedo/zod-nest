@@ -286,7 +286,7 @@ MulterModule.register({ limits: { fileSize: 2 * 1024 * 1024 } });
 
 **`attachFieldsToBody: 'keyValues'` is unsupported.** That mode yields a third shape again (decoded values rather than `MultipartFile` objects). Only `true` is modelled.
 
-**The multipart body is inline, not a `components.schemas` entry.** Swagger UI's try-it-out form generator doesn't follow `$ref` and doesn't unwrap `allOf`, so a referenced body renders as a single stub field instead of file pickers. `@ZodMultipart` always emits the body inline — the same trade-off [`@ZodBody({ flatten: true })`](recipes/intersection-with-union.md#swagger-ui--multipartform-data--flatten-true) documents.
+**The multipart body is inline, not a `components.schemas` entry.** Swagger UI's try-it-out form generator doesn't follow `$ref` and doesn't unwrap `allOf`, so a referenced body renders as a single stub field instead of file pickers. An anonymous `@ZodMultipart` body always ends up inline — the same trade-off [`@ZodBody({ flatten: true })`](recipes/intersection-with-union.md#swagger-ui--multipartform-data--flatten-true) documents. The inlining happens in `applyZodNest`, not at decoration time, so the document's `strict` and `override` apply to the body.
 
 **Module-level validation options don't reach the param decorators.** `@ZodUploadedFile`, `@ZodUploadedFiles`, and `@ZodMultipartBody` validate inside a Nest param factory, and param factories aren't resolved through the DI container. They always throw the default `ZodValidationException`, so `ZodNestModule.forRoot({ createValidationException, validationLogs })` does not apply to them. Everything else — `@Body()`, `@Query()`, `@ZodResponse` — is unaffected.
 

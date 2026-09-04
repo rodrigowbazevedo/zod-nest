@@ -15,6 +15,7 @@ import {
   createRegistry,
   ZodBody,
   ZodHeaders,
+  ZodNestUnrepresentableError,
   ZodQuery,
   ZodValidationPipe,
 } from '../../src';
@@ -255,5 +256,99 @@ describe('@ZodBody / @ZodQuery / @ZodHeaders — end-to-end with applyZodNest', 
     // bodies got dropped, surfacing as `DANGLING_REF` at doc-build time.
     const schemas = doc.components?.schemas as Record<string, unknown>;
     expect(schemas['FlatNamedBlob']).toBeDefined();
+  });
+});
+
+// ─── applyZodNest's strict / override reach deferred bodies (issue #141) ────
+
+const deferredRegistry = createRegistry();
+
+// `z.symbol()` is strict-unrepresentable and no built-in override covers it,
+// so it is the construct that distinguishes decoration-time emission from
+// doc-build-time emission.
+const SymbolBearingBody = z.intersection(
+  z.object({ sym: z.symbol() }),
+  z.object({ who: z.string() }),
+);
+
+@Controller('deferred')
+class DeferredBodyController {
+  @Post('flattened')
+  @ZodBody(SymbolBearingBody, { registry: deferredRegistry, flatten: true })
+  flattened(): void {}
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const flattenedBodyOf = (doc: OpenAPIObject): Record<string, unknown> => {
+  const requestBody = opAt(doc, '/deferred/flattened', 'post').requestBody;
+  if (!isRecord(requestBody) || !isRecord(requestBody.content)) {
+    throw new Error('No requestBody content on POST /deferred/flattened');
+  }
+  const mediaType = requestBody.content['application/json'];
+  if (!isRecord(mediaType) || !isRecord(mediaType.schema)) {
+    throw new Error('No application/json schema on POST /deferred/flattened');
+  }
+  return mediaType.schema;
+};
+
+const propertiesOf = (body: Record<string, unknown>): Record<string, unknown> => {
+  if (!isRecord(body.properties)) {
+    throw new Error('Body has no properties');
+  }
+  return body.properties;
+};
+
+describe('@ZodBody({ flatten: true }) — emission deferred to applyZodNest', () => {
+  // One app per test: `applyZodNest` mutates the document, so each case needs
+  // a freshly built one.
+  const apps: INestApplication[] = [];
+
+  afterAll(async () => {
+    await Promise.all(apps.map((instance) => instance.close()));
+  });
+
+  const rawDoc = async (): Promise<OpenAPIObject> => {
+    const result = await bootstrap([DeferredBodyController]);
+    apps.push(result.app);
+    return result.raw;
+  };
+
+  it('defers to a synthetic $ref instead of emitting at decoration time', async () => {
+    expect(flattenedBodyOf(await rawDoc()).$ref).toMatch(
+      /^#\/components\/schemas\/_AnonBodySchema_\d+$/,
+    );
+  });
+
+  it('honours strict: false — the unrepresentable property emits as {}', async () => {
+    const doc = applyZodNest(await rawDoc(), { registry: deferredRegistry, strict: false });
+    const properties = propertiesOf(flattenedBodyOf(doc));
+    expect(Object.keys(properties).sort()).toEqual(['sym', 'who']);
+    expect(properties['sym']).toEqual({});
+  });
+
+  it('throws ZodNestUnrepresentableError at doc-build time under default strict', async () => {
+    const raw = await rawDoc();
+    expect(() => applyZodNest(raw, { registry: deferredRegistry })).toThrow(
+      ZodNestUnrepresentableError,
+    );
+  });
+
+  it('applies a per-call override to the flattened body', async () => {
+    const doc = applyZodNest(await rawDoc(), {
+      registry: deferredRegistry,
+      override: ({ zodSchema, jsonSchema }) => {
+        if (zodSchema._zod.def.type !== 'symbol') {
+          return;
+        }
+        jsonSchema.type = 'string';
+        jsonSchema.description = 'serialized symbol';
+      },
+    });
+    expect(propertiesOf(flattenedBodyOf(doc))['sym']).toEqual({
+      type: 'string',
+      description: 'serialized symbol',
+    });
   });
 });

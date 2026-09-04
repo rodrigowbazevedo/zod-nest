@@ -9,6 +9,7 @@ import { isZodObject } from '../decorators/internal/zod-param-expand.js';
 import { resolveSchemaRef } from '../decorators/internal/zod-schema-ref.js';
 import { isZodSchema } from '../dto/predicates.js';
 import { defaultRegistry } from '../schema/registry.js';
+import { singleton } from '../schema/singleton.js';
 import { isFileSchema } from './file-marker.js';
 import { ZOD_MULTIPART_METADATA_KEY } from './metadata.js';
 
@@ -49,8 +50,26 @@ export interface ZodMultipartOptions {
   readonly required?: boolean;
 }
 
-const toSchema = (body: MultipartBody): z.ZodType =>
-  isZodSchema(body) ? body : z.object({ ...body });
+// One `z.object` per shape record, so a shape hoisted across handlers (the
+// pattern docs/recipes/multipart-uploads.md recommends) resolves to a single
+// synthetic id rather than one per route.
+const schemaByShape = singleton(
+  'multipart-shape-schemas',
+  () => new WeakMap<MultipartShape, z.ZodType>(),
+);
+
+const toSchema = (body: MultipartBody): z.ZodType => {
+  if (isZodSchema(body)) {
+    return body;
+  }
+  const cached = schemaByShape.get(body);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const schema = z.object({ ...body });
+  schemaByShape.set(body, schema);
+  return schema;
+};
 
 /**
  * The flat shape the param decorators split on. A record is already flat and a
@@ -80,24 +99,28 @@ const partitionKeys = (
 };
 
 /**
- * Resolves the operation's body. Anonymous bodies emit inline because Swagger
- * UI's `multipart/form-data` form generator doesn't follow `$ref` — a
- * referenced body renders one stub field instead of file pickers. Naming the
- * body (`id` or `.meta({ id })`) opts into the `$ref` and that trade-off.
+ * Resolves the operation's body to a `$ref`. An anonymous one targets a
+ * synthetic id that `applyZodNest` emits under the document's `strict` /
+ * `override` and then inlines at the operation — Swagger UI's
+ * `multipart/form-data` form generator doesn't follow `$ref`, so a referenced
+ * body renders one stub field instead of file pickers. Naming the body (`id`
+ * or `.meta({ id })`) keeps the `$ref` in the final document and opts into
+ * that trade-off.
  */
 const resolveBody = (
   schema: z.ZodType,
   options: ZodMultipartOptions | undefined,
   registry: ZodNestRegistry,
-): Record<string, unknown> | { readonly $ref: string } => {
+): { readonly $ref: string } => {
   if (options?.flatten === true) {
-    return flattenObjectIntersection(schema, registry, '@ZodMultipart');
+    const merged = flattenObjectIntersection(schema, registry, '@ZodMultipart');
+    return resolveSchemaRef(merged, { registry, deferAnonInline: true }).ref;
   }
-  const resolved = resolveSchemaRef(schema, {
+  return resolveSchemaRef(schema, {
     ...(options?.id !== undefined ? { id: options.id } : {}),
     registry,
-  });
-  return resolved.kind === 'ref' ? resolved.ref : resolved.schema;
+    deferAnonInline: true,
+  }).ref;
 };
 
 export const createZodMultipart = (defaultFilesIn: MultipartFilesIn) => {

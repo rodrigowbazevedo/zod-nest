@@ -139,6 +139,7 @@ export class TaxonomyTranslationController {
 What it does:
 
 - Walks the schema, collecting every `z.object` leaf reachable through intersections and/or unions. Merges all collected shapes into a single anonymous `z.object` and emits it **inline** into the operation's request body — no `$ref`, no `allOf`, no `oneOf` at the operation level.
+- Emission happens in `applyZodNest`, not at decoration time, so the document's `strict` and `override` apply to the merged body like any other anonymous one.
 - Per-property `.meta({ id })` schemas keep their normal `$ref` emission (e.g. `candidate_trafficking: FileSchema` still refs `#/components/schemas/File`). Only the _root_ is flattened.
 - Property collisions resolve right-arm-wins, mirroring `z.object({ ...Left.shape, ...Right.shape })`.
 - If the root itself has a `.meta({ id })`, the schema is **also** registered with its id and lands in `components.schemas[id]` in its _natural_ (non-flattened) form (`allOf` / `oneOf`). The operation body stays flat; the schema catalog gets the structural composition. Both forms coexist.

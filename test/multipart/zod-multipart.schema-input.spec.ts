@@ -11,7 +11,7 @@ import type { ExecutionContext, INestApplication, Type } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
 
 import { multerMemoryFile, ZodMultipart } from '../../src/express/index.js';
-import { applyZodNest, createRegistry } from '../../src/index.js';
+import { applyZodNest, createRegistry, ZodNestUnrepresentableError } from '../../src/index.js';
 import {
   resolveMultipartBody,
   resolveUploadedFile,
@@ -280,6 +280,78 @@ describe('@ZodMultipart param decorators with schema input', () => {
       await expect(
         resolveMultipartBody(undefined, makeContext(handler, { body: {} })),
       ).rejects.toThrow(expected);
+    });
+  });
+});
+
+// ─── applyZodNest's strict / override reach deferred bodies (issue #141) ────
+
+const deferredRegistry = createRegistry();
+
+// `z.symbol()` is strict-unrepresentable and no built-in override covers it,
+// so it distinguishes decoration-time emission from doc-build-time emission.
+@Controller('deferred')
+class DeferredMultipartController {
+  @Post('anonymous')
+  @ZodMultipart(z.object({ file: multerMemoryFile(), sym: z.symbol() }), {
+    registry: deferredRegistry,
+  })
+  anonymous(): null {
+    return null;
+  }
+}
+
+const rawDoc = async (): Promise<OpenAPIObject> => {
+  const moduleRef = await Test.createTestingModule({
+    imports: [DiscoveryModule],
+    controllers: [DeferredMultipartController],
+  }).compile();
+  const app: INestApplication = moduleRef.createNestApplication({ logger: false });
+  await app.init();
+  const doc = SwaggerModule.createDocument(
+    app,
+    new DocumentBuilder().setTitle('deferred').setVersion('v').build(),
+  );
+  await app.close();
+  return doc;
+};
+
+describe('@ZodMultipart — anonymous body emission deferred to applyZodNest', () => {
+  it('defers to a synthetic $ref instead of emitting at decoration time', async () => {
+    expect(bodyAt(await rawDoc(), '/deferred/anonymous').$ref).toMatch(
+      /^#\/components\/schemas\/_AnonBodySchema_\d+$/,
+    );
+  });
+
+  it('honours strict: false — the unrepresentable property emits as {}', async () => {
+    const doc = applyZodNest(await rawDoc(), { registry: deferredRegistry, strict: false });
+    const body = bodyAt(doc, '/deferred/anonymous');
+    expect(body.$ref).toBeUndefined();
+    expect(body.properties).toMatchObject({ sym: {}, file: { format: 'binary' } });
+    expect(Object.keys(doc.components?.schemas ?? {})).not.toContainEqual(
+      expect.stringMatching(/^_AnonBodySchema_/),
+    );
+  });
+
+  it('throws ZodNestUnrepresentableError at doc-build time under default strict', async () => {
+    const raw = await rawDoc();
+    expect(() => applyZodNest(raw, { registry: deferredRegistry })).toThrow(
+      ZodNestUnrepresentableError,
+    );
+  });
+
+  it('applies a per-call override to the anonymous body', async () => {
+    const doc = applyZodNest(await rawDoc(), {
+      registry: deferredRegistry,
+      override: ({ zodSchema, jsonSchema }) => {
+        if (zodSchema._zod.def.type !== 'symbol') {
+          return;
+        }
+        jsonSchema.type = 'string';
+      },
+    });
+    expect(bodyAt(doc, '/deferred/anonymous').properties).toMatchObject({
+      sym: { type: 'string' },
     });
   });
 });

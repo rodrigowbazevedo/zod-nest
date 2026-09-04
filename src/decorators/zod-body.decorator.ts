@@ -7,7 +7,9 @@ import { defaultRegistry } from '../schema/registry.js';
 import { flattenObjectIntersection } from './internal/flatten-intersection.js';
 import { resolveSchemaRef } from './internal/zod-schema-ref.js';
 
-type BodySchema = { readonly $ref: string } | Record<string, unknown>;
+interface BodySchema {
+  readonly $ref: string;
+}
 
 export interface ZodBodyOptions {
   /** Forces this id, overriding any `.meta({ id })` already on the schema. */
@@ -61,16 +63,18 @@ export const ZodBody = (schema: z.ZodType, options?: ZodBodyOptions): MethodDeco
   });
 };
 
+// `deferAnonInline: true` always resolves to a `$ref` (named → its id,
+// anonymous → a synthetic id inlined later by `applyZodNest`), so the overload
+// narrows both branches to a `ref`.
 const resolveBodySchema = (schema: z.ZodType, options: ZodBodyOptions | undefined): BodySchema => {
+  const registry = options?.registry ?? defaultRegistry;
   if (options?.flatten === true) {
-    return flattenObjectIntersection(schema, options.registry ?? defaultRegistry, '@ZodBody');
+    const merged = flattenObjectIntersection(schema, registry, '@ZodBody');
+    return resolveSchemaRef(merged, { registry, deferAnonInline: true }).ref;
   }
-  // `deferAnonInline: true` always resolves to a `$ref` (named → its id,
-  // anonymous → a synthetic id inlined later by `applyZodNest`), so the
-  // overload narrows the result to a `ref`.
   return resolveSchemaRef(schema, {
     id: options?.id,
-    registry: options?.registry,
+    registry,
     deferAnonInline: true,
   }).ref;
 };
