@@ -164,6 +164,47 @@ Tuple variants also apply `@ApiExtraModels(...slotDtos)` so each tuple-slot DTO 
 
 The `application/json` media-type key above is the default. Pass `contentType` (or declare a stream-typed `@Header('Content-Type', …)`) to emit the response under a different media type — see [Streaming responses](#streaming-responses-contenttype--stream).
 
+### Response `headers` and `links`
+
+`description` takes a string or an object. The object form carries the two OpenAPI response fields
+that have nothing to do with the body — `headers` and `links`:
+
+```ts
+@Get(':id')
+@ZodResponse({
+  type: UserDto,
+  description: {
+    description: 'the user',
+    headers: { 'X-Rate-Limit': { schema: { type: 'integer' } } },
+    links: {
+      address: {
+        operationId: 'getUserAddress',
+        parameters: { userid: '$request.path.id' },
+        server: { url: 'https://alt.example' }, // `server`, never `body`
+      },
+    },
+  },
+})
+findOne(@Param('id') id: string): UserDto {}
+```
+
+Both are typed `Record<string, unknown>` and **forwarded to `@ApiResponse` untouched**. `zod-nest`
+never inspects, validates or rewrites them — the payload you write is the payload the document
+carries, so a malformed Header or Link Object reaches your consumers unflagged. Validate the emitted
+document if that matters to you; `zod-nest` does not do it at runtime.
+
+The typing is deliberately loose so 3.1 / 3.2 / extension shapes pass without a cast. Both objects
+are version-safe in the direction that matters: **anything valid under 3.1 is valid under 3.2**. See
+[OpenAPI version](swagger-integration.md#openapi-version) for the two 3.2-only header fields that do
+_not_ travel backwards.
+
+> **A link's alternate server is `server`, not `body`.** The Link Object is identical in 3.1 and 3.2
+> — `body` has never been a field in either. It appears only in the official 3.1 JSON Schema before
+> iteration `2025-09-15`, which mis-spelled `server` as `body`
+> ([OAI/OpenAPI-Specification#4463](https://github.com/OAI/OpenAPI-Specification/issues/4463)). An
+> older validator will accept `body` and reject the correct `server`; that is the validator's bug,
+> not your document's. Write `server` and upgrade the validator.
+
 ### Decorator ordering & the microtask trick
 
 TypeScript decorators apply **bottom-up**, so `@ZodResponse` — usually written above `@Get` / `@Post` / `@HttpCode` / `@Header` — runs its factory body _first_, before sibling decorators have written their metadata. That metadata (`HTTP_CODE_METADATA`, `METHOD_METADATA`, `HEADERS_METADATA`) is what `@ZodResponse` reads to resolve the effective response **status** (when `status` is omitted) and the effective **content type** (when `contentType` is omitted but a `@Header('Content-Type', …)` is present).

@@ -51,6 +51,10 @@ describe('validateOpenApi — negative controls', () => {
   });
 });
 
+const responseWith = (response: Record<string, unknown>): Record<string, unknown> => ({
+  '/things': { get: { operationId: 'list', responses: { 200: response } } },
+});
+
 describe('validateOpenApi — 3.2-only shapes', () => {
   const pathItem = {
     query: {
@@ -67,5 +71,37 @@ describe('validateOpenApi — 3.2-only shapes', () => {
     expect(() => validateOpenApi(docOf('3.1.0', { '/things': pathItem }))).toThrow(
       /schema validation failed/,
     );
+  });
+
+  const reservedHeader = responseWith({
+    description: 'ok',
+    headers: { 'X-Next': { schema: { type: 'string' }, allowReserved: true } },
+  });
+
+  it('accepts `allowReserved` on a response header under 3.2', () => {
+    expect(() => validateOpenApi(docOf('3.2.0', reservedHeader))).not.toThrow();
+  });
+
+  it('rejects that same header under 3.1', () => {
+    expect(() => validateOpenApi(docOf('3.1.0', reservedHeader))).toThrow(
+      /schema validation failed/,
+    );
+  });
+});
+
+// OAI/OpenAPI-Specification#4463 mis-spelled the Link Object's `server` as `body`
+// in the 3.1 schema until iteration 2025-09-15. Both series agree now; these pin it.
+describe('validateOpenApi — Link Object `server`', () => {
+  const linkedResponse = (link: Record<string, unknown>): Record<string, unknown> =>
+    responseWith({ description: 'ok', links: { next: link } });
+
+  it.each(OPENAPI_SERIES)('accepts a link carrying `server` under %s', (series) => {
+    const paths = linkedResponse({ operationId: 'get', server: { url: 'https://alt.example' } });
+    expect(() => validateOpenApi(docOf(`${series}.0`, paths))).not.toThrow();
+  });
+
+  it.each(OPENAPI_SERIES)('rejects a link carrying `body` under %s', (series) => {
+    const paths = linkedResponse({ operationId: 'get', body: { url: 'https://alt.example' } });
+    expect(() => validateOpenApi(docOf(`${series}.0`, paths))).toThrow(/schema validation failed/);
   });
 });
