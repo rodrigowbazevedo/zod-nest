@@ -121,6 +121,20 @@ describe.skipIf(queryMethod === undefined)('applyZodNest — QUERY under 3.2 (RF
     expect(() => validateOpenApi(doc)).not.toThrow();
   });
 
+  // `query` is first-class in 3.2 and the schema forbids `QUERY` as an
+  // additionalOperations key, so relocating it would emit an invalid document.
+  it('stays a first-class `query` key and is never relocated', async () => {
+    const doc = await bootstrap(QueryController, '3.2.0');
+    const paths: Record<string, unknown> = doc.paths;
+    const pathItem = paths['/query-things'];
+
+    if (pathItem === null || typeof pathItem !== 'object') {
+      throw new Error('no /query-things path item');
+    }
+    expect(Object.keys(pathItem)).toEqual(['query']);
+    expect('additionalOperations' in pathItem).toBe(false);
+  });
+
   // The whole point: 3.2 defines `query` as a path-item field, 3.1 does not.
   it('does not validate against the 3.1 schema', async () => {
     const doc = await bootstrap(QueryController, '3.1.0');

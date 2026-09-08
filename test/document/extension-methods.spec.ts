@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type { OpenAPIObject } from '@nestjs/swagger';
 
 import { applyZodNest, createZodDto, ZodResponse } from '../../src';
+import { validateOpenApi } from './openapi-validator.js';
 
 type RouteDecoratorFactory = (path?: string | string[]) => MethodDecorator;
 
@@ -59,7 +60,7 @@ const noopDecorator: MethodDecorator = () => undefined;
 class CriteriaDto extends createZodDto(z.object({ term: z.string() }), { id: 'Criteria' }) {}
 class HitDto extends createZodDto(z.object({ id: z.string() }), { id: 'Hit' }) {}
 
-const bootstrap = async (controller: Type<unknown>): Promise<OpenAPIObject> => {
+const bootstrap = async (controller: Type<unknown>, declared = '3.1.0'): Promise<OpenAPIObject> => {
   const moduleRef = await Test.createTestingModule({
     imports: [DiscoveryModule],
     controllers: [controller],
@@ -68,7 +69,7 @@ const bootstrap = async (controller: Type<unknown>): Promise<OpenAPIObject> => {
   await app.init();
   const raw = SwaggerModule.createDocument(
     app,
-    new DocumentBuilder().setTitle('t').setVersion('v').build(),
+    new DocumentBuilder().setTitle('t').setVersion('v').setOpenAPIVersion(declared).build(),
   );
   await app.close();
   return applyZodNest(raw);
@@ -147,5 +148,45 @@ describe.skipIf(queryMethod === undefined)('applyZodNest — QUERY routes (RFC 1
     const properties = recordAt(doc.components?.schemas, 'Hit', 'properties');
     expect(properties['x-zod-nest-dto']).toBeUndefined();
     expect(properties.id).toEqual({ type: 'string' });
+  });
+});
+
+describe('applyZodNest — SEARCH relocation under 3.2', () => {
+  @Controller('search-things')
+  class SearchController {
+    @Search()
+    @ZodResponse({ type: HitDto })
+    find(@Body() body: CriteriaDto): HitDto {
+      return { id: body.term };
+    }
+  }
+
+  it('stays an inline path-item key under 3.1', async () => {
+    const doc = await bootstrap(SearchController, '3.1.0');
+
+    expect(sortedKeys(recordAt(doc.paths, '/search-things'))).toEqual(['search']);
+  });
+
+  // Asserting the shape, not just validity: dropping the operation entirely
+  // would also produce a document the schema accepts.
+  it('moves under additionalOperations.SEARCH under 3.2, refs intact', async () => {
+    const doc = await bootstrap(SearchController, '3.2.0');
+    const pathItem = recordAt(doc.paths, '/search-things');
+
+    expect(sortedKeys(pathItem)).toEqual(['additionalOperations']);
+
+    const operation = recordAt(pathItem, 'additionalOperations', 'SEARCH');
+    expect(refAt(operation, 'requestBody', 'content', 'application/json', 'schema', '$ref')).toBe(
+      '#/components/schemas/Criteria',
+    );
+    expect(
+      refAt(operation, 'responses', '200', 'content', 'application/json', 'schema', '$ref'),
+    ).toBe('#/components/schemas/Hit');
+  });
+
+  it('validates against the vendored 3.2 schema', async () => {
+    const doc = await bootstrap(SearchController, '3.2.0');
+
+    expect(() => validateOpenApi(doc)).not.toThrow();
   });
 });

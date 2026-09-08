@@ -5,6 +5,7 @@ import type { CollectedUsage } from './collect-usage.js';
 import type { QueryParamStyle } from './expand-param-markers.js';
 
 import { defaultRegistry } from '../schema/registry.js';
+import { relocateExtensionOperations } from './additional-operations.js';
 import { bulkEmit } from './bulk-emit.js';
 import { collectUsage } from './collect-usage.js';
 import { assertNoDanglingRefs } from './dangling-refs.js';
@@ -111,6 +112,8 @@ export interface ApplyZodNestOptions {
  * - `doc.openapi` is normalised to a version zod-nest emits — the one set via
  *   `DocumentBuilder.setOpenAPIVersion()` when supported, else `'3.1.0'` with a
  *   warning, so the version string always matches the emitted body.
+ * - Targeting 3.2 additionally moves `search` / WebDAV operations under
+ *   `additionalOperations`, the only place that version accepts them.
  *
  * Composable with other doc-transform passes — apply other mutations before
  * or after this function.
@@ -143,7 +146,13 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {})
     applyRefTitles(doc);
   }
   assertNoDanglingRefs({ doc, collected: extended });
-  doc.openapi = resolveOpenApiVersion(doc);
+  // Resolved once — it both gates relocation and stamps the doc, and it warns
+  // on an unsupported version, so a second call would warn twice.
+  const openApiVersion = resolveOpenApiVersion(doc);
+  if (openApiVersion.startsWith('3.2.')) {
+    relocateExtensionOperations(doc);
+  }
+  doc.openapi = openApiVersion;
 
   return doc;
 };

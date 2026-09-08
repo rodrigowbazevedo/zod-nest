@@ -338,3 +338,61 @@ describe('collectUsage — input side + class→dtoId map', () => {
     expect(classToDtoId.size).toBe(0);
   });
 });
+
+// `additionalOperations` (OpenAPI 3.2) holds Operation Objects like any method
+// key. A document arriving with one — hand-authored, or from a caller pre-pass
+// — must have its refs collected, or the schemas get pruned as unreachable.
+describe('collectUsage — additionalOperations', () => {
+  it('collects input refs from an operation under additionalOperations', () => {
+    const doc = makeDoc({
+      paths: {
+        '/things': {
+          additionalOperations: {
+            SEARCH: {
+              requestBody: {
+                content: { 'application/json': { schema: { $ref: '#/components/schemas/Crit' } } },
+              },
+            },
+          },
+        },
+      },
+      components: { schemas: { Crit: markerSchema('Crit') } },
+    });
+
+    const { inputExposedIds } = collectUsage(doc, stubRegistry);
+
+    expect([...inputExposedIds]).toEqual(['Crit']);
+  });
+
+  it('collects output refs from an operation under additionalOperations', () => {
+    const doc = makeDoc({
+      paths: {
+        '/things': {
+          additionalOperations: {
+            SEARCH: {
+              responses: {
+                200: {
+                  content: { 'application/json': { schema: { $ref: '#/components/schemas/Hit' } } },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: { schemas: { Hit: markerSchema('Hit', 'output') } },
+    });
+
+    const { outputExposedIds } = collectUsage(doc, stubRegistry);
+
+    expect([...outputExposedIds]).toEqual(['Hit']);
+  });
+
+  it('ignores a non-object additionalOperations value', () => {
+    const doc = makeDoc({
+      paths: { '/things': { additionalOperations: 'nonsense' } },
+      components: { schemas: {} },
+    });
+
+    expect(() => collectUsage(doc, stubRegistry)).not.toThrow();
+  });
+});

@@ -3,7 +3,7 @@ import type { ZodNestRegistry } from '../schema/registry.js';
 
 import { isZodDtoMarker } from '../dto/marker.js';
 import { COMPONENTS_SCHEMAS_PREFIX, ZOD_NEST_DTO_EXTENSION } from '../schema/constants.js';
-import { HTTP_METHODS } from './http-methods.js';
+import { operationsOfPathItem } from './http-methods.js';
 import { walkRefs } from './walk-refs.js';
 
 export interface CollectedUsage {
@@ -73,22 +73,11 @@ const collectInputExposedIds = (
     if (!isPlainRecord(pathItem)) {
       continue;
     }
-    for (const operation of operationsOf(pathItem)) {
+    for (const operation of operationsOfPathItem(pathItem)) {
       collectRefsFromOperation(operation, classToDtoId, knownIds, ids);
     }
   }
   return ids;
-};
-
-const operationsOf = (pathItem: Record<string, unknown>): Record<string, unknown>[] => {
-  const out: Record<string, unknown>[] = [];
-  for (const method of HTTP_METHODS) {
-    const op = pathItem[method];
-    if (isPlainRecord(op)) {
-      out.push(op);
-    }
-  }
-  return out;
 };
 
 const collectRefsFromOperation = (
@@ -188,7 +177,7 @@ const collectOutputExposedIds = (
     if (!isPlainRecord(pathItem)) {
       continue;
     }
-    for (const operation of operationsOf(pathItem)) {
+    for (const operation of operationsOfPathItem(pathItem)) {
       collectRefsFromResponses(operation.responses, classToDtoId, knownIds, ids);
     }
   }
