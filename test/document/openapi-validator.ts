@@ -8,7 +8,7 @@ import type { OpenAPIObject } from '@nestjs/swagger';
 import type { ValidateFunction } from 'ajv';
 
 const SCHEMA_FILES = {
-  '3.1': '3.1-2025-02-13.json',
+  '3.1': '3.1-2025-09-15.json',
   '3.2': '3.2-2025-09-17.json',
 } as const;
 

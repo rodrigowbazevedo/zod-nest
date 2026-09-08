@@ -335,4 +335,45 @@ describe('OpenAPI 3.1 conformance', () => {
       await app.close();
     }
   });
+
+  // Nothing inspects these on the way through, so the only guard is that both
+  // series accept the same Link and Header Objects. Pin that they still do.
+  it('validates response `headers` and `links` forwarded from the description object', async () => {
+    const userSchema = z.object({ id: z.uuid() }).meta({ id: 'ConformLinkedUser' });
+    class ConformLinkedUserDto extends createZodDto(userSchema) {}
+
+    @Controller('users')
+    class UsersController {
+      @Get(':id')
+      @ZodResponse({
+        type: ConformLinkedUserDto,
+        description: {
+          description: 'the user',
+          headers: { 'X-Rate-Limit': { schema: { type: 'integer' } } },
+          links: {
+            address: { operationId: 'getAddress', server: { url: 'https://alt.example' } },
+          },
+        },
+      })
+      findOne(): ConformLinkedUserDto {
+        return { id: '00000000-0000-4000-8000-000000000000' };
+      }
+    }
+
+    const { app, doc } = await bootstrap([UsersController]);
+    try {
+      expect(doc.paths['/users/{id}']?.get?.responses).toMatchObject({
+        200: {
+          headers: { 'X-Rate-Limit': { schema: { type: 'integer' } } },
+          links: {
+            address: { operationId: 'getAddress', server: { url: 'https://alt.example' } },
+          },
+        },
+      });
+      expect(() => validateOpenApi(doc)).not.toThrow();
+      expect(() => validateOpenApi({ ...doc, openapi: '3.2.0' })).not.toThrow();
+    } finally {
+      await app.close();
+    }
+  });
 });

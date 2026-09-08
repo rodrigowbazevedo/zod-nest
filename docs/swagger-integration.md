@@ -169,6 +169,15 @@ identical, so your component bodies are byte-for-byte the same either way. Three
 Keep 3.1 if your toolchain is 3.1-only; Swagger UI, Swagger Editor and Redocly all support 3.2,
 but coverage across generators is still uneven.
 
+Everything else in the document is version-neutral, **including the two objects `zod-nest` forwards
+without inspecting them** — the `headers` and `links` a user hands to
+[`@ZodResponse({ description })`](responses.md#response-headers-and-links). The Link Object is
+identical in both versions, and 3.2's Header Object is a strict superset of 3.1's. So a passthrough
+payload that validates as 3.1 still validates as 3.2; switching versions can never invalidate one.
+
+Only the reverse can bite, and only if you opt into a 3.2 feature: `allowReserved` on a header, and
+`example` / `examples` on a `content`-based header, are 3.2-only and fail a 3.1 validator.
+
 ### Sequential media types (`itemSchema`)
 
 3.1 has one field for a response body — `schema` — so a streamed endpoint documents its event DTO
