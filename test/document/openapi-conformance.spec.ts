@@ -1,6 +1,5 @@
 import 'reflect-metadata';
 
-import SwaggerParser from '@apidevtools/swagger-parser';
 import { Body, Controller, Get, Post, Query, Type, UseInterceptors } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -23,10 +22,11 @@ import {
   fastifyMultipartFile,
   ZodMultipart as ZodMultipartFastify,
 } from '../../src/fastify/index.js';
+import { validateOpenApi } from './openapi-validator.js';
 
-// OpenAPI 3.1 conformance check. The validator catches anything that drifts
-// from the 3.1 schema (invalid $refs, malformed schema objects, missing
-// required fields), so any change in `applyZodNest` that produces an
+// OpenAPI conformance check against the vendored official schemas. Catches
+// anything that drifts from the spec (invalid $refs, malformed schema objects,
+// missing required fields), so any change in `applyZodNest` that produces an
 // invalid doc fails this suite.
 
 const bootstrap = async (
@@ -39,9 +39,7 @@ const bootstrap = async (
   const app = moduleRef.createNestApplication({ logger: false });
   await app.init();
   // `.setOpenAPIVersion('3.1.0')` is the canonical way to tell NestJS that
-  // the doc body is OpenAPI 3.1 — otherwise DocumentBuilder defaults to
-  // '3.0.0' and swagger-parser validates against the 3.0 schema, which
-  // (rightly) rejects 3.1-only features in the body emitted by zod-nest.
+  // the doc body is OpenAPI 3.1 — otherwise DocumentBuilder defaults to '3.0.0'.
   const config = new DocumentBuilder()
     .setTitle('conformance')
     .setVersion('0.0.0')
@@ -51,13 +49,6 @@ const bootstrap = async (
   const doc = applyZodNest(raw);
   return { app, doc };
 };
-
-// SwaggerParser.validate accepts an `unknown`-typed doc structurally; it
-// reads `openapi: '3.1.x'` and runs the matching JSON Schema validator.
-// We pass a deep-clone so the parser's internal $ref dereferencing
-// doesn't mutate the doc the caller asserts on later.
-const validate = async (doc: OpenAPIObject): Promise<unknown> =>
-  SwaggerParser.validate(JSON.parse(JSON.stringify(doc)) as never);
 
 describe('OpenAPI 3.1 conformance', () => {
   it('validates a minimal single-DTO + single-response handler', async () => {
@@ -76,7 +67,7 @@ describe('OpenAPI 3.1 conformance', () => {
     const { app, doc } = await bootstrap([UsersController]);
     try {
       expect(doc.openapi).toBe('3.1.0');
-      await expect(validate(doc)).resolves.toBeDefined();
+      expect(() => validateOpenApi(doc)).not.toThrow();
     } finally {
       await app.close();
     }
@@ -107,7 +98,7 @@ describe('OpenAPI 3.1 conformance', () => {
     const { app, doc } = await bootstrap([UploadsController]);
     try {
       expect(doc.openapi).toBe('3.1.0');
-      await expect(validate(doc)).resolves.toBeDefined();
+      expect(() => validateOpenApi(doc)).not.toThrow();
     } finally {
       await app.close();
     }
@@ -130,7 +121,7 @@ describe('OpenAPI 3.1 conformance', () => {
 
     const { app, doc } = await bootstrap([NamedUploadsController]);
     try {
-      await expect(validate(doc)).resolves.toBeDefined();
+      expect(() => validateOpenApi(doc)).not.toThrow();
     } finally {
       await app.close();
     }
@@ -155,7 +146,7 @@ describe('OpenAPI 3.1 conformance', () => {
 
     const { app, doc } = await bootstrap([CompositeUploadsController]);
     try {
-      await expect(validate(doc)).resolves.toBeDefined();
+      expect(() => validateOpenApi(doc)).not.toThrow();
     } finally {
       await app.close();
     }
@@ -176,7 +167,7 @@ describe('OpenAPI 3.1 conformance', () => {
 
     const { app, doc } = await bootstrap([DocumentsController]);
     try {
-      await expect(validate(doc)).resolves.toBeDefined();
+      expect(() => validateOpenApi(doc)).not.toThrow();
     } finally {
       await app.close();
     }
@@ -209,7 +200,7 @@ describe('OpenAPI 3.1 conformance', () => {
 
     const { app, doc } = await bootstrap([UsersController]);
     try {
-      await expect(validate(doc)).resolves.toBeDefined();
+      expect(() => validateOpenApi(doc)).not.toThrow();
     } finally {
       await app.close();
     }
@@ -252,7 +243,7 @@ describe('OpenAPI 3.1 conformance', () => {
       expect(admin.type).toBe('object');
       expect(admin.allOf).toBeDefined();
       expect(admin.unevaluatedProperties).toBe(false);
-      await expect(validate(doc)).resolves.toBeDefined();
+      expect(() => validateOpenApi(doc)).not.toThrow();
     } finally {
       await app.close();
     }
@@ -263,7 +254,7 @@ describe('OpenAPI 3.1 conformance', () => {
   // emitted `$id: "#/components/schemas/SortDirection"` into the SortDirection
   // body. Swagger UI's strict resolver re-anchored ref lookups against the
   // leaf schema and reported "Could not resolve reference" for every named
-  // component. `SwaggerParser.validate` is more permissive but the doc
+  // component. The schema validator is more permissive but the doc
   // shouldn't carry those internal fields in the first place.
   it('strips `$id` / `$schema` from named components referenced by a @Query() DTO property', async () => {
     const SortDirection = z
@@ -288,8 +279,8 @@ describe('OpenAPI 3.1 conformance', () => {
 
     const { app, doc } = await bootstrap([ItemsController]);
     try {
-      // SwaggerParser validates the 3.1 doc end-to-end.
-      await expect(validate(doc)).resolves.toBeDefined();
+      // The vendored 3.1 schema validates the doc end-to-end.
+      expect(() => validateOpenApi(doc)).not.toThrow();
 
       // The named-component body has no JSON Schema dialect metadata.
       const sortDirection = (doc.components?.schemas as Record<string, Record<string, unknown>>)
