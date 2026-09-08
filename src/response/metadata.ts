@@ -22,12 +22,14 @@ export type ResponseStatusWildcard = '1XX' | '2XX' | '3XX' | '4XX' | '5XX';
  * Description payload accepted by `@ZodResponse(...)` and passed through to
  * `applyZodNest`'s `@ApiResponse(...)` emitter. String form is shorthand for
  * `{ description }`; the object form lets users declare OpenAPI response
- * `headers` / `links` alongside the description.
+ * `summary` / `headers` / `links` alongside the description.
  */
 export type ZodResponseDescription =
   | string
   | {
       description: string;
+      /** 3.2-only. `applyZodNest` drops it, with a warning, when emitting 3.1. */
+      summary?: string;
       headers?: Record<string, unknown>;
       links?: Record<string, unknown>;
     };

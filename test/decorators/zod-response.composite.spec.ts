@@ -14,6 +14,7 @@ interface ApiResponseMeta {
     isArray?: boolean;
     schema?: { type?: string; prefixItems?: { $ref: string }[]; items?: false };
     description?: string;
+    summary?: string;
     headers?: Record<string, unknown>;
     links?: Record<string, unknown>;
   };
@@ -79,6 +80,17 @@ class Controller {
     },
   })
   descWithHeaders(): void {}
+
+  @Get('desc-summary')
+  @ZodResponse({
+    status: HttpStatus.OK,
+    type: UserDto,
+    description: {
+      description: 'with summary',
+      summary: 'A short summary',
+    },
+  })
+  descWithSummary(): void {}
 
   @Get('desc-links')
   @ZodResponse({
@@ -161,8 +173,15 @@ describe('@ZodResponse — composite swagger application', () => {
   it('accepts the description object form (description only)', () => {
     const meta = apiResponseMeta(Controller.prototype.descObjectOnly);
     expect(meta?.['200']?.description).toBe('object form');
+    expect(meta?.['200']?.summary).toBeUndefined();
     expect(meta?.['200']?.headers).toBeUndefined();
     expect(meta?.['200']?.links).toBeUndefined();
+  });
+
+  it('passes summary through when set on the description object', () => {
+    const meta = apiResponseMeta(Controller.prototype.descWithSummary);
+    expect(meta?.['200']?.description).toBe('with summary');
+    expect(meta?.['200']?.summary).toBe('A short summary');
   });
 
   it('passes headers through when set on the description object', () => {
