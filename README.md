@@ -1,19 +1,19 @@
 # zod-nest
 
-> Modern **Zod v4** ↔ **NestJS** ↔ **OpenAPI 3.1** integration.
+> Modern **Zod v4** ↔ **NestJS** ↔ **OpenAPI 3.1 / 3.2** integration.
 
 [![npm](https://img.shields.io/npm/v/zod-nest)](https://www.npmjs.com/package/zod-nest)
 [![CI](https://github.com/rodrigowbazevedo/zod-nest/actions/workflows/ci.yml/badge.svg)](https://github.com/rodrigowbazevedo/zod-nest/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/rodrigowbazevedo/zod-nest/branch/main/graph/badge.svg)](https://codecov.io/gh/rodrigowbazevedo/zod-nest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Define your DTOs once with Zod, get validated request bodies, validated response bodies, and a correct OpenAPI 3.1 document — without the dual-codepath, post-process, or `@ts-ignore` baggage that comes with bolting Zod onto class-validator-shaped tooling.
+Define your DTOs once with Zod, get validated request bodies, validated response bodies, and a correct OpenAPI 3.1 or 3.2 document — without the dual-codepath, post-process, or `@ts-ignore` baggage that comes with bolting Zod onto class-validator-shaped tooling.
 
 ## Why this exists
 
 `zod-nest` is a fresh take on the idea pioneered by [`nestjs-zod`](https://github.com/BenLorantfy/nestjs-zod) — many thanks to that project and its maintainers; this library would not exist without it.
 
-The difference is that `zod-nest` is Zod v4 only and OpenAPI 3.1 only. It drops `class-validator` / `class-transformer` coexistence, drops Zod v3 codepaths, drops `cleanupOpenApiDoc` as a separate post-process, and drops the 20-odd `@ts-ignore`s that the dual-version approach required. The result is a smaller surface, fully type-safe end to end, with extension points where you actually need them — exception factories, response status resolution, custom emission overrides.
+The difference is that `zod-nest` is Zod v4 only and OpenAPI 3.1+ only (3.1 or 3.2; no 3.0). It drops `class-validator` / `class-transformer` coexistence, drops Zod v3 codepaths, drops `cleanupOpenApiDoc` as a separate post-process, and drops the 20-odd `@ts-ignore`s that the dual-version approach required. The result is a smaller surface, fully type-safe end to end, with extension points where you actually need them — exception factories, response status resolution, custom emission overrides.
 
 For the long-form motivation, see [`docs/why-this-exists.md`](docs/why-this-exists.md).
 
@@ -42,7 +42,7 @@ A short list of behavioural differences you'll hit on day one. Full migration ta
 - **Multi-status `@ZodResponse`** — stack the decorator per status code. In `nestjs-zod`, multi-status required mixing `@ZodSerializerDto` with hand-rolled `@ApiResponse({ status: ... })` calls.
 - **No internal `@HttpCode`** — `@ZodResponse` does **not** call `@HttpCode` under the hood. Status resolution precedence: `@ZodResponse({ status })` → `@HttpCode(...)` on the handler → method default (`POST → 201`, others → `200`). The caller controls `201` vs `200` vs `204` via standard NestJS decorators. `status` accepts numeric codes plus the OpenAPI 3.1 range keys (`'1XX'`…`'5XX'`) and `'default'` (sugar for the resolved method default).
 - **I/O suffix only when needed** — `<Id>Output` is only emitted when the input and output JSON Schemas actually differ. `nestjs-zod` always emitted `_Output`.
-- **OpenAPI 3.1 only** — no `3.0` fallback. `$ref`s emit to the final location; `cleanupOpenApiDoc` is unnecessary.
+- **OpenAPI 3.1 and 3.2** — no `3.0` fallback. Pick with `DocumentBuilder.setOpenAPIVersion('3.2.0')`; 3.2 is what makes `QUERY` routes conformant. `$ref`s emit to the final location; `cleanupOpenApiDoc` is unnecessary.
 - **Validation-failure logging out of the box** — `nestjs-zod` has none.
 - **Customizable serialization exception** — both `ZodValidationPipe` and `ZodSerializerInterceptor` accept a factory. `nestjs-zod` only customized the input side.
 - **DTO discriminator** — `Symbol.for('zod-nest.dto')` (cross-realm safe), not `MyDto.isZodDto`.
