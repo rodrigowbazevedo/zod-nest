@@ -70,3 +70,28 @@ describe('forEachOperation', () => {
     expect(seen).toEqual(['find']);
   });
 });
+
+describe('forEachOperation — additionalOperations (OpenAPI 3.2)', () => {
+  it('visits operations nested under additionalOperations', () => {
+    const seen = visitedOperationIds({
+      get: { operationId: 'list' },
+      additionalOperations: { SEARCH: { operationId: 'find' }, PURGE: { operationId: 'purge' } },
+    });
+
+    expect([...seen].sort()).toEqual(['find', 'list', 'purge']);
+  });
+
+  it('ignores a non-object value inside additionalOperations', () => {
+    const seen = visitedOperationIds({
+      additionalOperations: { SEARCH: { operationId: 'find' }, BROKEN: 'not-an-operation' },
+    });
+
+    expect(seen).toEqual(['find']);
+  });
+
+  it('ignores a non-object additionalOperations', () => {
+    expect(visitedOperationIds({ get: { operationId: 'list' }, additionalOperations: 7 })).toEqual([
+      'list',
+    ]);
+  });
+});

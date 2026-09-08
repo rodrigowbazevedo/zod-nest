@@ -104,6 +104,17 @@ describe('relocateExtensionOperations', () => {
     expect('additionalOperations' in pathItemOf(doc)).toBe(false);
   });
 
+  it('skips a non-object path item', () => {
+    const doc = {
+      openapi: '3.2.0',
+      info: { title: 't', version: 'v' },
+      paths: { '/broken': null, '/things': { search: operation('find') } },
+    } as unknown as OpenAPIObject;
+
+    expect(() => relocateExtensionOperations(doc)).not.toThrow();
+    expect(pathItemOf(doc).additionalOperations).toEqual({ SEARCH: operation('find') });
+  });
+
   it('leaves a document with no paths alone', () => {
     const doc = {
       openapi: '3.2.0',
