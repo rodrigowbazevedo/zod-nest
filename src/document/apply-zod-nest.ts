@@ -12,6 +12,7 @@ import { expandParamMarkers } from './expand-param-markers.js';
 import { extendExposureViaRefs } from './expose-closure.js';
 import { inlineAnonymousBodies } from './inline-anon.js';
 import { mergeSchemas } from './merge-schemas.js';
+import { resolveOpenApiVersion } from './openapi-version.js';
 import { applyRefTitles } from './ref-titles.js';
 import { rewriteRefs } from './rewrite-refs.js';
 import { stripMarkers } from './strip-markers.js';
@@ -35,8 +36,6 @@ const withForcedExposure = (
     classToDtoId: collected.classToDtoId,
   };
 };
-
-const OPENAPI_VERSION = '3.1.0';
 
 export interface ApplyZodNestOptions {
   /**
@@ -109,9 +108,9 @@ export interface ApplyZodNestOptions {
  *   as a `{ $ref, title }` sibling (`applyRefTitles`, unless `refTitles: false`)
  *   so Swagger UI's 3.1 renderer surfaces the component name. Inert annotation.
  * - Every `$ref` whose target is missing throws `ZodNestDocumentError(DANGLING_REF)`.
- * - `doc.openapi` is set to `'3.1.0'` — zod-nest emits OpenAPI 3.1 only; this
- *   guarantees the version string matches the emitted body regardless of the
- *   `DocumentBuilder` configuration on the caller side.
+ * - `doc.openapi` is normalised to a version zod-nest emits — the one set via
+ *   `DocumentBuilder.setOpenAPIVersion()` when supported, else `'3.1.0'` with a
+ *   warning, so the version string always matches the emitted body.
  *
  * Composable with other doc-transform passes — apply other mutations before
  * or after this function.
@@ -144,7 +143,7 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {})
     applyRefTitles(doc);
   }
   assertNoDanglingRefs({ doc, collected: extended });
-  doc.openapi = OPENAPI_VERSION;
+  doc.openapi = resolveOpenApiVersion(doc);
 
   return doc;
 };

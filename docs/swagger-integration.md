@@ -97,11 +97,52 @@ class UsersController {
 Because `QUERY` is safe, an omitted `@ZodResponse({ status })` resolves to `200` rather than `POST`'s
 `201` — see [Status resolution precedence](responses.md#status-resolution-precedence).
 
-> **Conformance caveat.** `query` became a path-item field in OpenAPI **3.2**; it is not valid 3.1,
-> and step 10 pins `doc.openapi` to `'3.1.0'`. `zod-nest` emits the operation NestJS actually routed
-> rather than dropping it, so the document describes your API correctly but a strict 3.1 validator
-> will reject the `query` key. Swagger UI renders it. The same applies to `search` and the WebDAV
-> methods, which have never been 3.1 fields either.
+`query` is a path-item field in OpenAPI **3.2** but not in 3.1, so a QUERY route only validates
+against a strict checker when the document is emitted as 3.2 — see
+[OpenAPI version](#openapi-version).
+
+> **Still not conformant: `search` and WebDAV.** 3.2 promoted only `query`. `search`, `propfind`,
+> `mkcol` and friends are path-item fields in neither version, so `zod-nest` emits the operation
+> NestJS actually routed and a strict validator rejects the key under 3.1 **and** 3.2. The document
+> describes your API correctly and Swagger UI renders it. 3.2 provides `additionalOperations` as the
+> conformant home for these; adopting it is tracked separately.
+
+## OpenAPI version
+
+`applyZodNest` normalises `doc.openapi` so the version string always matches the body it emitted.
+It reads whatever `DocumentBuilder` declared:
+
+```ts
+const config = new DocumentBuilder().setOpenAPIVersion('3.2.0').build();
+const document = applyZodNest(SwaggerModule.createDocument(app, config));
+```
+
+| Declared on the document              | Emitted        | Warns |
+| ------------------------------------- | -------------- | ----- |
+| any `3.1.x` (e.g. `'3.1.0'`, `3.1.1`) | declared value | no    |
+| any `3.2.x`                           | declared value | no    |
+| nothing                               | `'3.1.0'`      | no    |
+| anything else (incl. `'3.0.0'`)       | `'3.1.0'`      | yes   |
+
+A supported version is passed through **verbatim**, not normalised — the accepted shape mirrors the
+`^3\.1\.\d+(-.+)?$` pattern the OpenAPI schemas enforce themselves, so every patch and
+pre-release they accept is accepted here and your declared string stays accurate.
+
+> **You will see the warning unless you call the setter.** `DocumentBuilder` stamps `'3.0.0'` when
+> `setOpenAPIVersion()` is never called, and `zod-nest` does not emit 3.0 — so the common case of
+> never touching the setter warns and emits 3.1. Call `.setOpenAPIVersion('3.1.0')` to silence it.
+> This is deliberate: silently turning a declared `3.0.0` into a 3.1 body is exactly the mismatch
+> the warning exists to surface.
+
+OpenAPI 3.2 is a **minor, fully backward-compatible** revision of 3.1 — the version tag moves
+without changing how schemas are validated. For a document `zod-nest` emits, nothing but the
+version string differs, with one exception that is the whole reason to choose it: 3.2 defines
+`query` as a path-item field ([RFC 10008](https://www.rfc-editor.org/info/rfc10008/), routed by
+NestJS 12+ as `@QueryMethod()`) and 3.1 does not. A QUERY route therefore fails strict 3.1
+validation and passes under 3.2.
+
+Keep 3.1 if your toolchain is 3.1-only; Swagger UI, Swagger Editor and Redocly all support 3.2,
+but coverage across generators is still uneven.
 
 ## `$ref` titles (Swagger UI 3.1)
 

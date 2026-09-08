@@ -135,7 +135,7 @@ If your codebase still uses Zod v3 APIs, work through Zod's own [v3-to-v4 migrat
   SwaggerModule.setup('docs', app, doc);
 ```
 
-`applyZodNest` always emits OpenAPI 3.1 — there's no version flag. It takes no required arguments — `applyZodNest(doc)` is the whole call. (zod-nest v1 required an `{ app }` argument; v2 removed it — output-side DTO usage is now read from the document's `responses`.)
+`applyZodNest` emits the version you set with `DocumentBuilder.setOpenAPIVersion()` — any `3.1.x` or `3.2.x` passes through verbatim, and anything else falls back to `3.1.0` with a warning. 3.2 is a backward-compatible superset, needed only if you route `QUERY`. There's still no 3.0 path. It takes no required arguments — `applyZodNest(doc)` is the whole call. (zod-nest v1 required an `{ app }` argument; v2 removed it — output-side DTO usage is now read from the document's `responses`.)
 
 If you served OpenAPI 3.0 from `nestjs-zod`, you'll need a downgrade pass _after_ `applyZodNest`. There are good standalone tools (e.g. `openapi-down-convert`) for this.
 
