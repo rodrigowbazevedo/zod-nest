@@ -1,3 +1,10 @@
+# [3.5.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.4.0...v3.5.0) (2026-09-08)
+
+
+### Features
+
+* emit OpenAPI 3.2 itemSchema for sequential media types ([#173](https://github.com/rodrigowbazevedo/zod-nest/issues/173)) ([47a8b4a](https://github.com/rodrigowbazevedo/zod-nest/commit/47a8b4adfe41bc2c84f2a6ccb82365d0b31fa0b8)), closes [#168](https://github.com/rodrigowbazevedo/zod-nest/issues/168)
+
 # [3.4.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.3.0...v3.4.0) (2026-09-08)
 
 
