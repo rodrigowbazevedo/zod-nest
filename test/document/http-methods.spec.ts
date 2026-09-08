@@ -1,6 +1,11 @@
 import type { OpenAPIObject } from '@nestjs/swagger';
 
-import { forEachOperation, HTTP_METHODS } from '../../src/document/http-methods.js';
+import {
+  forEachOperation,
+  HTTP_METHODS,
+  operationEntriesOfPathItem,
+  operationsOfPathItem,
+} from '../../src/document/http-methods.js';
 
 const docOf = (pathItem: Record<string, unknown>): OpenAPIObject =>
   ({
@@ -93,5 +98,58 @@ describe('forEachOperation — additionalOperations (OpenAPI 3.2)', () => {
     expect(visitedOperationIds({ get: { operationId: 'list' }, additionalOperations: 7 })).toEqual([
       'list',
     ]);
+  });
+});
+
+describe('operationEntriesOfPathItem', () => {
+  it('pairs each operation with the method naming it', () => {
+    const entries = operationEntriesOfPathItem({
+      get: { operationId: 'list' },
+      query: { operationId: 'find' },
+      additionalOperations: { SEARCH: { operationId: 'legacyFind' } },
+    });
+
+    expect(entries.map((entry) => [entry.method, entry.operation.operationId]).sort()).toEqual([
+      ['SEARCH', 'legacyFind'],
+      ['get', 'list'],
+      ['query', 'find'],
+    ]);
+  });
+
+  it('backs `operationsOfPathItem`, which still yields bare operations', () => {
+    const pathItem = {
+      get: { operationId: 'list' },
+      additionalOperations: { SEARCH: { operationId: 'legacyFind' } },
+    };
+
+    expect(operationsOfPathItem(pathItem)).toEqual(
+      operationEntriesOfPathItem(pathItem).map((entry) => entry.operation),
+    );
+  });
+});
+
+describe('forEachOperation — operation context', () => {
+  it('reports the path and method of every operation it visits', () => {
+    const seen: string[] = [];
+    forEachOperation(
+      docOf({ get: { operationId: 'list' }, query: { operationId: 'find' } }),
+      (_op, { path, method }) => {
+        seen.push(`${method} ${path}`);
+      },
+    );
+
+    expect([...seen].sort()).toEqual(['get /things', 'query /things']);
+  });
+
+  it('reports the uppercased key as the method for additionalOperations', () => {
+    const seen: string[] = [];
+    forEachOperation(
+      docOf({ additionalOperations: { SEARCH: { operationId: 'find' } } }),
+      (_op, { path, method }) => {
+        seen.push(`${method} ${path}`);
+      },
+    );
+
+    expect(seen).toEqual(['SEARCH /things']);
   });
 });

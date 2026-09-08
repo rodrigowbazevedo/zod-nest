@@ -157,7 +157,7 @@ pre-release they accept is accepted here and your declared string stays accurate
 
 OpenAPI 3.2 is a **minor, fully backward-compatible** revision of 3.1 — the version tag moves
 without changing how schemas are validated, and the Schema Object dialect (JSON Schema 2020-12) is
-identical, so your component bodies are byte-for-byte the same either way. Three things in a
+identical, so your component bodies are byte-for-byte the same either way. Four things in a
 `zod-nest` document do differ, and they are the reasons to choose 3.2:
 
 | Under 3.2                                                              | Under 3.1                                             |
@@ -165,15 +165,23 @@ identical, so your component bodies are byte-for-byte the same either way. Three
 | `query` is a path-item field ([RFC 10008](https://www.rfc-editor.org/info/rfc10008/), routed by NestJS 12+ as `@QueryMethod()`) | no such field — a QUERY route fails strict validation |
 | `search` / WebDAV operations live under `additionalOperations`          | no conformant home — see [below](#search-and-the-webdav-methods) |
 | SSE / NDJSON responses use `itemSchema`                                 | `schema`, which overstates a stream as a single body  |
+| Response Object `summary` is emitted                                    | no such field — each one is dropped, with a warning   |
 
 Keep 3.1 if your toolchain is 3.1-only; Swagger UI, Swagger Editor and Redocly all support 3.2,
 but coverage across generators is still uneven.
 
 Everything else in the document is version-neutral, **including the two objects `zod-nest` forwards
 without inspecting them** — the `headers` and `links` a user hands to
-[`@ZodResponse({ description })`](responses.md#response-headers-and-links). The Link Object is
-identical in both versions, and 3.2's Header Object is a strict superset of 3.1's. So a passthrough
-payload that validates as 3.1 still validates as 3.2; switching versions can never invalidate one.
+[`@ZodResponse({ description })`](responses.md#response-summary-headers-and-links). The Link Object
+is identical in both versions, and 3.2's Header Object is a strict superset of 3.1's. So a
+passthrough payload that validates as 3.1 still validates as 3.2; switching versions can never
+invalidate one.
+
+The `summary` on that same object is the sole exception: it rides the `description` object beside
+`headers` and `links`, but 3.2 added it to the Response Object and 3.1 forbids it. Targeting 3.1
+therefore drops each one and warns, naming the operation and status, rather than emitting a
+non-conformant document. `description` stays required in that object form regardless — 3.2 relaxed
+it, but keeping it means a `zod-nest` response body is valid under both versions.
 
 Only the reverse can bite, and only if you opt into a 3.2 feature: `allowReserved` on a header, and
 `example` / `examples` on a `content`-based header, are 3.2-only and fail a 3.1 validator.

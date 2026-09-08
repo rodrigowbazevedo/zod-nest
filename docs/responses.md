@@ -164,10 +164,10 @@ Tuple variants also apply `@ApiExtraModels(...slotDtos)` so each tuple-slot DTO 
 
 The `application/json` media-type key above is the default. Pass `contentType` (or declare a stream-typed `@Header('Content-Type', …)`) to emit the response under a different media type — see [Streaming responses](#streaming-responses-contenttype--stream).
 
-### Response `headers` and `links`
+### Response `summary`, `headers` and `links`
 
-`description` takes a string or an object. The object form carries the two OpenAPI response fields
-that have nothing to do with the body — `headers` and `links`:
+`description` takes a string or an object. The object form carries the OpenAPI response fields that
+have nothing to do with the body — a short `summary`, plus `headers` and `links`:
 
 ```ts
 @Get(':id')
@@ -175,6 +175,7 @@ that have nothing to do with the body — `headers` and `links`:
   type: UserDto,
   description: {
     description: 'the user',
+    summary: 'One user', // 3.2 only — see below
     headers: { 'X-Rate-Limit': { schema: { type: 'integer' } } },
     links: {
       address: {
@@ -188,15 +189,33 @@ that have nothing to do with the body — `headers` and `links`:
 findOne(@Param('id') id: string): UserDto {}
 ```
 
-Both are typed `Record<string, unknown>` and **forwarded to `@ApiResponse` untouched**. `zod-nest`
-never inspects, validates or rewrites them — the payload you write is the payload the document
-carries, so a malformed Header or Link Object reaches your consumers unflagged. Validate the emitted
-document if that matters to you; `zod-nest` does not do it at runtime.
+`headers` and `links` are typed `Record<string, unknown>` and **forwarded to `@ApiResponse`
+untouched**. `zod-nest` never inspects, validates or rewrites them — the payload you write is the
+payload the document carries, so a malformed Header or Link Object reaches your consumers unflagged.
+Validate the emitted document if that matters to you; `zod-nest` does not do it at runtime.
 
 The typing is deliberately loose so 3.1 / 3.2 / extension shapes pass without a cast. Both objects
 are version-safe in the direction that matters: **anything valid under 3.1 is valid under 3.2**. See
 [OpenAPI version](swagger-integration.md#openapi-version) for the two 3.2-only header fields that do
 _not_ travel backwards.
+
+> **`summary` is the one field here that is not version-neutral.** OpenAPI 3.2 added it to the
+> Response Object; 3.1 has no such field and rejects it. So `summary` is the exception to the rule
+> above — it does _not_ travel backwards. When the document targets 3.1, `applyZodNest` drops every
+> `summary` and warns once per affected response, naming the operation and status:
+>
+> ```
+> [zod-nest] Dropped `summary` from `GET /users/{id}` response `200`: OpenAPI 3.1 has no
+> Response Object `summary` field. Declare 3.2 via
+> `DocumentBuilder.setOpenAPIVersion('3.2.0')` to emit it.
+> ```
+>
+> The drop keeps the emitted document conformant rather than shipping a field 3.1 forbids. It is not
+> rejected at decoration time because `@ZodResponse` runs long before `DocumentBuilder` has declared
+> a version — the version is only known when `applyZodNest` finishes. Declare 3.2 to keep the field.
+>
+> `description` stays **required** in the object form even though 3.2 dropped it from its own
+> required list, so a `zod-nest` response is always valid under both versions.
 
 > **A link's alternate server is `server`, not `body`.** The Link Object is identical in 3.1 and 3.2
 > — `body` has never been a field in either. It appears only in the official 3.1 JSON Schema before

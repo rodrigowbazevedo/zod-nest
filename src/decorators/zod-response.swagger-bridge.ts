@@ -28,6 +28,7 @@ interface TupleSchema {
 
 interface DescriptionFields {
   description?: string;
+  summary?: string;
   headers?: Record<string, unknown>;
   links?: Record<string, unknown>;
 }
@@ -40,6 +41,9 @@ const extractDescriptionFields = (desc: ZodResponseDescription | undefined): Des
     return { description: desc };
   }
   const out: DescriptionFields = { description: desc.description };
+  if (desc.summary !== undefined) {
+    out.summary = desc.summary;
+  }
   if (desc.headers !== undefined) {
     out.headers = desc.headers;
   }

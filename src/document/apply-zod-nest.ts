@@ -16,6 +16,7 @@ import { applyItemSchema } from './item-schema.js';
 import { mergeSchemas } from './merge-schemas.js';
 import { resolveOpenApiVersion } from './openapi-version.js';
 import { applyRefTitles } from './ref-titles.js';
+import { applyResponseSummary } from './response-summary.js';
 import { rewriteRefs } from './rewrite-refs.js';
 import { stripMarkers } from './strip-markers.js';
 
@@ -117,6 +118,8 @@ export interface ApplyZodNestOptions {
  *   `additionalOperations`, the only place that version accepts them, and
  *   rewrites `schema` to `itemSchema` on sequential media types (SSE, NDJSON, …)
  *   so a streamed body documents one item rather than the whole sequence.
+ * - Response Object `summary` survives only under 3.2; emitting 3.1 drops each
+ *   one with a warning naming the operation, since 3.1 forbids the field.
  *
  * Composable with other doc-transform passes — apply other mutations before
  * or after this function.
@@ -152,10 +155,12 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {})
   // Resolved once — it both gates relocation and stamps the doc, and it warns
   // on an unsupported version, so a second call would warn twice.
   const openApiVersion = resolveOpenApiVersion(doc);
-  if (openApiVersion.startsWith('3.2.')) {
+  const emitThirtyTwo = openApiVersion.startsWith('3.2.');
+  if (emitThirtyTwo) {
     relocateExtensionOperations(doc);
   }
-  applyItemSchema(doc, { emit: openApiVersion.startsWith('3.2.') });
+  applyItemSchema(doc, { emit: emitThirtyTwo });
+  applyResponseSummary(doc, { emit: emitThirtyTwo });
   doc.openapi = openApiVersion;
 
   return doc;
