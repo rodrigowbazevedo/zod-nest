@@ -2,7 +2,7 @@ import type { OpenAPIObject } from '@nestjs/swagger';
 
 import { COMPONENTS_SCHEMAS_PREFIX } from '../schema/constants.js';
 import { OUTPUT_SUFFIX } from './constants.js';
-import { HTTP_METHODS } from './http-methods.js';
+import { operationsOfPathItem } from './http-methods.js';
 import { walkRefs } from './walk-refs.js';
 
 export interface RewriteRefsParams {
@@ -63,12 +63,8 @@ const rewriteResponseSubtree = (
   pathItem: Record<string, unknown>,
   divergentOutputIds: ReadonlySet<string>,
 ): void => {
-  for (const method of HTTP_METHODS) {
-    const op = pathItem[method];
-    if (op === null || typeof op !== 'object') {
-      continue;
-    }
-    const responses = (op as { responses?: unknown }).responses;
+  for (const op of operationsOfPathItem(pathItem)) {
+    const responses = op.responses;
     if (responses === null || typeof responses !== 'object') {
       continue;
     }

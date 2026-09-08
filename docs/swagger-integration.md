@@ -60,7 +60,8 @@ interface ApplyZodNestOptions {
 
 8. **Apply `$ref` titles.** Copy each named component's `title` (when set via `.meta({ title })`) onto every `$ref` that targets it, as a `{ $ref, title }` sibling. Inert annotation; helps Swagger UI's 3.1 renderer show the component name (see [`$ref` titles](#ref-titles-swagger-ui-31)). Skipped when `refTitles: false`.
 9. **Assert no dangling refs.** Walk every `$ref` and confirm the target exists in `components.schemas`. Throws `ZodNestDocumentError({ code: 'DANGLING_REF' })` on the first miss, listing every offending ref with a per-ref hint inferred from collected usage.
-10. **Force OpenAPI 3.1.** Set `doc.openapi = '3.1.0'` so the version string matches the emitted body even when `DocumentBuilder.setOpenAPIVersion('3.1.0')` was not called on the caller side.
+10. **Relocate extension operations (3.2 only).** `search` and the WebDAV methods move under the path item's `additionalOperations`, keyed by uppercased method. Runs last of the mutating passes so every `$ref` walk above still sees the flat shape. No-op when targeting 3.1. See [`search` and the WebDAV methods](#search-and-the-webdav-methods).
+11. **Normalise the OpenAPI version.** Set `doc.openapi` to the version resolved from the document, so the version string always matches the emitted body. See [OpenAPI version](#openapi-version).
 
 The function is **composable** — apply your own doc-transform passes before or after `applyZodNest`. Just ensure that any pre-pass that touches `$ref`s knows what's coming.
 
@@ -101,11 +102,30 @@ Because `QUERY` is safe, an omitted `@ZodResponse({ status })` resolves to `200`
 against a strict checker when the document is emitted as 3.2 — see
 [OpenAPI version](#openapi-version).
 
-> **Still not conformant: `search` and WebDAV.** 3.2 promoted only `query`. `search`, `propfind`,
-> `mkcol` and friends are path-item fields in neither version, so `zod-nest` emits the operation
-> NestJS actually routed and a strict validator rejects the key under 3.1 **and** 3.2. The document
-> describes your API correctly and Swagger UI renders it. 3.2 provides `additionalOperations` as the
-> conformant home for these; adopting it is tracked separately.
+### `search` and the WebDAV methods
+
+3.2 promoted only `query`. `search`, `propfind`, `mkcol` and friends are path-item fields in neither
+version, so they need somewhere else to live — and 3.2 supplies it. When the document targets 3.2,
+`applyZodNest` moves each of them under `additionalOperations`, keyed by the uppercased method:
+
+```jsonc
+"/things": {
+  "get": { "…": "…" },
+  "additionalOperations": {
+    "SEARCH": { "operationId": "ThingsController_find", "requestBody": { "…": "…" } }
+  }
+}
+```
+
+The relocation is unconditional under 3.2 — it is the only representation the spec accepts, and the
+schema enforces the key rules itself (an RFC 9110 token, and explicitly *not* one of the nine
+standard methods, `QUERY` included). A caller-authored `additionalOperations` entry is merged with,
+never overwritten, and wins on a key collision.
+
+> **Under 3.1 they stay inline and stay non-conformant.** 3.1 has no `additionalOperations`, so
+> there is nothing to move them to. `zod-nest` emits the operation NestJS actually routed: the
+> document describes your API correctly and Swagger UI renders it, but a strict 3.1 validator
+> rejects the key. Emit 3.2 if you route these methods and need a conformant document.
 
 ## OpenAPI version
 
