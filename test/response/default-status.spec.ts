@@ -143,3 +143,25 @@ describe('resolveEffectiveStatus — wildcards and default', () => {
     expect(resolveEffectiveStatus(variant!, handler)).toBe(204);
   });
 });
+
+/** `RequestMethod.QUERY` (RFC 10008) only exists from NestJS 12 — absent on the v11 floor. */
+const queryRequestMethod = ((): number | undefined => {
+  const members: Record<string, unknown> = { ...RequestMethod };
+  const value = members.QUERY;
+  return typeof value === 'number' ? value : undefined;
+})();
+
+describe.skipIf(queryRequestMethod === undefined)('defaultStatusFor — QUERY (RFC 10008)', () => {
+  it('returns 200 because QUERY is safe and idempotent', () => {
+    const handler = (): void => {};
+    Reflect.defineMetadata(METHOD_METADATA, queryRequestMethod, handler);
+    expect(defaultStatusFor(handler)).toBe(200);
+  });
+
+  it('still lets @HttpCode override the method default', () => {
+    const handler = (): void => {};
+    Reflect.defineMetadata(METHOD_METADATA, queryRequestMethod, handler);
+    Reflect.defineMetadata(HTTP_CODE_METADATA, 206, handler);
+    expect(defaultStatusFor(handler)).toBe(206);
+  });
+});

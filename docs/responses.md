@@ -86,7 +86,9 @@ The precedence chain when computing `resolveEffectiveStatus(variant, handler)`:
 
 1. **Explicit `@ZodResponse({ status })`** — wins outright.
 2. **`@HttpCode(n)` on the handler** — read via `Reflect.getMetadata(HTTP_CODE_METADATA, handler)`.
-3. **HTTP method default** — `POST` → `201`, everything else → `200`.
+3. **HTTP method default** — `POST` → `201`, everything else → `200`. Safe methods therefore
+   resolve to `200`, including `QUERY` ([RFC 10008](https://www.rfc-editor.org/info/rfc10008/),
+   routed by NestJS 12+ as `@QueryMethod()`).
 
 ```ts
 @Post()

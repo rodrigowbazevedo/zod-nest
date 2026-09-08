@@ -64,6 +64,45 @@ interface ApplyZodNestOptions {
 
 The function is **composable** — apply your own doc-transform passes before or after `applyZodNest`. Just ensure that any pre-pass that touches `$ref`s knows what's coming.
 
+## HTTP methods covered
+
+Every pass above walks the operation keys of each path item. That set is wider than OpenAPI 3.1's
+fixed `get` / `put` / `post` / `delete` / `options` / `head` / `patch` / `trace`, because
+`@nestjs/swagger` lowercases whatever `RequestMethod` names into the path item — so a route declared
+with an extension method lands under a key 3.1 never defined. `applyZodNest` therefore also visits
+`query`, `search`, `propfind`, `proppatch`, `mkcol`, `copy`, `move`, `lock` and `unlock`.
+
+An operation the walk skips never contributes its ids to step 1, so its schemas are pruned and its
+`$ref`s fail the dangling-ref assertion in step 9 — the whole document build throws. That is why the
+list has to track NestJS' router rather than the 3.1 spec.
+
+### `QUERY` (RFC 10008)
+
+[RFC 10008](https://www.rfc-editor.org/info/rfc10008/) defines `QUERY` as the safe, idempotent,
+body-carrying method for reads whose criteria are too large or too structured for a query string.
+NestJS routes it from v12 as `@QueryMethod()` — named to sidestep the existing `@Query()` parameter
+decorator. Everything `zod-nest` does for a `@Post()` body applies unchanged:
+
+```ts
+@Controller('users')
+class UsersController {
+  @QueryMethod()
+  @ZodResponse({ type: UserPageDto })
+  find(@ZodBody() criteria: UserCriteriaDto): UserPageDto {
+    return this.users.find(criteria);
+  }
+}
+```
+
+Because `QUERY` is safe, an omitted `@ZodResponse({ status })` resolves to `200` rather than `POST`'s
+`201` — see [Status resolution precedence](responses.md#status-resolution-precedence).
+
+> **Conformance caveat.** `query` became a path-item field in OpenAPI **3.2**; it is not valid 3.1,
+> and step 10 pins `doc.openapi` to `'3.1.0'`. `zod-nest` emits the operation NestJS actually routed
+> rather than dropping it, so the document describes your API correctly but a strict 3.1 validator
+> will reject the `query` key. Swagger UI renders it. The same applies to `search` and the WebDAV
+> methods, which have never been 3.1 fields either.
+
 ## `$ref` titles (Swagger UI 3.1)
 
 Swagger UI's OpenAPI **3.1** renderer inlines `$ref`-ed schemas without surfacing the referenced component's name — a property typed `{ $ref: '#/components/schemas/Foo' }` shows up as a bare `object` instead of `Foo` ([swagger-api/swagger-ui#9540](https://github.com/swagger-api/swagger-ui/issues/9540), open across 5.x). The emitted spec is valid and `$ref`-correct — this is purely a renderer limitation — but it makes complex docs hard to read.
