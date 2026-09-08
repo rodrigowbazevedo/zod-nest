@@ -1,3 +1,10 @@
+# [3.4.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.3.0...v3.4.0) (2026-09-08)
+
+
+### Features
+
+* relocate search and WebDAV operations into additionalOperations ([#172](https://github.com/rodrigowbazevedo/zod-nest/issues/172)) ([10bea32](https://github.com/rodrigowbazevedo/zod-nest/commit/10bea32bffb0a8664216c0cf251cda40d84c7945)), closes [#162](https://github.com/rodrigowbazevedo/zod-nest/issues/162) [#169](https://github.com/rodrigowbazevedo/zod-nest/issues/169)
+
 # [3.3.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.6...v3.3.0) (2026-09-08)
 
 
