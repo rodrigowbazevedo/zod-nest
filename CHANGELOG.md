@@ -1,3 +1,10 @@
+# [3.3.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.6...v3.3.0) (2026-09-08)
+
+
+### Features
+
+* emit OpenAPI 3.2 when the document declares it ([#167](https://github.com/rodrigowbazevedo/zod-nest/issues/167)) ([2f63283](https://github.com/rodrigowbazevedo/zod-nest/commit/2f63283c89dc10c8dca68c8f77c4e6afd0bebb0d)), closes [#162](https://github.com/rodrigowbazevedo/zod-nest/issues/162) [#166](https://github.com/rodrigowbazevedo/zod-nest/issues/166)
+
 ## [3.2.6](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.5...v3.2.6) (2026-09-08)
 
 
