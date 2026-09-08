@@ -1,3 +1,10 @@
+# [3.6.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.5.0...v3.6.0) (2026-09-08)
+
+
+### Features
+
+* emit the OpenAPI 3.2 Response Object summary field ([#175](https://github.com/rodrigowbazevedo/zod-nest/issues/175)) ([344810c](https://github.com/rodrigowbazevedo/zod-nest/commit/344810c275e6d63332c4ee94892a9429f5ef73d0))
+
 # [3.5.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.4.0...v3.5.0) (2026-09-08)
 
 
