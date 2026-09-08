@@ -23,3 +23,14 @@ and acknowledge the prior art.
 
 No code is lifted verbatim from nestjs-zod. If that changes in a future
 release, the affected file(s) will carry the upstream MIT header.
+
+This product vendors the official OpenAPI Specification JSON Schemas
+(Apache-2.0, Copyright (c) the OpenAPI Initiative / Linux Foundation —
+https://spec.openapis.org) under test/document/openapi-schemas/:
+
+- 3.1-2025-02-13.json — https://spec.openapis.org/oas/3.1/schema/2025-02-13
+- 3.2-2025-09-17.json — https://spec.openapis.org/oas/3.2/schema/2025-09-17
+
+They are unmodified copies used only by the test suite to validate emitted
+documents; they are not part of the published package. Refresh them with
+`node scripts/update-openapi-schemas.mjs`.
