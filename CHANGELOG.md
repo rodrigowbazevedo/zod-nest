@@ -1,3 +1,10 @@
+## [3.2.6](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.5...v3.2.6) (2026-09-08)
+
+
+### Bug Fixes
+
+* walk extension-method operations in applyZodNest ([#162](https://github.com/rodrigowbazevedo/zod-nest/issues/162)) ([20f751e](https://github.com/rodrigowbazevedo/zod-nest/commit/20f751ebba5407f8903452d2d4da7c3bd12db5a5))
+
 ## [3.2.5](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.2.4...v3.2.5) (2026-09-04)
 
 
