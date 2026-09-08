@@ -26,7 +26,7 @@ export class NotificationsController {
 }
 ```
 
-The doc gets `responses.200.content['text/event-stream'].schema = { $ref: '#/components/schemas/NotificationEvent' }`, and `stream` defaults to `true` (because `text/event-stream` is a built-in stream type) so the interceptor leaves the `Observable` untouched.
+The doc gets `responses.200.content['text/event-stream'].schema = { $ref: '#/components/schemas/NotificationEvent' }` — or `itemSchema` under OpenAPI 3.2, see [below](#under-openapi-32-one-schema-per-item) — and `stream` defaults to `true` (because `text/event-stream` is a built-in stream type) so the interceptor leaves the `Observable` untouched.
 
 ## NDJSON
 
@@ -55,6 +55,49 @@ export class ExportsController {
 ```
 
 The `ExportRow` DTO documents the shape of **one line**, mirroring the paginated endpoint's element type — exactly what you'd otherwise hand-write into `@ApiOkResponse({ content: { 'application/x-ndjson': { schema } } })`.
+
+## Under OpenAPI 3.2: one schema per item
+
+Under 3.1 there is only `schema`, so the two examples above document the event DTO as *the whole
+response body*. That's the best 3.1 can express, and it's not what the endpoint does — the body is a
+sequence. 3.2 added `itemSchema` for the case, and `applyZodNest` emits it whenever the document
+declares 3.2:
+
+```ts
+const config = new DocumentBuilder().setOpenAPIVersion('3.2.0').build();
+const document = applyZodNest(SwaggerModule.createDocument(app, config));
+```
+
+```jsonc
+"text/event-stream": {
+  "itemSchema": { "$ref": "#/components/schemas/NotificationEvent" }
+}
+```
+
+`itemSchema` replaces `schema` — it is the same DTO, now saying the right thing about it. Your
+controllers don't change; only the declared version does.
+
+- **`@ZodResponse({ type: [Dto] })`** — a bare `{ type: 'array', items }` says "a sequence of these"
+  twice over, so it collapses to `itemSchema: Dto`.
+- **`@ZodResponse({ type: [A, B] })`** — a tuple names each slot positionally and has no single item
+  shape, so it stays on `schema` as `prefixItems`.
+- **Binary downloads** — `application/octet-stream`, `image/*` and friends are opaque bytes with
+  nothing per-item to describe. They keep `schema` under both versions.
+
+### Opting a custom content type in
+
+The rewrite is keyed on the media types 3.2 names as sequential. For anything else — a streamed
+`text/csv`, a vendor type — declare `stream: true` and `@ZodResponse` marks it for you:
+
+```ts
+@Get('rows.csv')
+@ZodResponse({ type: ExportRowDto, contentType: 'text/csv', stream: true })
+rows(): void {}
+```
+
+An explicit `stream: true` reads as *a sequence of `type`*, so pick an opaque built-in
+(`application/octet-stream` and the `image/*` / `audio/*` / `video/*` families) for a custom body
+that is one indivisible blob — those are excluded from the rewrite by design.
 
 ## Notes
 

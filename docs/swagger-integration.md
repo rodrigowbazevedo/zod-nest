@@ -61,7 +61,8 @@ interface ApplyZodNestOptions {
 8. **Apply `$ref` titles.** Copy each named component's `title` (when set via `.meta({ title })`) onto every `$ref` that targets it, as a `{ $ref, title }` sibling. Inert annotation; helps Swagger UI's 3.1 renderer show the component name (see [`$ref` titles](#ref-titles-swagger-ui-31)). Skipped when `refTitles: false`.
 9. **Assert no dangling refs.** Walk every `$ref` and confirm the target exists in `components.schemas`. Throws `ZodNestDocumentError({ code: 'DANGLING_REF' })` on the first miss, listing every offending ref with a per-ref hint inferred from collected usage.
 10. **Relocate extension operations (3.2 only).** `search` and the WebDAV methods move under the path item's `additionalOperations`, keyed by uppercased method. Runs last of the mutating passes so every `$ref` walk above still sees the flat shape. No-op when targeting 3.1. See [`search` and the WebDAV methods](#search-and-the-webdav-methods).
-11. **Normalise the OpenAPI version.** Set `doc.openapi` to the version resolved from the document, so the version string always matches the emitted body. See [OpenAPI version](#openapi-version).
+11. **Rewrite sequential media types to `itemSchema` (3.2 only).** For every media type that carries a sequence of discrete items — SSE, NDJSON and the rest of [`SEQUENTIAL_MEDIA_TYPES`](#sequential-media-types-itemschema), plus any custom `stream: true` type — `schema` becomes `itemSchema`, so the document describes one item rather than claiming the whole body is one. Opaque byte streams (`application/octet-stream`, `image/*`, …) are untouched. Under 3.1 the pass only strips its own internal marker. See [Sequential media types](#sequential-media-types-itemschema).
+12. **Normalise the OpenAPI version.** Set `doc.openapi` to the version resolved from the document, so the version string always matches the emitted body. See [OpenAPI version](#openapi-version).
 
 The function is **composable** — apply your own doc-transform passes before or after `applyZodNest`. Just ensure that any pre-pass that touches `$ref`s knows what's coming.
 
@@ -155,14 +156,51 @@ pre-release they accept is accepted here and your declared string stays accurate
 > the warning exists to surface.
 
 OpenAPI 3.2 is a **minor, fully backward-compatible** revision of 3.1 — the version tag moves
-without changing how schemas are validated. For a document `zod-nest` emits, nothing but the
-version string differs, with one exception that is the whole reason to choose it: 3.2 defines
-`query` as a path-item field ([RFC 10008](https://www.rfc-editor.org/info/rfc10008/), routed by
-NestJS 12+ as `@QueryMethod()`) and 3.1 does not. A QUERY route therefore fails strict 3.1
-validation and passes under 3.2.
+without changing how schemas are validated, and the Schema Object dialect (JSON Schema 2020-12) is
+identical, so your component bodies are byte-for-byte the same either way. Three things in a
+`zod-nest` document do differ, and they are the reasons to choose 3.2:
+
+| Under 3.2                                                              | Under 3.1                                             |
+| ---------------------------------------------------------------------- | ----------------------------------------------------- |
+| `query` is a path-item field ([RFC 10008](https://www.rfc-editor.org/info/rfc10008/), routed by NestJS 12+ as `@QueryMethod()`) | no such field — a QUERY route fails strict validation |
+| `search` / WebDAV operations live under `additionalOperations`          | no conformant home — see [below](#search-and-the-webdav-methods) |
+| SSE / NDJSON responses use `itemSchema`                                 | `schema`, which overstates a stream as a single body  |
 
 Keep 3.1 if your toolchain is 3.1-only; Swagger UI, Swagger Editor and Redocly all support 3.2,
 but coverage across generators is still uneven.
+
+### Sequential media types (`itemSchema`)
+
+3.1 has one field for a response body — `schema` — so a streamed endpoint documents its event DTO
+there and thereby claims *the entire body is one event*. It isn't; it's a sequence. 3.2 added
+`itemSchema` to the Media Type Object for exactly this, and `applyZodNest` emits it:
+
+```jsonc
+// 3.1                                          // 3.2
+"text/event-stream": {                          "text/event-stream": {
+  "schema": { "$ref": ".../Event" }               "itemSchema": { "$ref": ".../Event" }
+}                                               }
+```
+
+`itemSchema` **replaces** `schema` rather than joining it — the spec notes that carrying both has no
+real advantage over an array `schema`, and the `schema` form is the claim that was wrong to begin
+with. The rewrite applies to the media types OpenAPI 3.2 names as _sequential_, exported as
+`SEQUENTIAL_MEDIA_TYPES`:
+
+`text/event-stream` · `application/x-ndjson` · `application/jsonl` · `application/json-seq` ·
+`application/geo+json-seq` · `multipart/mixed`
+
+Two kinds of media type are deliberately left on `schema`:
+
+- **Opaque byte streams** — `application/octet-stream`, `application/pdf`, `image/*`, `audio/*`,
+  `video/*`. There is no per-item schema to describe, so `itemSchema` would be meaningless.
+- **Array and tuple response kinds** — `@ZodResponse({ type: [Dto, Other] })` emits `prefixItems`,
+  and any array carrying its own constraints (`maxItems`) is already how 3.2 describes _complete_
+  sequential content. A bare `{ type: 'array', items }` — what `@ZodResponse({ type: [Dto] })`
+  produces — does collapse to `itemSchema: Dto`, since that is the same statement written twice.
+
+A custom content type opts in with `stream: true`; see
+[`recipes/streaming-responses.md`](recipes/streaming-responses.md#opting-a-custom-content-type-in).
 
 ## `$ref` titles (Swagger UI 3.1)
 

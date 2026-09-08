@@ -11,10 +11,14 @@ import {
   DEFAULT_CONTENT_TYPE,
   DEFAULT_STREAM_CONTENT_TYPES,
   DEFAULT_STREAM_MATCHER,
+  isItemStreamVariant,
+  isSequentialMediaType,
   isStreamResponse,
   matchesStream,
   normalizeStreamMatcher,
+  OPAQUE_STREAM_MEDIA_TYPES,
   resolveContentType,
+  SEQUENTIAL_MEDIA_TYPES,
 } from '../../src/response/stream.js';
 
 class StreamUnitDto extends createZodDto(z.object({ id: z.string() }), { id: 'StreamUnitDto' }) {}
@@ -214,5 +218,71 @@ describe('isStreamResponse', () => {
     expect(
       isStreamResponse(variant, HeaderController.prototype.plain, DEFAULT_STREAM_MATCHER),
     ).toBe(false);
+  });
+});
+
+describe('SEQUENTIAL_MEDIA_TYPES', () => {
+  it('lists the six media types OpenAPI 3.2 names as sequential', () => {
+    expect(SEQUENTIAL_MEDIA_TYPES).toEqual([
+      'text/event-stream',
+      'application/x-ndjson',
+      'application/jsonl',
+      'application/json-seq',
+      'application/geo+json-seq',
+      'multipart/mixed',
+    ]);
+  });
+
+  it('partitions the stream defaults together with the opaque list', () => {
+    const sequentialDefaults = DEFAULT_STREAM_CONTENT_TYPES.filter((type) =>
+      SEQUENTIAL_MEDIA_TYPES.includes(type),
+    );
+    expect([...sequentialDefaults, ...OPAQUE_STREAM_MEDIA_TYPES]).toEqual(
+      DEFAULT_STREAM_CONTENT_TYPES,
+    );
+  });
+});
+
+describe('isSequentialMediaType', () => {
+  it.each(SEQUENTIAL_MEDIA_TYPES)('matches %s', (mediaType) => {
+    expect(isSequentialMediaType(mediaType)).toBe(true);
+  });
+
+  it.each(OPAQUE_STREAM_MEDIA_TYPES)('rejects the opaque stream type %s', (mediaType) => {
+    expect(isSequentialMediaType(mediaType)).toBe(false);
+  });
+
+  it('normalises case and media-type parameters', () => {
+    expect(isSequentialMediaType('TEXT/Event-Stream; charset=utf-8')).toBe(true);
+  });
+
+  it('rejects application/json', () => {
+    expect(isSequentialMediaType('application/json')).toBe(false);
+  });
+});
+
+describe('isItemStreamVariant', () => {
+  it('marks a custom content type declared with `stream: true`', () => {
+    expect(isItemStreamVariant(makeVariant({ stream: true }), 'text/csv')).toBe(true);
+  });
+
+  it('leaves a custom content type unmarked when `stream` is not set', () => {
+    expect(isItemStreamVariant(makeVariant(), 'text/csv')).toBe(false);
+  });
+
+  it('leaves a custom content type unmarked when `stream` is explicitly false', () => {
+    expect(isItemStreamVariant(makeVariant({ stream: false }), 'text/csv')).toBe(false);
+  });
+
+  it.each(SEQUENTIAL_MEDIA_TYPES)('leaves the sequential type %s unmarked', (mediaType) => {
+    expect(isItemStreamVariant(makeVariant({ stream: true }), mediaType)).toBe(false);
+  });
+
+  it.each(OPAQUE_STREAM_MEDIA_TYPES)('leaves the opaque type %s unmarked', (mediaType) => {
+    expect(isItemStreamVariant(makeVariant({ stream: true }), mediaType)).toBe(false);
+  });
+
+  it('leaves a concrete member of an opaque family unmarked', () => {
+    expect(isItemStreamVariant(makeVariant({ stream: true }), 'image/png')).toBe(false);
   });
 });

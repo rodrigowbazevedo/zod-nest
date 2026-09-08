@@ -36,7 +36,7 @@ export class ExportsController {
 }
 ```
 
-The emitted doc has `responses.200.content['application/octet-stream'].schema = { $ref: '#/components/schemas/Blob' }`, and `components.schemas.Blob` resolves to `{ type: 'string', format: 'binary' }` — which Swagger UI, OpenAPI clients, and `swagger-typescript-api` codegen all understand as a binary download. Because `application/octet-stream` is a built-in stream type, `stream` defaults to `true` and `ZodSerializerInterceptor` never tries to validate the `StreamableFile` against `BlobSchema`.
+The emitted doc has `responses.200.content['application/octet-stream'].schema = { $ref: '#/components/schemas/Blob' }`, and `components.schemas.Blob` resolves to `{ type: 'string', format: 'binary' }` — which Swagger UI, OpenAPI clients, and `swagger-typescript-api` codegen all understand as a binary download. Because `application/octet-stream` is a built-in stream type, `stream` defaults to `true` and `ZodSerializerInterceptor` never tries to validate the `StreamableFile` against `BlobSchema`. Unlike [SSE / NDJSON](streaming-responses.md#under-openapi-32-one-schema-per-item), a binary download stays on `schema` under OpenAPI 3.2 — opaque bytes have no per-item shape to describe.
 
 ## Removing the manual `@ApiOkResponse` workaround during migration
 

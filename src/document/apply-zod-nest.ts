@@ -12,6 +12,7 @@ import { assertNoDanglingRefs } from './dangling-refs.js';
 import { expandParamMarkers } from './expand-param-markers.js';
 import { extendExposureViaRefs } from './expose-closure.js';
 import { inlineAnonymousBodies } from './inline-anon.js';
+import { applyItemSchema } from './item-schema.js';
 import { mergeSchemas } from './merge-schemas.js';
 import { resolveOpenApiVersion } from './openapi-version.js';
 import { applyRefTitles } from './ref-titles.js';
@@ -113,7 +114,9 @@ export interface ApplyZodNestOptions {
  *   `DocumentBuilder.setOpenAPIVersion()` when supported, else `'3.1.0'` with a
  *   warning, so the version string always matches the emitted body.
  * - Targeting 3.2 additionally moves `search` / WebDAV operations under
- *   `additionalOperations`, the only place that version accepts them.
+ *   `additionalOperations`, the only place that version accepts them, and
+ *   rewrites `schema` to `itemSchema` on sequential media types (SSE, NDJSON, …)
+ *   so a streamed body documents one item rather than the whole sequence.
  *
  * Composable with other doc-transform passes — apply other mutations before
  * or after this function.
@@ -152,6 +155,7 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {})
   if (openApiVersion.startsWith('3.2.')) {
     relocateExtensionOperations(doc);
   }
+  applyItemSchema(doc, { emit: openApiVersion.startsWith('3.2.') });
   doc.openapi = openApiVersion;
 
   return doc;
