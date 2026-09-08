@@ -10,6 +10,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
 
 import { applyZodNest, createZodDto, ZodResponse } from '../../src';
+import { ZOD_NEST_ITEM_STREAM_EXTENSION } from '../../src/schema/constants.js';
 
 const flushMicrotasks = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
@@ -177,5 +178,85 @@ describe('@ZodResponse — streaming content types end-to-end with applyZodNest'
     expect(schemas['Stream_SseEvent']?.type).toBe('object');
     const props = schemas['Stream_SseEvent']?.properties as Record<string, unknown>;
     expect(Object.keys(props).sort()).toEqual(['data', 'event']);
+  });
+});
+
+class CsvRow extends createZodDto(z.object({ cell: z.string() }), { id: 'Stream_CsvRow' }) {}
+
+@Controller('marker')
+class MarkerController {
+  @Get('custom-stream')
+  @ZodResponse({ type: CsvRow, contentType: 'text/csv', stream: true })
+  customStream(): void {}
+
+  @Get('custom-not-stream')
+  @ZodResponse({ type: CsvRow, contentType: 'text/csv' })
+  customNotStream(): void {}
+
+  @Get('opaque-stream')
+  @ZodResponse({ type: CsvRow, contentType: 'application/octet-stream', stream: true })
+  opaqueStream(): void {}
+
+  @Get('sse')
+  @ZodResponse({ type: CsvRow, contentType: 'text/event-stream' })
+  sse(): void {}
+}
+
+describe('@ZodResponse — the x-zod-nest-item-stream marker', () => {
+  let app: INestApplication;
+  let raw: OpenAPIObject;
+
+  const markerAt = (path: string, mediaType: string): unknown => {
+    const paths = raw.paths as Record<
+      string,
+      Record<string, { responses: Record<string, { content: Record<string, unknown> }> }>
+    >;
+    const content = paths[path]?.get?.responses?.['200']?.content;
+    const found = content?.[mediaType];
+    if (found === undefined || found === null || typeof found !== 'object') {
+      throw new Error(`No ${mediaType} content for GET ${path}`);
+    }
+    return (found as Record<string, unknown>)[ZOD_NEST_ITEM_STREAM_EXTENSION];
+  };
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [DiscoveryModule],
+      controllers: [MarkerController],
+    }).compile();
+    app = moduleRef.createNestApplication({ logger: false });
+    await app.init();
+    await flushMicrotasks();
+    const config = new DocumentBuilder()
+      .setTitle('marker')
+      .setVersion('0.0.0')
+      .setOpenAPIVersion('3.1.0')
+      .build();
+    raw = SwaggerModule.createDocument(app, config);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('marks a custom content type declared with `stream: true`', () => {
+    expect(markerAt('/marker/custom-stream', 'text/csv')).toBe(true);
+  });
+
+  it('leaves a custom content type unmarked without `stream: true`', () => {
+    expect(markerAt('/marker/custom-not-stream', 'text/csv')).toBeUndefined();
+  });
+
+  it('leaves an opaque stream type unmarked — it carries no per-item schema', () => {
+    expect(markerAt('/marker/opaque-stream', 'application/octet-stream')).toBeUndefined();
+  });
+
+  it('leaves a sequential type unmarked — the document pass matches it by key', () => {
+    expect(markerAt('/marker/sse', 'text/event-stream')).toBeUndefined();
+  });
+
+  it('never survives applyZodNest, on a 3.1 target', () => {
+    const doc = applyZodNest(raw);
+    expect(JSON.stringify(doc)).not.toContain(ZOD_NEST_ITEM_STREAM_EXTENSION);
   });
 });

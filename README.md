@@ -42,7 +42,7 @@ A short list of behavioural differences you'll hit on day one. Full migration ta
 - **Multi-status `@ZodResponse`** — stack the decorator per status code. In `nestjs-zod`, multi-status required mixing `@ZodSerializerDto` with hand-rolled `@ApiResponse({ status: ... })` calls.
 - **No internal `@HttpCode`** — `@ZodResponse` does **not** call `@HttpCode` under the hood. Status resolution precedence: `@ZodResponse({ status })` → `@HttpCode(...)` on the handler → method default (`POST → 201`, others → `200`). The caller controls `201` vs `200` vs `204` via standard NestJS decorators. `status` accepts numeric codes plus the OpenAPI 3.1 range keys (`'1XX'`…`'5XX'`) and `'default'` (sugar for the resolved method default).
 - **I/O suffix only when needed** — `<Id>Output` is only emitted when the input and output JSON Schemas actually differ. `nestjs-zod` always emitted `_Output`.
-- **OpenAPI 3.1 and 3.2** — no `3.0` fallback. Pick with `DocumentBuilder.setOpenAPIVersion('3.2.0')`; 3.2 is what makes `QUERY` routes conformant. `$ref`s emit to the final location; `cleanupOpenApiDoc` is unnecessary.
+- **OpenAPI 3.1 and 3.2** — no `3.0` fallback. Pick with `DocumentBuilder.setOpenAPIVersion('3.2.0')`; 3.2 is what makes `QUERY` and WebDAV routes conformant, and what lets a streamed response say `itemSchema` instead of overstating the whole body. `$ref`s emit to the final location; `cleanupOpenApiDoc` is unnecessary.
 - **Validation-failure logging out of the box** — `nestjs-zod` has none.
 - **Customizable serialization exception** — both `ZodValidationPipe` and `ZodSerializerInterceptor` accept a factory. `nestjs-zod` only customized the input side.
 - **DTO discriminator** — `Symbol.for('zod-nest.dto')` (cross-realm safe), not `MyDto.isZodDto`.
@@ -484,7 +484,7 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 
 **Module** — [`docs/module-options.md`](docs/module-options.md) / [`docs/logging.md`](docs/logging.md)
 
-- `ZodNestModule.forRoot(options?)`, `ZodNestModuleOptions`, `DEFAULT_REDACT_KEYS`, `DEFAULT_MAX_LOGGED_VALUE_BYTES`, `ZOD_NEST_OPTIONS`
+- `ZodNestModule.forRoot(options?)`, `ZodNestModuleOptions`, `DEFAULT_REDACT_KEYS`, `DEFAULT_MAX_LOGGED_VALUE_BYTES`, `DEFAULT_STREAM_CONTENT_TYPES`, `SEQUENTIAL_MEDIA_TYPES`, `ZOD_NEST_OPTIONS`
 
 **Schema engine** — single-schema mode and extension points
 

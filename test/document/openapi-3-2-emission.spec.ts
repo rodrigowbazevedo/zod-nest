@@ -141,3 +141,110 @@ describe.skipIf(queryMethod === undefined)('applyZodNest — QUERY under 3.2 (RF
     expect(() => validateOpenApi(doc)).toThrow(/schema validation failed/);
   });
 });
+
+@Controller('streams')
+class StreamsController {
+  @Get('sse')
+  @ZodResponse({ type: HitDto, contentType: 'text/event-stream' })
+  sse(): void {}
+
+  @Get('ndjson')
+  @ZodResponse({ type: [HitDto], contentType: 'application/x-ndjson' })
+  ndjson(): void {}
+
+  @Get('download')
+  @ZodResponse({ type: HitDto, contentType: 'application/octet-stream' })
+  download(): void {}
+
+  @Get('csv')
+  @ZodResponse({ type: HitDto, contentType: 'text/csv', stream: true })
+  csv(): void {}
+
+  @Get('tuple')
+  @ZodResponse({ type: [HitDto, HitDto], contentType: 'text/event-stream' })
+  tuple(): void {}
+}
+
+describe('applyZodNest — itemSchema for sequential media types', () => {
+  const HIT_REF = { $ref: '#/components/schemas/Hit' };
+
+  const mediaTypeAt = (
+    doc: OpenAPIObject,
+    route: string,
+    mediaType: string,
+  ): Record<string, unknown> => {
+    const paths = doc.paths as Record<
+      string,
+      Record<string, { responses: Record<string, { content: Record<string, unknown> }> }>
+    >;
+    const found = paths[`/streams/${route}`]?.get?.responses?.['200']?.content?.[mediaType];
+    if (found === undefined || found === null || typeof found !== 'object') {
+      throw new Error(`No ${mediaType} content for GET /streams/${route}`);
+    }
+    return found as Record<string, unknown>;
+  };
+
+  it('rewrites an SSE response to itemSchema under 3.2', async () => {
+    const doc = await bootstrap(StreamsController, '3.2.0');
+
+    expect(mediaTypeAt(doc, 'sse', 'text/event-stream')).toEqual({ itemSchema: HIT_REF });
+  });
+
+  it('keeps `schema` on the same SSE response under 3.1', async () => {
+    const doc = await bootstrap(StreamsController, '3.1.0');
+
+    expect(mediaTypeAt(doc, 'sse', 'text/event-stream')).toEqual({ schema: HIT_REF });
+  });
+
+  it('unwraps an NDJSON array response into its element schema', async () => {
+    const doc = await bootstrap(StreamsController, '3.2.0');
+
+    expect(mediaTypeAt(doc, 'ndjson', 'application/x-ndjson')).toEqual({ itemSchema: HIT_REF });
+  });
+
+  it('leaves an opaque binary download on `schema`', async () => {
+    const doc = await bootstrap(StreamsController, '3.2.0');
+
+    expect(mediaTypeAt(doc, 'download', 'application/octet-stream')).toEqual({ schema: HIT_REF });
+  });
+
+  it('rewrites a custom `stream: true` content type', async () => {
+    const doc = await bootstrap(StreamsController, '3.2.0');
+
+    expect(mediaTypeAt(doc, 'csv', 'text/csv')).toEqual({ itemSchema: HIT_REF });
+  });
+
+  // A tuple names each slot positionally, so it has no single item shape — and
+  // an array `schema` is already how 3.2 describes complete sequential content.
+  it('leaves a tuple response on `schema`', async () => {
+    const doc = await bootstrap(StreamsController, '3.2.0');
+
+    expect(mediaTypeAt(doc, 'tuple', 'text/event-stream')).toEqual({
+      schema: { type: 'array', prefixItems: [HIT_REF, HIT_REF], items: false },
+    });
+  });
+
+  it('conforms to the vendored schema under either version', async () => {
+    const asThirtyOne = await bootstrap(StreamsController, '3.1.0');
+    const asThirtyTwo = await bootstrap(StreamsController, '3.2.0');
+
+    expect(() => validateOpenApi(asThirtyOne)).not.toThrow();
+    expect(() => validateOpenApi(asThirtyTwo)).not.toThrow();
+  });
+
+  // The whole point: `itemSchema` is a 3.2 field, and 3.1's Media Type Object
+  // sets `unevaluatedProperties: false`, so the 3.2 body is invalid as 3.1.
+  it('produces a body that does not validate as 3.1', async () => {
+    const doc = await bootstrap(StreamsController, '3.2.0');
+
+    expect(() => validateOpenApi({ ...doc, openapi: '3.1.0' })).toThrow(/schema validation failed/);
+  });
+
+  it('leaves no zod-nest marker behind under either version', async () => {
+    const asThirtyOne = await bootstrap(StreamsController, '3.1.0');
+    const asThirtyTwo = await bootstrap(StreamsController, '3.2.0');
+
+    expect(JSON.stringify(asThirtyOne)).not.toContain('x-zod-nest-item-stream');
+    expect(JSON.stringify(asThirtyTwo)).not.toContain('x-zod-nest-item-stream');
+  });
+});

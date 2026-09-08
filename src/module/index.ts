@@ -4,7 +4,7 @@ export {
   normalizeZodNestOptions,
   ZOD_NEST_OPTIONS,
 } from './options.js';
-export { DEFAULT_STREAM_CONTENT_TYPES } from '../response/stream.js';
+export { DEFAULT_STREAM_CONTENT_TYPES, SEQUENTIAL_MEDIA_TYPES } from '../response/stream.js';
 export type {
   CreateSerializationException,
   CreateValidationException,

@@ -199,6 +199,8 @@ A trailing `/*` entry matches a media-type family (`font/*` → `font/woff2`, `f
 
 The constant is exported so you can introspect, extend, or replace it programmatically.
 
+That first row is a different kind of stream from the two below it: a sequence of discrete items rather than one opaque payload. The distinction only matters when emitting OpenAPI 3.2, where the item-oriented types document each item with `itemSchema` — see [`SEQUENTIAL_MEDIA_TYPES`](swagger-integration.md#sequential-media-types-itemschema), also exported, which lists them along with the other sequential types 3.2 names.
+
 ## `ZOD_NEST_OPTIONS` token
 
 ```ts

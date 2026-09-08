@@ -9,7 +9,8 @@ import type {
   ZodResponseDescription,
 } from '../response/metadata.js';
 
-import { DEFAULT_CONTENT_TYPE } from '../response/stream.js';
+import { DEFAULT_CONTENT_TYPE, isItemStreamVariant } from '../response/stream.js';
+import { ZOD_NEST_ITEM_STREAM_EXTENSION } from '../schema/constants.js';
 
 /**
  * Minimal shape for an OpenAPI 3.1 tuple schema. `@nestjs/swagger`'s
@@ -96,9 +97,13 @@ const buildContentResponseOptions = (
   base: { status: number | ResponseStatusWildcard } & DescriptionFields,
   contentType: string,
   schema: ContentSchema,
+  markItemStream: boolean,
 ): ApiResponseOptions => {
+  const mediaType = markItemStream
+    ? { schema, [ZOD_NEST_ITEM_STREAM_EXTENSION]: true }
+    : { schema };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 3.1 schema shapes (prefixItems) + the headers shape don't fit @nestjs/swagger's 3.0 types; see comments above
-  return { ...base, content: { [contentType]: { schema } } } as any;
+  return { ...base, content: { [contentType]: mediaType } } as any;
 };
 
 /**
@@ -115,11 +120,13 @@ const applyCustomContentResponse = (
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<unknown>,
 ): void => {
+  const markItemStream = isItemStreamVariant(variant, contentType);
+
   if (variant.kind === 'single') {
     const dto = variant.dto as ZodDto;
     ApiExtraModels(asDtoFunction(dto))(target, propertyKey, descriptor);
     const schema: ContentSchema = { $ref: getSchemaPath(asDtoFunction(dto)) };
-    ApiResponse(buildContentResponseOptions(base, contentType, schema))(
+    ApiResponse(buildContentResponseOptions(base, contentType, schema, markItemStream))(
       target,
       propertyKey,
       descriptor,
@@ -138,7 +145,7 @@ const applyCustomContentResponse = (
       type: 'array',
       items: { $ref: getSchemaPath(asDtoFunction(dto)) },
     };
-    ApiResponse(buildContentResponseOptions(base, contentType, schema))(
+    ApiResponse(buildContentResponseOptions(base, contentType, schema, markItemStream))(
       target,
       propertyKey,
       descriptor,
@@ -147,11 +154,9 @@ const applyCustomContentResponse = (
   }
 
   // tuple
-  ApiResponse(buildContentResponseOptions(base, contentType, buildTupleSchema(dtos)))(
-    target,
-    propertyKey,
-    descriptor,
-  );
+  ApiResponse(
+    buildContentResponseOptions(base, contentType, buildTupleSchema(dtos), markItemStream),
+  )(target, propertyKey, descriptor);
 };
 
 /**

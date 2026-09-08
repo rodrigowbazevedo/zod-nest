@@ -220,6 +220,10 @@ The built-in stream set is [`DEFAULT_STREAM_CONTENT_TYPES`](module-options.md#st
 
 Set `stream` explicitly to override the inference either way — e.g. `stream: false` on a `text/event-stream` endpoint to keep validating, or `stream: true` on a custom content type you haven't added to the module set.
 
+### Under OpenAPI 3.2: `itemSchema`
+
+When the document declares 3.2, `applyZodNest` emits a sequential response under `itemSchema` instead of `schema`, so it reads as "each item looks like this" rather than "the body is one of these". SSE, NDJSON and the other [sequential media types](swagger-integration.md#sequential-media-types-itemschema) are rewritten; opaque binary types keep `schema`. A custom content type joins them by declaring `stream: true`. Nothing changes under 3.1 — `itemSchema` is not a valid 3.1 field.
+
 For full SSE / NDJSON / binary patterns, see [`recipes/streaming-responses.md`](recipes/streaming-responses.md) and [`recipes/binary-downloads.md`](recipes/binary-downloads.md).
 
 > **`@Header` vs. the OpenAPI media type.** A stream-typed `@Header('Content-Type', …)` drives **both** the documented media type and the validation skip. A `@Header` whose value isn't a known stream type (e.g. `text/csv`) is ignored for the media-type key — set `contentType` explicitly to document an off-list type. The runtime skip still honours a module-configured `streamContentTypes` entry regardless.

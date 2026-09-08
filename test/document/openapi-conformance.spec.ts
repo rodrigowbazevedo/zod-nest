@@ -304,4 +304,35 @@ describe('OpenAPI 3.1 conformance', () => {
       await app.close();
     }
   });
+
+  it('validates streamed responses and keeps `itemSchema` out of a 3.1 body', async () => {
+    const eventSchema = z
+      .object({ kind: z.string(), body: z.string() })
+      .meta({ id: 'ConformEvent' });
+    class ConformEventDto extends createZodDto(eventSchema) {}
+
+    @Controller('streams')
+    class StreamsController {
+      @Get('sse')
+      @ZodResponse({ type: ConformEventDto, contentType: 'text/event-stream' })
+      sse(): void {}
+
+      @Get('ndjson')
+      @ZodResponse({ type: [ConformEventDto], contentType: 'application/x-ndjson' })
+      ndjson(): void {}
+
+      @Get('csv')
+      @ZodResponse({ type: ConformEventDto, contentType: 'text/csv', stream: true })
+      csv(): void {}
+    }
+
+    const { app, doc } = await bootstrap([StreamsController]);
+    try {
+      expect(() => validateOpenApi(doc)).not.toThrow();
+      expect(JSON.stringify(doc)).not.toContain('itemSchema');
+      expect(JSON.stringify(doc)).not.toContain('x-zod-nest-item-stream');
+    } finally {
+      await app.close();
+    }
+  });
 });

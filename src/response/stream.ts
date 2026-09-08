@@ -9,6 +9,32 @@ import type { ResponseVariant } from './metadata.js';
  */
 export const DEFAULT_CONTENT_TYPE = 'application/json';
 
+const SEQUENTIAL_DEFAULT_MEDIA_TYPES: readonly string[] = [
+  'text/event-stream',
+  'application/x-ndjson',
+];
+
+/** Every media type OpenAPI 3.2 names as *sequential* — a bare repeating
+ * structure, so 3.2 describes one item via `itemSchema` instead of the whole
+ * body via `schema`. Beyond the two defaults, reachable by hand-written docs. */
+export const SEQUENTIAL_MEDIA_TYPES: readonly string[] = [
+  ...SEQUENTIAL_DEFAULT_MEDIA_TYPES,
+  'application/jsonl',
+  'application/json-seq',
+  'application/geo+json-seq',
+  'multipart/mixed',
+];
+
+/** The stream defaults carrying no per-item schema — opaque bytes, where
+ * `itemSchema` is meaningless and must never appear. */
+export const OPAQUE_STREAM_MEDIA_TYPES: readonly string[] = [
+  'application/octet-stream',
+  'application/pdf',
+  'image/*',
+  'audio/*',
+  'video/*',
+];
+
 /**
  * Content types whose bodies zod-nest treats as streams by default: the
  * handler writes them straight to the response buffer (SSE, NDJSON, raw
@@ -21,13 +47,8 @@ export const DEFAULT_CONTENT_TYPE = 'application/json';
  * always retained so SSE / NDJSON detection can't be accidentally dropped.
  */
 export const DEFAULT_STREAM_CONTENT_TYPES: readonly string[] = [
-  'text/event-stream',
-  'application/x-ndjson',
-  'application/octet-stream',
-  'application/pdf',
-  'image/*',
-  'audio/*',
-  'video/*',
+  ...SEQUENTIAL_DEFAULT_MEDIA_TYPES,
+  ...OPAQUE_STREAM_MEDIA_TYPES,
 ];
 
 /**
@@ -90,6 +111,27 @@ export const matchesStream = (contentType: string, matcher: StreamContentTypeMat
     }
   }
   return false;
+};
+
+const SEQUENTIAL_MATCHER: StreamContentTypeMatcher = normalizeStreamMatcher(SEQUENTIAL_MEDIA_TYPES);
+const OPAQUE_MATCHER: StreamContentTypeMatcher = normalizeStreamMatcher(OPAQUE_STREAM_MEDIA_TYPES);
+
+/** Whether a media-type key names a sequence of items under 3.2. Keyed on the
+ * type alone, so it also classifies hand-written `@ApiResponse` content. */
+export const isSequentialMediaType = (contentType: string): boolean =>
+  matchesStream(contentType, SEQUENTIAL_MATCHER);
+
+/** Whether a variant is a *custom* item stream — an explicit `stream: true` on a
+ * type that is neither already sequential (the document pass matches those by
+ * key) nor opaque bytes. Such a media type gets marked for that pass. */
+export const isItemStreamVariant = (variant: ResponseVariant, contentType: string): boolean => {
+  if (variant.stream !== true) {
+    return false;
+  }
+  if (isSequentialMediaType(contentType)) {
+    return false;
+  }
+  return !matchesStream(contentType, OPAQUE_MATCHER);
 };
 
 interface HeaderMetadataEntry {
