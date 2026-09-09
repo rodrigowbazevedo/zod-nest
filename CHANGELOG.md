@@ -1,3 +1,10 @@
+# [3.7.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.6.0...v3.7.0) (2026-09-09)
+
+
+### Features
+
+* collapse named query DTOs to `in: querystring` under OpenAPI 3.2 ([#178](https://github.com/rodrigowbazevedo/zod-nest/issues/178)) ([b3945a0](https://github.com/rodrigowbazevedo/zod-nest/commit/b3945a0865540fb77371e35f04ede79db24e289c)), closes [#177](https://github.com/rodrigowbazevedo/zod-nest/issues/177) [#176](https://github.com/rodrigowbazevedo/zod-nest/issues/176)
+
 # [3.6.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.5.0...v3.6.0) (2026-09-08)
 
 
