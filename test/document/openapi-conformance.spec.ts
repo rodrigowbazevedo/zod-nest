@@ -31,6 +31,7 @@ import { validateOpenApi } from './openapi-validator.js';
 
 const bootstrap = async (
   controllers: Type<unknown>[],
+  declared = '3.1.0',
 ): Promise<{ app: INestApplication; doc: OpenAPIObject }> => {
   const moduleRef = await Test.createTestingModule({
     imports: [DiscoveryModule],
@@ -43,7 +44,7 @@ const bootstrap = async (
   const config = new DocumentBuilder()
     .setTitle('conformance')
     .setVersion('0.0.0')
-    .setOpenAPIVersion('3.1.0')
+    .setOpenAPIVersion(declared)
     .build();
   const raw = SwaggerModule.createDocument(app, config);
   const doc = applyZodNest(raw);
@@ -372,6 +373,72 @@ describe('OpenAPI 3.1 conformance', () => {
       });
       expect(() => validateOpenApi(doc)).not.toThrow();
       expect(() => validateOpenApi({ ...doc, openapi: '3.2.0' })).not.toThrow();
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+// The 3.2 meta-schema enforces the `querystring` coexistence rules itself
+// (`$defs.parameters`: at most one, never beside an `in: query`), so these
+// cases fail loudly if the emission ever slips.
+describe('OpenAPI 3.2 conformance — querystring parameters', () => {
+  const filtersSchema = z
+    .object({
+      term: z.string().describe('Search term'),
+      limit: z.number().optional(),
+      tags: z.array(z.string()).optional(),
+    })
+    .meta({ id: 'ConformFilters' });
+
+  class ConformFiltersDto extends createZodDto(filtersSchema) {}
+
+  it('validates a named query DTO collapsed to in: querystring', async () => {
+    @Controller('search')
+    class SearchController {
+      @Get()
+      @ZodResponse({ type: ConformFiltersDto })
+      find(@Query() filters: ConformFiltersDto): ConformFiltersDto {
+        return filters;
+      }
+    }
+
+    const { app, doc } = await bootstrap([SearchController], '3.2.0');
+    try {
+      const parameters = doc.paths['/search']?.get?.parameters ?? [];
+      expect(parameters).toEqual([
+        expect.objectContaining({
+          in: 'querystring',
+          content: {
+            'application/x-www-form-urlencoded': {
+              schema: { $ref: '#/components/schemas/ConformFilters' },
+            },
+          },
+        }),
+      ]);
+      expect(() => validateOpenApi(doc)).not.toThrow();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('validates the degraded form when a plain @Query() shares the operation', async () => {
+    @Controller('mixed')
+    class MixedController {
+      @Get()
+      @ZodResponse({ type: ConformFiltersDto })
+      find(@Query() filters: ConformFiltersDto, @Query('page') _page: string): ConformFiltersDto {
+        return filters;
+      }
+    }
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { app, doc } = await bootstrap([MixedController], '3.2.0');
+    warn.mockRestore();
+    try {
+      const parameters = doc.paths['/mixed']?.get?.parameters ?? [];
+      expect(parameters.every((param) => 'in' in param && param.in === 'query')).toBe(true);
+      expect(() => validateOpenApi(doc)).not.toThrow();
     } finally {
       await app.close();
     }

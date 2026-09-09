@@ -23,6 +23,7 @@ interface ApplyZodNestOptions {
   registry?: ZodNestRegistry;
   override?: Override;
   strict?: boolean;
+  /** @deprecated 3.2 collapses named query DTOs by default. */
   queryParamStyle?: 'expand' | 'ref';
   refTitles?: boolean;
 }
@@ -37,7 +38,7 @@ interface ApplyZodNestOptions {
 | `registry`        | no       | `defaultRegistry` | Pass an explicit registry for multi-app isolation.                                                                                                                                                                                                                               |
 | `override`        | no       | `undefined`       | User-supplied emission override applied on top of the built-in overrides (composition, primitives).                                                                                                                                                                              |
 | `strict`          | no       | `true`            | Strict mode throws `ZodNestUnrepresentableError` on unrepresentable Zod constructs (bigint / date / symbol / transform / …).                                                                                                                                                     |
-| `queryParamStyle` | no       | `'expand'`        | How named `@Query()` / `@ZodQuery` DTOs render: `'expand'` (one parameter per property) or `'ref'` (a single schema-based parameter that `$ref`s the component). Query-only; see [Query parameter style](#query-parameter-style).                                                |
+| `queryParamStyle` | no       | version-derived   | **Deprecated.** Overrides how named `@Query()` / `@ZodQuery` DTOs render: `'expand'` (one parameter per property) or `'ref'` (collapse to one). Unset, 3.2 collapses to `in: querystring` and 3.1 expands. Query-only; see [Query parameter style](#query-parameter-style).      |
 | `refTitles`       | no       | `true`            | Copy each named component's `title` (when set via `.meta({ title })`) onto every `$ref` that targets it, as a `{ $ref, title }` sibling. Helps Swagger UI's 3.1 renderer show the component name (see [`$ref` titles](#ref-titles-swagger-ui-31)). Set `false` for bare `$ref`s. |
 
 **Output usage comes from the document.** `@ZodResponse` is a composite decorator — it applies the equivalent `@ApiResponse(...)`, so `@nestjs/swagger` writes the response shape into `paths.<route>.<method>.responses.<status>.content[...]`. `applyZodNest` reads those response `$ref`s directly, which keeps output exposure scoped to the endpoints in _this_ document (rather than every controller in the app). This is why `app` is no longer needed.
@@ -51,7 +52,7 @@ interface ApplyZodNestOptions {
 1. **Collect usage.** Walk the document for both input-side ids (`requestBody` / `parameters` `$ref`s, plus `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` marker placeholders) and output-side ids (`responses.*.content.*` `$ref`s — `@ZodResponse`'s swagger bridge emits these via `@ApiResponse`). Produces `{ inputExposedIds, outputExposedIds }`. **Exposure is reachability-scoped: only schemas the document's endpoints actually reference are kept** — a schema put through `registerSchema()` that no endpoint reaches is _pruned_, not emitted. Two exceptions are added on top: ids registered with `{ expose: true }` (the author's explicit opt-in to document an unreferenced schema), and the query/param/header/cookie roots captured via their markers (expanded inline, but still documented). The exposure sets are then closed over `$ref`s so nested `.meta({ id })` schemas reachable from an exposed body are emitted too. Walking the document (rather than the app's controller graph) keeps exposure scoped to _this_ document — several Swagger documents sharing one registry each carry only what they use.
 2. **Bulk emit.** Run `z.toJSONSchema` against the registry once per side (`input`, `output`), producing two maps `Record<dtoId, SchemaObject>`. Zod is handed a registry pre-scoped to the ids `zod-nest` itself registered — including ids discovered transitively from `.meta({ id })` on descendants of explicitly-registered DTOs. `register()` queues the schema; the Zod composition tree is walked (and every named descendant adopted) on the registry's first read, which is this pass. Deferring the walk is what makes forward and circular `z.lazy` references safe — resolving a getter at registration time would read a module binding that hasn't initialised yet. Third-party entries in `z.globalRegistry` that aren't reachable through a registered DTO are left alone — never emitted, and never strict-checked, so an unrepresentable construct inside one can't fail the build.
 3. **Merge schemas.** For each id, apply the I/O suffix truth table. Equal bodies collapse to `components.schemas[id]`. Divergent bodies split as `id` (input) + `<id>Output` (output). Class-name → dtoId rename pass runs alongside.
-4. **Expand parameter markers.** Walk `paths.*.<op>.parameters[]` for `__zodNestDto: true` placeholders — the byproduct of `@nestjs/swagger` exploding a `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` DTO via `_OPENAPI_METADATA_FACTORY`. Each marker becomes one parameter per top-level property of the DTO's schema, with `description` mirrored onto both the parameter object and its schema. Optional fields bound to `in: 'path'` are coerced to `required: true` with a `console.warn`, since OpenAPI 3.1 forbids optional path parameters. Non-object DTOs (arrays, unions, primitives) throw `ZodNestDocumentError({ code: 'UNEXPANDABLE_PARAM_DTO' })`. The synthetic `components.schemas.Object` placeholder that `@nestjs/swagger` materialises from the marker's `type: () => Object` is pruned once its only referrer (the marker parameter) is gone. The exception is a `@Query()` marker under ref mode (see [Query parameter style](#query-parameter-style)), which collapses to a single `$ref` parameter instead of expanding. See [`recipes/query-param-dtos.md`](recipes/query-param-dtos.md) for the consumer-facing pattern.
+4. **Expand parameter markers.** Walk `paths.*.<op>.parameters[]` for `__zodNestDto: true` placeholders — the byproduct of `@nestjs/swagger` exploding a `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` DTO via `_OPENAPI_METADATA_FACTORY`. Each marker becomes one parameter per top-level property of the DTO's schema, with `description` mirrored onto both the parameter object and its schema. Optional fields bound to `in: 'path'` are coerced to `required: true` with a `console.warn`, since OpenAPI 3.1 forbids optional path parameters. Non-object DTOs (arrays, unions, primitives) throw `ZodNestDocumentError({ code: 'UNEXPANDABLE_PARAM_DTO' })`. The synthetic `components.schemas.Object` placeholder that `@nestjs/swagger` materialises from the marker's `type: () => Object` is pruned once its only referrer (the marker parameter) is gone. The exception is a named `@Query()` marker that collapses instead of expanding (see [Query parameter style](#query-parameter-style)): under 3.2 to a single `in: querystring` parameter, under 3.1 to the deprecated `queryParamStyle: 'ref'` approximation. A collapse degrades back to expansion, with a warning, where 3.2's coexistence rules forbid it. See [`recipes/query-param-dtos.md`](recipes/query-param-dtos.md) for the consumer-facing pattern.
 5. **Rewrite refs.** Two sub-passes: (a) class-name → dtoId rename for every `$ref` in the doc; (b) response-side `$ref` rewrite to `<id>Output` for every id in `divergentOutputIds`. Scoped to `paths.*.{op}.responses.*` so request-side refs are untouched.
 6. **Strip markers.** Remove every `x-zod-nest-dto` placeholder from `components.schemas[*].properties`, drop the JSON Schema 2020-12 metadata (`$schema`, `$id`) that Zod's bulk `toJSONSchema` leaks onto every emitted body, plus any leftover marker parameter from `paths.*.<op>.parameters[]` (defensive — `expandParamMarkers` removes them in the normal path). The `$id` / `$schema` strip exists because Swagger UI's strict ref resolver re-anchors lookups against the leaf schema when `$id` is a relative URI fragment (`#/components/schemas/<Id>`) and then fails to find `components` at the new root; the fields are redundant in OpenAPI anyway since the schema's identity comes from its `components.schemas` key. Empty `properties` blocks are dropped. The `x-zod-nest-error` extension (engine collision policy) is preserved so the broken contract stays visible in Swagger UI.
 7. **Inline anonymous bodies.** Every schema passed inline to `@ZodResponse` / `@ZodBody` / `@ZodMultipart` with no resolvable id (no `.meta({ id })`, no `id` option) was registered under a synthetic `anonymous` id so its body could be emitted under the document's `strict` / `override` in step 2. The merged object `@ZodBody` / `@ZodMultipart` build under `flatten: true` is always anonymous, so it takes the same route. This pass replaces each `$ref` to such an id with a deep clone of the emitted body and prunes the synthetic component — so anonymous schemas appear inline at their use site and leave no `_Anon*Schema_*` entry in `components.schemas`. Named members referenced inside the inlined body stay as `$ref`s (and remain exposed). A reused anonymous instance duplicates its body at each site; add `.meta({ id })` to share it as a named component instead.
@@ -119,7 +120,7 @@ version, so they need somewhere else to live — and 3.2 supplies it. When the d
 ```
 
 The relocation is unconditional under 3.2 — it is the only representation the spec accepts, and the
-schema enforces the key rules itself (an RFC 9110 token, and explicitly *not* one of the nine
+schema enforces the key rules itself (an RFC 9110 token, and explicitly _not_ one of the nine
 standard methods, `QUERY` included). A caller-authored `additionalOperations` entry is merged with,
 never overwritten, and wins on a key collision.
 
@@ -157,15 +158,16 @@ pre-release they accept is accepted here and your declared string stays accurate
 
 OpenAPI 3.2 is a **minor, fully backward-compatible** revision of 3.1 — the version tag moves
 without changing how schemas are validated, and the Schema Object dialect (JSON Schema 2020-12) is
-identical, so your component bodies are byte-for-byte the same either way. Four things in a
+identical, so your component bodies are byte-for-byte the same either way. Five things in a
 `zod-nest` document do differ, and they are the reasons to choose 3.2:
 
-| Under 3.2                                                              | Under 3.1                                             |
-| ---------------------------------------------------------------------- | ----------------------------------------------------- |
-| `query` is a path-item field ([RFC 10008](https://www.rfc-editor.org/info/rfc10008/), routed by NestJS 12+ as `@QueryMethod()`) | no such field — a QUERY route fails strict validation |
-| `search` / WebDAV operations live under `additionalOperations`          | no conformant home — see [below](#search-and-the-webdav-methods) |
-| SSE / NDJSON responses use `itemSchema`                                 | `schema`, which overstates a stream as a single body  |
-| Response Object `summary` is emitted                                    | no such field — each one is dropped, with a warning   |
+| Under 3.2                                                                                                                       | Under 3.1                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `query` is a path-item field ([RFC 10008](https://www.rfc-editor.org/info/rfc10008/), routed by NestJS 12+ as `@QueryMethod()`) | no such field — a QUERY route fails strict validation                |
+| `search` / WebDAV operations live under `additionalOperations`                                                                  | no conformant home — see [below](#search-and-the-webdav-methods)     |
+| SSE / NDJSON responses use `itemSchema`                                                                                         | `schema`, which overstates a stream as a single body                 |
+| Response Object `summary` is emitted                                                                                            | no such field — each one is dropped, with a warning                  |
+| Named query DTOs collapse to `in: querystring`                                                                                  | expanded per property, or the `queryParamStyle: 'ref'` approximation |
 
 Keep 3.1 if your toolchain is 3.1-only; Swagger UI, Swagger Editor and Redocly all support 3.2,
 but coverage across generators is still uneven.
@@ -189,7 +191,7 @@ Only the reverse can bite, and only if you opt into a 3.2 feature: `allowReserve
 ### Sequential media types (`itemSchema`)
 
 3.1 has one field for a response body — `schema` — so a streamed endpoint documents its event DTO
-there and thereby claims *the entire body is one event*. It isn't; it's a sequence. 3.2 added
+there and thereby claims _the entire body is one event_. It isn't; it's a sequence. 3.2 added
 `itemSchema` to the Media Type Object for exactly this, and `applyZodNest` emits it:
 
 ```jsonc
@@ -283,12 +285,12 @@ The error `details` carry `{ dtoId, in, io }` so the offending decorator is easy
 
 `createZodDto` requires the schema's `z.infer<>` to resolve to a single object type, since TS rejects unions as class bases (TS2509). For schemas where that doesn't hold — `z.intersection(obj, union)`, `z.discriminatedUnion`, or bare `z.union` — use the parameter-level decorators instead. They share the same registry + emission pipeline as `createZodDto` but skip the class step entirely:
 
-| Decorator                    | OpenAPI target                                             | Schema requirement |
-| ---------------------------- | ---------------------------------------------------------- | ------------------ |
-| `@ZodBody(schema, opts?)`    | request body — `requestBody.content[...].schema`           | any                |
-| `@ZodQuery(schema, opts?)`   | query parameters — per-property, or one `$ref` in ref mode | must be `z.object` |
-| `@ZodHeaders(schema, opts?)` | one header parameter per top-level property                | must be `z.object` |
-| `@ZodCookies(schema, opts?)` | one cookie parameter per top-level property                | must be `z.object` |
+| Decorator                    | OpenAPI target                                              | Schema requirement |
+| ---------------------------- | ----------------------------------------------------------- | ------------------ |
+| `@ZodBody(schema, opts?)`    | request body — `requestBody.content[...].schema`            | any                |
+| `@ZodQuery(schema, opts?)`   | query parameters — per-property, or one collapsed parameter | must be `z.object` |
+| `@ZodHeaders(schema, opts?)` | one header parameter per top-level property                 | must be `z.object` |
+| `@ZodCookies(schema, opts?)` | one cookie parameter per top-level property                 | must be `z.object` |
 
 All decorators are method-level (applied next to `@Get` / `@Post` / etc.). Validation stays a separate concern — pair with `@Body(new ZodValidationPipe(schema))` (or `@Query(...)`, etc.) at the parameter so the handler arg keeps a precise `z.infer<>` type.
 
@@ -302,46 +304,67 @@ For the full pattern with code, see [`recipes/intersection-with-union.md`](recip
 
 By default, a named query DTO — whether bound as `@Query() params: SomeDto` (a `createZodDto` class) or declared with `@ZodQuery(schema)` — is **expanded** into one OpenAPI parameter per top-level property. The named root object also lands in `components.schemas`: the decorator emits a marker carrying the root's id, which the collect-usage pass picks up and exposes even though no `$ref` points at it after expansion — so the shape is both expanded _and_ documented as a component. (This is specific to query: `@ZodHeaders` / `@ZodCookies` expand eagerly without a root marker, so their root object is pruned unless referenced elsewhere — the per-property parameters carry the full contract.)
 
-Set `queryParamStyle: 'ref'` on `applyZodNest` to instead emit a single **schema-based** query parameter that references the shared component:
+**Under OpenAPI 3.2 a named query DTO collapses instead**, to the single `in: querystring` parameter 3.2 introduced for exactly this — one Schema Object describing the whole query string. No option needed:
 
 ```ts
-const doc = applyZodNest(raw, { queryParamStyle: 'ref' });
+const doc = applyZodNest(raw); // doc declared 3.2 via setOpenAPIVersion('3.2.0')
 ```
 
 ```yaml
-# expand (default)                    # ref
+# 3.1 — expanded                      # 3.2 — querystring
 parameters:                           parameters:
-  - { name: timeFrom, in: query, … }    - in: query
-  - { name: timeTo,   in: query, … }      name: ActivityQuery
+  - { name: timeFrom, in: query, … }    - name: ActivityQuery
+  - { name: timeTo,   in: query, … }      in: querystring
   - { name: search,   in: query, … }      required: true
-  - { name: userId,   in: query, … }      style: form
-                                          explode: true
-                                          schema: { $ref: '#/components/schemas/ActivityQuery' }
+  - { name: userId,   in: query, … }      content:
+                                            application/x-www-form-urlencoded:
+                                              schema: { $ref: '#/components/schemas/ActivityQuery' }
 ```
 
-The **wire format is identical** — `style: form` + `explode: true` serializes the object's properties as `?timeFrom=…&timeTo=…`, exactly like the expanded form. Only the document representation changes: the spec now points at the existing component instead of duplicating each field inline. The parameter is marked `required: true` when the schema has at least one required field; per-field requiredness stays in the referenced component's `required` array.
+`content` is mandatory on `in: querystring` — 3.2 forbids `schema` and `style` there. The media type describes how a query string is encoded, which it always was; nothing changes on the wire, and `?timeFrom=…&timeTo=…` is unaffected. The one nuance: form-urlencoded's canonical space encoding is `+` where RFC 6570's `form` style gives `%20`. The spec permits both, so no client or server breaks — a generated client may simply prefer `+`.
 
-**Swagger UI renders the two forms differently** (one combined object input vs. one input per field), which is why `expand` remains the default and `ref` is opt-in.
+`required` follows the Zod schema: `true` when at least one field is required (so the query string must be present), `false` when every field is optional. Per-field requiredness stays in the referenced component's `required` array.
 
-**Query-only.** `@Param()` / `@Headers()` / `@Cookie()` DTOs always expand — the form-exploded-object pattern is a query serialization, and path parameters can't be an object `$ref`.
+### When collapsing degrades to expansion
 
-### Per-handler override
+3.2 allows **at most one** `querystring` parameter per operation, and forbids it **alongside any `in: query` parameter** in the operation or its path item. Where that would be violated, `zod-nest` expands per property instead and warns — the document stays valid rather than failing the build:
 
-`@ZodQuery` takes a `ref` option that wins over the global preference:
+```ts
+@Get()
+list(@Query() filters: FiltersDto, @Query('page') page: string) {} // expands both, warns
+```
+
+The same fallback applies, silently, when the DTO has no component to reference.
+
+### The 3.1 approximation (`queryParamStyle: 'ref'`) — deprecated
+
+3.1 has no way to say "the whole query string is this schema", so `queryParamStyle: 'ref'` approximated it with `style: form` + `explode: true` + `schema: { $ref }`. The wire format matched the expanded form; only the document representation collapsed.
+
+```ts
+const doc = applyZodNest(raw, { queryParamStyle: 'ref' }); // 3.1 only
+```
+
+Since 3.2 expresses this natively, both `queryParamStyle` and `@ZodQuery`'s `ref` option are **deprecated and will be removed in the next major**, after which 3.1 always expands and 3.2 always collapses. Under 3.2 an explicit value still wins — `queryParamStyle: 'expand'` is the escape hatch if you prefer expanded parameters in Swagger UI's "try it out" — but it warns.
+
+**Query-only.** `@Param()` / `@Headers()` / `@Cookie()` DTOs always expand — collapsing an object into one parameter is a query serialization, and path parameters can't be an object `$ref`.
+
+### Per-handler override (deprecated)
+
+`@ZodQuery` takes a `ref` option that wins over both the global preference and the version:
 
 ```ts
 @Get('activities')
-@ZodQuery(ActivityQuerySchema, { ref: true })   // force a single $ref param here
+@ZodQuery(ActivityQuerySchema, { ref: false })   // keep this one expanded under 3.2
 getActivities(
   @Query(new ZodValidationPipe(ActivityQuerySchema)) params: ActivityQuery,
 ): void {}
 ```
 
-- `ref: true` — always emit the single `$ref` parameter.
+- `ref: true` — always collapse (`in: querystring` under 3.2, `style: form` under 3.1).
 - `ref: false` — always expand per property.
-- unset — follow `applyZodNest`'s `queryParamStyle` (default `'expand'`).
+- unset — follow `queryParamStyle`, then the target version.
 
-Ref mode needs a named schema to reference. `@ZodQuery({ ref: true })` on an anonymous schema (no `.meta({ id })`, no `id` option) throws `ZodNestError`; an anonymous `@ZodQuery` always expands regardless of the global preference. The `@Query() dto` path always has a name (the DTO id), so it always honors `queryParamStyle`.
+Collapsing needs a named schema to reference. `@ZodQuery({ ref: true })` on an anonymous schema (no `.meta({ id })`, no `id` option) throws `ZodNestError`; an anonymous `@ZodQuery` always expands. The `@Query() dto` path always has a name (the DTO id), so it always collapses under 3.2 — it has no per-handler flag, so `queryParamStyle: 'expand'` is the only way to opt it out.
 
 ### `DANGLING_REF`
 

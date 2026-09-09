@@ -517,6 +517,314 @@ describe('expandParamMarkers', () => {
     expect(params[0]).toMatchObject({ __zodNestDto: true, ref: 'nope' });
   });
 
+  // ─── 3.2 querystring (emitThirtyTwo) ─────────────────────────────────────
+
+  const QUERYSTRING_PARAM = {
+    name: 'Q',
+    in: 'querystring',
+    required: true,
+    content: {
+      'application/x-www-form-urlencoded': { schema: { $ref: '#/components/schemas/Q' } },
+    },
+  };
+
+  const REF_PARAM = {
+    name: 'Q',
+    in: 'query',
+    required: true,
+    style: 'form',
+    explode: true,
+    schema: { $ref: '#/components/schemas/Q' },
+  };
+
+  let warn: ReturnType<typeof vi.spyOn>;
+
+  const warnMessages = (): string[] => warn.mock.calls.map((call: unknown[]) => String(call[0]));
+
+  beforeEach(() => {
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  it('collapses to `in: querystring` by default under 3.2 — no option needed', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      emitThirtyTwo: true,
+    });
+
+    expect(paramsOf(doc, '/x', 'get')).toEqual([QUERYSTRING_PARAM]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('honours an explicit `queryParamStyle: "expand"` under 3.2 as the escape hatch', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      queryParamStyle: 'expand',
+      emitThirtyTwo: true,
+    });
+
+    expect(paramsOf(doc, '/x', 'get').map((p) => p.name)).toEqual(['timeFrom', 'search']);
+  });
+
+  it('renders `queryParamStyle: "ref"` as querystring under 3.2, not the 3.1 form', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      queryParamStyle: 'ref',
+      emitThirtyTwo: true,
+    });
+
+    expect(paramsOf(doc, '/x', 'get')).toEqual([QUERYSTRING_PARAM]);
+  });
+
+  it('keeps the 3.1 `style: form` form when not targeting 3.2', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      queryParamStyle: 'ref',
+      emitThirtyTwo: false,
+    });
+
+    expect(paramsOf(doc, '/x', 'get')).toEqual([REF_PARAM]);
+  });
+
+  it('expands by default under 3.1 — the version, not the option, decides', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      emitThirtyTwo: false,
+    });
+
+    expect(paramsOf(doc, '/x', 'get').map((p) => p.name)).toEqual(['timeFrom', 'search']);
+  });
+
+  it('lets `@ZodQuery({ ref: false })` opt out of querystring under 3.2', () => {
+    const doc = docOf({
+      paths: {
+        '/x': { get: { parameters: [{ ...markerParam('query', 'Q'), ref: false }] } },
+      },
+      components: {
+        schemas: { Object: objectMarkerSchema(), Q: { type: 'object', properties: {} } },
+      },
+    });
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      emitThirtyTwo: true,
+    });
+
+    expect(paramsOf(doc, '/x', 'get').map((p) => p.name)).toEqual(['timeFrom', 'search']);
+  });
+
+  it('falls back to expansion under 3.2 when the DTO has no component', () => {
+    const doc = docOf({
+      paths: { '/x': { get: { parameters: [markerParam('query', 'Missing')] } } },
+      components: { schemas: { Object: objectMarkerSchema() } },
+    });
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: new Map<string, unknown>([
+        ['Missing', { type: 'object', properties: { a: { type: 'string' } } }],
+      ]),
+      outputSchemas: new Map(),
+      emitThirtyTwo: true,
+    });
+
+    expect(paramsOf(doc, '/x', 'get').map((p) => p.name)).toEqual(['a']);
+    // A missing component is not a spec violation — it degrades silently.
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('degrades to expansion when a sibling `in: query` parameter shares the operation', () => {
+    const doc = docOf({
+      paths: {
+        '/x': {
+          get: {
+            parameters: [
+              markerParam('query', 'Q'),
+              { name: 'page', in: 'query', required: false, schema: { type: 'string' } },
+            ],
+          },
+        },
+      },
+      components: {
+        schemas: { Object: objectMarkerSchema(), Q: { type: 'object', properties: {} } },
+      },
+    });
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      emitThirtyTwo: true,
+    });
+
+    expect(paramsOf(doc, '/x', 'get').map((p) => p.name)).toEqual(['timeFrom', 'search', 'page']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('`GET /x`');
+    expect(warn.mock.calls[0]?.[0]).toContain('`page`');
+  });
+
+  it('degrades when the enclosing path item carries an `in: query` parameter', () => {
+    const doc = docOf({
+      paths: {
+        '/x': {
+          parameters: [{ name: 'tenant', in: 'query', required: true, schema: { type: 'string' } }],
+          get: { parameters: [markerParam('query', 'Q')] },
+        },
+      },
+      components: {
+        schemas: { Object: objectMarkerSchema(), Q: { type: 'object', properties: {} } },
+      },
+    });
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      emitThirtyTwo: true,
+    });
+
+    expect(paramsOf(doc, '/x', 'get').map((p) => p.name)).toEqual(['timeFrom', 'search']);
+    expect(warn.mock.calls[0]?.[0]).toContain('`tenant`');
+  });
+
+  it('degrades both candidates when one operation has two query DTOs', () => {
+    const doc = docOf({
+      paths: {
+        '/x': { get: { parameters: [markerParam('query', 'Q'), markerParam('query', 'R')] } },
+      },
+      components: {
+        schemas: {
+          Object: objectMarkerSchema(),
+          Q: { type: 'object', properties: {} },
+          R: { type: 'object', properties: {} },
+        },
+      },
+    });
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: new Map<string, unknown>([
+        ['Q', { type: 'object', properties: { a: { type: 'string' } } }],
+        ['R', { type: 'object', properties: { b: { type: 'string' } } }],
+      ]),
+      outputSchemas: new Map(),
+      emitThirtyTwo: true,
+    });
+
+    expect(paramsOf(doc, '/x', 'get').map((p) => p.name)).toEqual(['a', 'b']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('2 query DTOs');
+  });
+
+  it('does not apply the coexistence rule under 3.1, where it does not exist', () => {
+    const doc = docOf({
+      paths: {
+        '/x': {
+          get: {
+            parameters: [
+              markerParam('query', 'Q'),
+              { name: 'page', in: 'query', required: false, schema: { type: 'string' } },
+            ],
+          },
+        },
+      },
+      components: {
+        schemas: { Object: objectMarkerSchema(), Q: { type: 'object', properties: {} } },
+      },
+    });
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      queryParamStyle: 'ref',
+      emitThirtyTwo: false,
+    });
+
+    expect(paramsOf(doc, '/x', 'get')).toEqual([
+      REF_PARAM,
+      expect.objectContaining({ name: 'page' }),
+    ]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns that `queryParamStyle` is deprecated, but only under 3.2', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      queryParamStyle: 'ref',
+      emitThirtyTwo: true,
+    });
+
+    const messages = warnMessages();
+    expect(messages).toContainEqual(expect.stringContaining('`queryParamStyle` is deprecated'));
+  });
+
+  it('warns that `@ZodQuery({ ref })` is deprecated, but only under 3.2', () => {
+    const withRef = (emitThirtyTwo: boolean): string[] => {
+      const doc = docOf({
+        paths: {
+          '/x': { get: { parameters: [{ ...markerParam('query', 'Q'), ref: true }] } },
+        },
+        components: {
+          schemas: { Object: objectMarkerSchema(), Q: { type: 'object', properties: {} } },
+        },
+      });
+      expandParamMarkers({
+        doc,
+        inputSchemas: querySchema(['timeFrom']),
+        outputSchemas: new Map(),
+        emitThirtyTwo,
+      });
+      return warnMessages();
+    };
+
+    expect(withRef(false)).toEqual([]);
+    warn.mockClear();
+    expect(withRef(true)).toContainEqual(expect.stringContaining('`@ZodQuery({ ref })` on `Q`'));
+  });
+
+  it('does not warn about deprecation when neither flag was set', () => {
+    const doc = refDoc('query', 'Q');
+
+    expandParamMarkers({
+      doc,
+      inputSchemas: querySchema(['timeFrom']),
+      outputSchemas: new Map(),
+      emitThirtyTwo: true,
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('is a no-op when there are no marker parameters', () => {
     const original = {
       '/static': {

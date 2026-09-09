@@ -42,7 +42,7 @@ A short list of behavioural differences you'll hit on day one. Full migration ta
 - **Multi-status `@ZodResponse`** — stack the decorator per status code. In `nestjs-zod`, multi-status required mixing `@ZodSerializerDto` with hand-rolled `@ApiResponse({ status: ... })` calls.
 - **No internal `@HttpCode`** — `@ZodResponse` does **not** call `@HttpCode` under the hood. Status resolution precedence: `@ZodResponse({ status })` → `@HttpCode(...)` on the handler → method default (`POST → 201`, others → `200`). The caller controls `201` vs `200` vs `204` via standard NestJS decorators. `status` accepts numeric codes plus the OpenAPI 3.1 range keys (`'1XX'`…`'5XX'`) and `'default'` (sugar for the resolved method default).
 - **I/O suffix only when needed** — `<Id>Output` is only emitted when the input and output JSON Schemas actually differ. `nestjs-zod` always emitted `_Output`.
-- **OpenAPI 3.1 and 3.2** — no `3.0` fallback. Pick with `DocumentBuilder.setOpenAPIVersion('3.2.0')`; 3.2 is what makes `QUERY` and WebDAV routes conformant, and what lets a streamed response say `itemSchema` instead of overstating the whole body. `$ref`s emit to the final location; `cleanupOpenApiDoc` is unnecessary.
+- **OpenAPI 3.1 and 3.2** — no `3.0` fallback. Pick with `DocumentBuilder.setOpenAPIVersion('3.2.0')`; 3.2 is what makes `QUERY` and WebDAV routes conformant, what lets a streamed response say `itemSchema` instead of overstating the whole body, what emits Response Object `summary`, and what collapses a named query DTO to `in: querystring`. `$ref`s emit to the final location; `cleanupOpenApiDoc` is unnecessary.
 - **Validation-failure logging out of the box** — `nestjs-zod` has none.
 - **Customizable serialization exception** — both `ZodValidationPipe` and `ZodSerializerInterceptor` accept a factory. `nestjs-zod` only customized the input side.
 - **DTO discriminator** — `Symbol.for('zod-nest.dto')` (cross-realm safe), not `MyDto.isZodDto`.
@@ -186,7 +186,7 @@ The decorator set: `@ZodBody`, `@ZodQuery`, `@ZodHeaders`, `@ZodCookies`. All ar
 
 See [`docs/recipes/intersection-with-union.md`](docs/recipes/intersection-with-union.md) for the full pattern.
 
-Named query objects (both `@Query() dto` and `@ZodQuery`) expand to one parameter per field by default. Pass `applyZodNest(raw, { queryParamStyle: 'ref' })` — or `@ZodQuery(schema, { ref: true })` per handler — to instead emit a single schema-based query parameter that `$ref`s the shared component. Same wire format; see [`docs/swagger-integration.md → Query parameter style`](docs/swagger-integration.md#query-parameter-style).
+Named query objects (both `@Query() dto` and `@ZodQuery`) collapse to a single `in: querystring` parameter under OpenAPI 3.2 — the field 3.2 added for exactly this — and expand to one parameter per field under 3.1. Nothing changes on the wire either way. The deprecated `queryParamStyle` / `@ZodQuery({ ref })` flags override the default; see [`docs/swagger-integration.md → Query parameter style`](docs/swagger-integration.md#query-parameter-style).
 
 ### I/O suffix rules
 

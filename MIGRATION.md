@@ -21,6 +21,35 @@ If you're on Nest 11 and Node 22.12+, this is a version bump and nothing else.
 
 > Wondering whether to switch to NestJS 12's built-in Standard Schema support (`@Body({ schema })`, `StandardSchemaValidationPipe`)? See [`docs/why-this-exists.md`](docs/why-this-exists.md#nestjs-12s-native-standard-schema-support) — short version: pick one per document. Using the `schema` option on a `.meta({ id })` schema makes `applyZodNest` throw `AMBIGUOUS_RENAME`, because both sides emit the same component.
 
+## Named query DTOs under OpenAPI 3.2
+
+Also for existing `zod-nest` users, and **only if your document declares 3.2** — 3.1 documents are untouched.
+
+A named query DTO (`@Query() params: SomeDto` or `@ZodQuery(schema)`) now collapses to a single `in: querystring` parameter instead of expanding to one parameter per field:
+
+```yaml
+# before                              # after
+parameters:                           parameters:
+  - { name: timeFrom, in: query, … }    - name: ActivityQuery
+  - { name: timeTo,   in: query, … }      in: querystring
+  - { name: search,   in: query, … }      required: true
+                                          content:
+                                            application/x-www-form-urlencoded:
+                                              schema: { $ref: '#/components/schemas/ActivityQuery' }
+```
+
+**Nothing changes on the wire.** `?timeFrom=…&timeTo=…` is unaffected, and `ZodValidationPipe` behaves identically — this is a document-representation change. `in: querystring` is the field OpenAPI 3.2 added to say "the whole query string is this schema", which is what `queryParamStyle: 'ref'` had been approximating with `style: form` + `explode: true`.
+
+What to do:
+
+- **Happy with it** — nothing. This is the spec-correct representation.
+- **Want the old expanded output** — pass `applyZodNest(raw, { queryParamStyle: 'expand' })`, or `@ZodQuery(schema, { ref: false })` for one handler. Both warn, and both go away in the next major.
+- **Regenerating clients** — expect the query parameter to change shape. Client behaviour shouldn't, but the generated signature may.
+
+Two 3.2 rules can make an operation keep expanding: only one `querystring` parameter is allowed per operation, and it can't sit beside an `in: query` parameter. A handler mixing a DTO with a plain `@Query('page')` therefore expands as before, with a warning naming the conflict. The document stays valid either way.
+
+**`queryParamStyle` and `@ZodQuery`'s `ref` option are both deprecated** and will be removed in the next major, after which 3.1 always expands and 3.2 always collapses. They existed only because 3.1 could not express a whole-query-string schema.
+
 ## TL;DR — 5 bullets
 
 1. **Bump Zod to v4** (`zod@^4`). `zod-nest` is v4-only.
@@ -135,7 +164,7 @@ If your codebase still uses Zod v3 APIs, work through Zod's own [v3-to-v4 migrat
   SwaggerModule.setup('docs', app, doc);
 ```
 
-`applyZodNest` emits the version you set with `DocumentBuilder.setOpenAPIVersion()` — any `3.1.x` or `3.2.x` passes through verbatim, and anything else falls back to `3.1.0` with a warning. 3.2 is a backward-compatible superset, needed only if you route `QUERY`. There's still no 3.0 path. It takes no required arguments — `applyZodNest(doc)` is the whole call. (zod-nest v1 required an `{ app }` argument; v2 removed it — output-side DTO usage is now read from the document's `responses`.)
+`applyZodNest` emits the version you set with `DocumentBuilder.setOpenAPIVersion()` — any `3.1.x` or `3.2.x` passes through verbatim, and anything else falls back to `3.1.0` with a warning. 3.2 is a backward-compatible superset; it makes `QUERY` and WebDAV routes conformant, lets a streamed response say `itemSchema`, emits Response Object `summary`, and collapses a named query DTO to `in: querystring` (see [Query parameter style](docs/swagger-integration.md#query-parameter-style)). There's still no 3.0 path. It takes no required arguments — `applyZodNest(doc)` is the whole call. (zod-nest v1 required an `{ app }` argument; v2 removed it — output-side DTO usage is now read from the document's `responses`.)
 
 If you served OpenAPI 3.0 from `nestjs-zod`, you'll need a downgrade pass _after_ `applyZodNest`. There are good standalone tools (e.g. `openapi-down-convert`) for this.
 

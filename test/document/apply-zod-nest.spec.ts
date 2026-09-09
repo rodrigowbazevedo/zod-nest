@@ -890,8 +890,10 @@ describe('applyZodNest — optional field in @Param() DTO is coerced to required
     const id = params.find((p) => p.name === 'id');
     expect(id?.required).toBe(true);
     expect(warn).toHaveBeenCalled();
-    const [firstCall] = warn.mock.calls;
-    expect(firstCall?.[0]).toContain('Path parameter `id` on DTO `OptionalPathDto`');
+    const messages = warn.mock.calls.map(([message]) => message);
+    expect(messages).toContainEqual(
+      expect.stringContaining('Path parameter `id` on DTO `OptionalPathDto`'),
+    );
 
     warn.mockRestore();
     await app.close();
