@@ -33,37 +33,45 @@ class TemplatesController {
 
 The emitted operation has four parameters — `limit`, `cursor`, `search`, `sortBy` — each with its own `required` and `description`. The `TemplatesQuery` schema is still emitted under `components.schemas` (it might be referenced by `@Body()` elsewhere); the expansion is purely additive at the operation level.
 
-## Schema-based query parameters (`queryParamStyle: 'ref'`)
+## Whole-query-string parameters (`in: querystring`)
 
-The expansion above duplicates each field inline even though `TemplatesQuery` already lives in `components.schemas`. Opt into the **schema-based** form to collapse the whole query object to a single parameter that references the shared component — no controller change needed, just one flag on `applyZodNest`:
+The expansion above duplicates each field inline even though `TemplatesQuery` already lives in `components.schemas`. **Declare OpenAPI 3.2 and the whole query object collapses to one parameter** referencing the shared component — no controller change and no option:
 
 ```ts
-const doc = applyZodNest(SwaggerModule.createDocument(app, config), {
-  app,
-  queryParamStyle: 'ref',
-});
+const config = new DocumentBuilder().setOpenAPIVersion('3.2.0').build();
+const doc = applyZodNest(SwaggerModule.createDocument(app, config));
 ```
 
 The `@Query() q: TemplatesQueryDto` operation now emits one parameter instead of four:
 
 ```yaml
 parameters:
-  - in: query
-    name: TemplatesQuery
+  - name: TemplatesQuery
+    in: querystring
     required: false # no required fields on this schema → optional container
-    style: form
-    explode: true
-    schema:
-      $ref: '#/components/schemas/TemplatesQuery'
+    content:
+      application/x-www-form-urlencoded:
+        schema:
+          $ref: '#/components/schemas/TemplatesQuery'
 ```
 
-`style: form` + `explode: true` is the OpenAPI serialization that makes this wire-identical to the expanded form (`?limit=20&search=foo`), so clients and `ZodValidationPipe` behave exactly the same — only the document representation changes. Note Swagger UI renders a schema-based query parameter as a single combined input rather than one input per field, which is why this is opt-in.
+Nothing changes on the wire — `?limit=20&search=foo` is unaffected, and clients and `ZodValidationPipe` behave exactly the same. Only the document representation changes. Note Swagger UI renders this as a single combined input rather than one input per field.
 
-To flip a single endpoint without changing the global default, use `@ZodQuery` with its `ref` option (it overrides `queryParamStyle`):
+**Two rules 3.2 enforces:** at most one `querystring` parameter per operation, and never one alongside an `in: query` parameter. Where a handler would break either — a DTO plus a plain `@Query('page')`, say — `zod-nest` expands per property instead and warns, so the document stays valid.
+
+On 3.1 there is no `querystring`, so a named query DTO expands. The deprecated `queryParamStyle: 'ref'` opts into a 3.1 approximation (`style: form` + `explode: true` + `schema: { $ref }`):
+
+```ts
+const doc = applyZodNest(SwaggerModule.createDocument(app, config), {
+  queryParamStyle: 'ref',
+});
+```
+
+To flip a single endpoint, `@ZodQuery`'s `ref` option overrides both the global preference and the version — also deprecated, and removed alongside it in the next major:
 
 ```ts
 @Get()
-@ZodQuery(TemplatesQuery, { ref: true })
+@ZodQuery(TemplatesQuery, { ref: false }) // keep this one expanded under 3.2
 list(@Query(new ZodValidationPipe(TemplatesQuery)) q: z.infer<typeof TemplatesQuery>): unknown {
   return q;
 }

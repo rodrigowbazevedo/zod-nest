@@ -15,16 +15,19 @@ export interface ZodQueryOptions {
   /** Registry to register into. Defaults to `defaultRegistry`. */
   readonly registry?: ZodNestRegistry;
   /**
-   * Override how this query DTO is represented in the OpenAPI doc, taking
-   * precedence over `applyZodNest`'s `queryParamStyle`:
+   * Override how this query DTO is represented, taking precedence over
+   * `applyZodNest`'s `queryParamStyle` and the target version:
    *
-   * - `true` — one single schema-based query parameter that `$ref`s the DTO's
-   *   `components.schemas` entry (`style: 'form'`, `explode: true`).
+   * - `true` — collapse to one parameter carrying the whole schema
+   *   (`in: 'querystring'` under 3.2, `style: 'form'` under 3.1).
    * - `false` — one parameter per top-level property.
-   * - unset — follow the global `queryParamStyle` preference (default `'expand'`).
+   * - unset — follow `queryParamStyle`, then the version (3.2 collapses).
    *
-   * Ref mode needs a named schema to reference: `ref: true` on an anonymous
+   * Collapsing needs a named schema to reference: `ref: true` on an anonymous
    * schema (no `.meta({ id })` and no `id` option) throws `ZodNestError`.
+   *
+   * @deprecated Removed in the next major, where 3.1 always expands and 3.2
+   * always collapses. Under 3.2 an explicit value warns.
    */
   readonly ref?: boolean;
 }

@@ -56,17 +56,17 @@ export interface ApplyZodNestOptions {
    */
   strict?: boolean;
   /**
-   * How named `@Query()` / `@ZodQuery` DTOs are represented in the document
-   * (default `'expand'`):
+   * Overrides the version-derived default for named `@Query()` / `@ZodQuery`
+   * DTOs: `'expand'` for one parameter per property, `'ref'` to collapse to a
+   * single parameter carrying the whole schema.
    *
-   * - `'expand'` — one query parameter per top-level property of the DTO.
-   * - `'ref'` — a single schema-based query parameter referencing the DTO's
-   *   `components.schemas` entry (`style: 'form'`, `explode: true`). The wire
-   *   format is unchanged; only the spec representation collapses to the
-   *   shared component. Note: Swagger UI renders the two forms differently.
+   * Left unset, 3.2 collapses (as `in: 'querystring'`) and 3.1 expands.
+   * Query-only — path / header / cookie DTOs always expand — and a per-handler
+   * `@ZodQuery({ ref })` takes precedence.
    *
-   * Query-only — path / header / cookie DTOs always expand. A per-handler
-   * `@ZodQuery({ ref })` override takes precedence over this preference.
+   * @deprecated Removed in the next major, where 3.1 always expands and 3.2
+   * always collapses. This option existed because 3.1 could not express a
+   * whole-query-string schema; 3.2's `querystring` can.
    */
   queryParamStyle?: QueryParamStyle;
   /**
@@ -93,9 +93,9 @@ export interface ApplyZodNestOptions {
  *   keyed by the marker's `dtoId` (renaming as needed).
  * - Every `@Query()` / `@Param()` / `@Headers()` / `@Cookie()` marker
  *   parameter is expanded into one parameter per top-level property of the
- *   DTO's schema (`expandParamMarkers`) — except `@Query()` DTOs under
- *   `queryParamStyle: 'ref'` (or a `@ZodQuery({ ref: true })` override), which
- *   collapse to a single `$ref` schema-based query parameter. The synthetic
+ *   DTO's schema (`expandParamMarkers`) — except named `@Query()` DTOs under
+ *   3.2, which collapse to a single `in: 'querystring'` parameter, and their
+ *   3.1 equivalent under `queryParamStyle: 'ref'`. The synthetic
  *   `components.schemas.Object` that `@nestjs/swagger` materialises for the
  *   marker placeholder is pruned when it has no remaining referrers.
  * - The I/O suffix truth table is applied — equal input/output bodies collapse
@@ -120,12 +120,19 @@ export interface ApplyZodNestOptions {
  *   so a streamed body documents one item rather than the whole sequence.
  * - Response Object `summary` survives only under 3.2; emitting 3.1 drops each
  *   one with a warning naming the operation, since 3.1 forbids the field.
+ * - Under 3.2 a named query DTO collapses to `in: 'querystring'`, degrading to
+ *   per-property expansion (with a warning) where that version's coexistence
+ *   rules forbid it — a sibling `in: 'query'` parameter, or a second candidate.
  *
  * Composable with other doc-transform passes — apply other mutations before
  * or after this function.
  */
 export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {}): OpenAPIObject => {
   const registry = opts.registry ?? defaultRegistry;
+  // Resolved up front because `expandParamMarkers` branches on it, and once
+  // only — it warns on an unsupported version, so a second call would warn twice.
+  const openApiVersion = resolveOpenApiVersion(doc);
+  const emitThirtyTwo = openApiVersion.startsWith('3.2.');
 
   const collected = collectUsage(doc, registry);
   // Reachability-scoped exposure: `collectUsage` seeds what the document's
@@ -144,7 +151,13 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {})
     collected: extended,
     collisions: registry.getCollisions(),
   });
-  expandParamMarkers({ doc, inputSchemas, outputSchemas, queryParamStyle: opts.queryParamStyle });
+  expandParamMarkers({
+    doc,
+    inputSchemas,
+    outputSchemas,
+    queryParamStyle: opts.queryParamStyle,
+    emitThirtyTwo,
+  });
   rewriteRefs({ doc, renames, divergentOutputIds });
   stripMarkers(doc);
   inlineAnonymousBodies({ doc, registry });
@@ -152,10 +165,6 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {})
     applyRefTitles(doc);
   }
   assertNoDanglingRefs({ doc, collected: extended });
-  // Resolved once — it both gates relocation and stamps the doc, and it warns
-  // on an unsupported version, so a second call would warn twice.
-  const openApiVersion = resolveOpenApiVersion(doc);
-  const emitThirtyTwo = openApiVersion.startsWith('3.2.');
   if (emitThirtyTwo) {
     relocateExtensionOperations(doc);
   }

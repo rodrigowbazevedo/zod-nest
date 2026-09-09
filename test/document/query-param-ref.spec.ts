@@ -26,6 +26,7 @@ type ActivityQuery = z.infer<typeof ActivityQuerySchema>;
 
 const bootstrap = async (
   controllers: Type<unknown>[],
+  declared?: string,
 ): Promise<{ app: INestApplication; raw: OpenAPIObject }> => {
   const moduleRef = await Test.createTestingModule({
     imports: [DiscoveryModule],
@@ -33,19 +34,29 @@ const bootstrap = async (
   }).compile();
   const app = moduleRef.createNestApplication({ logger: false });
   await app.init();
-  const config = new DocumentBuilder().setTitle('query-ref').setVersion('v').build();
-  const raw = SwaggerModule.createDocument(app, config);
+  const builder = new DocumentBuilder().setTitle('query-ref').setVersion('v');
+  if (declared !== undefined) {
+    builder.setOpenAPIVersion(declared);
+  }
+  const raw = SwaggerModule.createDocument(app, builder.build());
   return { app, raw };
 };
 
-const queryParamsAt = (doc: OpenAPIObject, path: string): Array<Record<string, unknown>> => {
+const paramsIn = (
+  doc: OpenAPIObject,
+  path: string,
+  location: string,
+): Array<Record<string, unknown>> => {
   const paths = doc.paths as Record<string, Record<string, Record<string, unknown>>> | undefined;
   const parameters = paths?.[path]?.get?.parameters;
   if (!Array.isArray(parameters)) {
     return [];
   }
-  return (parameters as Array<Record<string, unknown>>).filter((p) => p.in === 'query');
+  return (parameters as Array<Record<string, unknown>>).filter((p) => p.in === location);
 };
+
+const queryParamsAt = (doc: OpenAPIObject, path: string): Array<Record<string, unknown>> =>
+  paramsIn(doc, path, 'query');
 
 describe('query parameter ref mode (end-to-end)', () => {
   describe('queryParamStyle: "ref"', () => {
@@ -158,6 +169,90 @@ describe('query parameter ref mode (end-to-end)', () => {
       expect(params).toHaveLength(1);
       expect(params[0]?.schema).toEqual({ $ref: '#/components/schemas/ActivityQuery' });
       expect(params[0]?.style).toBe('form');
+    });
+  });
+
+  describe('OpenAPI 3.2 collapses to `in: querystring` with no option set', () => {
+    let app: INestApplication;
+    let doc: OpenAPIObject;
+
+    beforeAll(async () => {
+      const registry = createRegistry();
+      class Local extends createZodDto(ActivityQuerySchema, { registry }) {}
+      @Controller('activities')
+      class LocalController {
+        @Get('via-dto')
+        viaDto(@Query() _params: Local): void {}
+      }
+      const result = await bootstrap([LocalController], '3.2.0');
+      app = result.app;
+      doc = applyZodNest(result.raw, { registry });
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    it('emits one querystring parameter and no `in: query` parameters', () => {
+      expect(queryParamsAt(doc, '/activities/via-dto')).toHaveLength(0);
+      const params = paramsIn(doc, '/activities/via-dto', 'querystring');
+      expect(params).toHaveLength(1);
+      expect(params[0]).toEqual({
+        name: 'ActivityQuery',
+        in: 'querystring',
+        required: true,
+        content: {
+          'application/x-www-form-urlencoded': {
+            schema: { $ref: '#/components/schemas/ActivityQuery' },
+          },
+        },
+      });
+    });
+
+    it('keeps the ActivityQuery component intact', () => {
+      const schemas = (doc.components?.schemas ?? {}) as Record<string, unknown>;
+      expect(schemas.ActivityQuery).toEqual(
+        expect.objectContaining({ type: 'object', required: ['timeFrom', 'timeTo'] }),
+      );
+    });
+  });
+
+  describe('OpenAPI 3.2 degrades to expansion when a plain @Query() shares the handler', () => {
+    let app: INestApplication;
+    let doc: OpenAPIObject;
+    const warnings: string[] = [];
+
+    beforeAll(async () => {
+      const registry = createRegistry();
+      class Local extends createZodDto(ActivityQuerySchema, { registry }) {}
+      @Controller('activities')
+      class LocalController {
+        @Get('mixed')
+        mixed(@Query() _params: Local, @Query('page') _page: string): void {}
+      }
+      const result = await bootstrap([LocalController], '3.2.0');
+      app = result.app;
+      const warn = vi
+        .spyOn(console, 'warn')
+        .mockImplementation((message: unknown) => void warnings.push(String(message)));
+      doc = applyZodNest(result.raw, { registry });
+      warn.mockRestore();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    it('expands rather than emitting an invalid querystring/query mix', () => {
+      expect(paramsIn(doc, '/activities/mixed', 'querystring')).toHaveLength(0);
+      const names = queryParamsAt(doc, '/activities/mixed').map((p) => p.name);
+      expect(names).toContain('timeFrom');
+      expect(names).toContain('page');
+    });
+
+    it('warns naming the operation and the conflicting parameter', () => {
+      expect(warnings).toContainEqual(expect.stringContaining('`GET /activities/mixed`'));
+      expect(warnings).toContainEqual(expect.stringContaining('`page`'));
     });
   });
 });

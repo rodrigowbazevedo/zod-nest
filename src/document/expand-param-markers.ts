@@ -2,21 +2,25 @@ import type { OpenAPIObject } from '@nestjs/swagger';
 
 import { COMPONENTS_SCHEMAS_PREFIX } from '../schema/constants.js';
 import { ZodNestDocumentError } from './errors.js';
-import { forEachOperation } from './http-methods.js';
+import { operationEntriesOfPathItem } from './http-methods.js';
+import {
+  buildQuerystringParam,
+  conflictingQueryNames,
+  hasQueryConflict,
+} from './querystring-param.js';
 import { walkRefs } from './walk-refs.js';
 
 /**
  * How a named `@Query()` / `@ZodQuery` DTO is represented in the OpenAPI doc:
  *
- * - `'expand'` (default) — one parameter per top-level property of the DTO
- *   schema, each inlined or `$ref`'d independently.
- * - `'ref'` — a single schema-based query parameter that references the DTO's
- *   `components.schemas` entry (`style: 'form'`, `explode: true`,
- *   `schema: { $ref }`). The wire format is identical to `'expand'`; only the
- *   document representation collapses to the shared component.
+ * - `'expand'` — one parameter per top-level property of the DTO schema.
+ * - `'ref'` — collapse to a single parameter carrying the whole schema.
  *
- * Query-only: path / header / cookie markers always expand regardless of this
- * setting, since the form-exploded-object pattern is a query serialization.
+ * Query-only: path / header / cookie markers always expand, since collapsing
+ * an object into one parameter is a query serialization.
+ *
+ * @deprecated Removed in the next major. 3.2 collapses named query DTOs to
+ * `in: 'querystring'` by default, which is what this option approximated.
  */
 export type QueryParamStyle = 'expand' | 'ref';
 
@@ -28,11 +32,14 @@ export interface ExpandParamMarkersParams {
   /** Bulk-emitted output-side schemas keyed by `dtoId`. Source for the (rare) `io: 'output'` parameter marker. */
   outputSchemas: ReadonlyMap<string, unknown>;
   /**
-   * Global preference for how `in: 'query'` DTO markers are represented.
-   * Defaults to `'expand'`. A per-marker `ref` override (set by `@ZodQuery`)
-   * wins over this when present.
+   * Explicit override of the version-derived default. Unset is meaningful —
+   * it is what lets 3.2 collapse and 3.1 expand.
+   *
+   * @deprecated See {@link QueryParamStyle}.
    */
   queryParamStyle?: QueryParamStyle;
+  /** Target is OpenAPI 3.2: collapse by default, and render as `in: 'querystring'`. */
+  emitThirtyTwo?: boolean;
 }
 
 interface MarkerParam extends Record<string, unknown> {
@@ -40,10 +47,9 @@ interface MarkerParam extends Record<string, unknown> {
   dtoId: string;
   io: 'input' | 'output';
   /**
-   * Per-marker override of `queryParamStyle`. `true` forces the single-`$ref`
-   * query parameter, `false` forces per-property expansion, `undefined` falls
-   * back to the global preference. Only `@ZodQuery({ ref })` sets it; the
-   * `@Query() dto` marker omits it (follows the global preference).
+   * Per-marker override: `true` collapses, `false` expands, `undefined` defers
+   * to `queryParamStyle` and then to the target version. Only `@ZodQuery({ ref })`
+   * sets it — `@Query() dto` omits it.
    */
   ref?: boolean;
 }
@@ -58,16 +64,21 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
  * a non-body decorator — with one parameter per top-level property of the
  * DTO schema.
  *
- * A `'query'` marker is instead collapsed to a single schema-based parameter
- * (`style: 'form'`, `explode: true`, `schema: { $ref }`) when ref mode applies
- * — either the per-marker `ref` override (from `@ZodQuery`) or the global
- * `queryParamStyle: 'ref'` preference. Ref mode is query-only; path / header /
- * cookie markers always expand. See `QueryParamStyle`.
+ * A `'query'` marker with a named component instead collapses to one
+ * parameter carrying the whole schema: `in: 'querystring'` + `content` under
+ * 3.2, or the 3.1 approximation of it (`in: 'query'`, `style: 'form'`,
+ * `explode: true`). `@ZodQuery({ ref })` wins, then `queryParamStyle`, then
+ * the target version. Query-only; path / header / cookie markers always expand.
+ *
+ * Collapsing degrades to expansion — never an error — when the component is
+ * missing, or when 3.2's coexistence rules would be broken (a sibling
+ * `in: 'query'` parameter on the operation or its path item, or more than one
+ * candidate). The last two warn.
  *
  * Runs after `mergeSchemas` (so the real schema body lives in the
  * `inputSchemas` map, and the DTO's component is in `doc.components.schemas`
- * for ref mode) and before `rewriteRefs` (so any `$ref` inside a property
- * schema gets rewritten in the subsequent pass).
+ * to collapse against) and before `rewriteRefs` (so any `$ref` inside a
+ * property schema gets rewritten in the subsequent pass).
  *
  * After expansion, if `components.schemas.Object` (the synthetic placeholder
  * `@nestjs/swagger` materialises from the marker's `type: () => Object`) has
@@ -81,30 +92,46 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
  * action is to fail loudly at doc-build time.
  */
 export const expandParamMarkers = (params: ExpandParamMarkersParams): void => {
-  const { doc, inputSchemas, outputSchemas } = params;
-  const queryParamStyle = params.queryParamStyle ?? 'expand';
+  const { doc, inputSchemas, outputSchemas, queryParamStyle } = params;
+  const emitThirtyTwo = params.emitThirtyTwo ?? false;
   const schemas = doc.components?.schemas;
   const componentIds =
     schemas !== null && typeof schemas === 'object'
       ? new Set(Object.keys(schemas))
       : new Set<string>();
+  if (queryParamStyle !== undefined && emitThirtyTwo) {
+    warnDeprecatedQueryParamStyle();
+  }
+  const context: ExpandContext = {
+    inputSchemas,
+    outputSchemas,
+    queryParamStyle,
+    emitThirtyTwo,
+    componentIds,
+  };
   let expandedAny = false;
-  forEachOperation(doc, (op) => {
-    const parameters = op.parameters;
-    if (!Array.isArray(parameters)) {
-      return;
+  // Walks `doc.paths` directly rather than via `forEachOperation`, which
+  // exposes no path item — 3.2's coexistence rule spans its `parameters` too.
+  for (const [path, pathItem] of Object.entries(doc.paths ?? {})) {
+    if (!isPlainRecord(pathItem)) {
+      continue;
     }
-    const next = expandParameterList(parameters, {
-      inputSchemas,
-      outputSchemas,
-      queryParamStyle,
-      componentIds,
-    });
-    if (next !== parameters) {
-      op.parameters = next;
-      expandedAny = true;
+    for (const { method, operation } of operationEntriesOfPathItem(pathItem)) {
+      const parameters = operation.parameters;
+      if (!Array.isArray(parameters)) {
+        continue;
+      }
+      const next = expandParameterList(parameters, context, {
+        path,
+        method,
+        pathItemParameters: pathItem.parameters,
+      });
+      if (next !== parameters) {
+        operation.parameters = next;
+        expandedAny = true;
+      }
     }
-  });
+  }
   // The synthetic `components.schemas.Object` only appears when at least one
   // marker parameter was processed by @nestjs/swagger — skip the full-doc
   // ref walk on the common no-marker path.
@@ -116,14 +143,35 @@ export const expandParamMarkers = (params: ExpandParamMarkersParams): void => {
 interface ExpandContext {
   readonly inputSchemas: ReadonlyMap<string, unknown>;
   readonly outputSchemas: ReadonlyMap<string, unknown>;
-  readonly queryParamStyle: QueryParamStyle;
+  readonly queryParamStyle: QueryParamStyle | undefined;
+  readonly emitThirtyTwo: boolean;
   readonly componentIds: ReadonlySet<string>;
+}
+
+/** Where the parameter list being expanded lives, for conflict checks and warnings. */
+interface OperationScope {
+  readonly path: string;
+  readonly method: string;
+  readonly pathItemParameters: unknown;
 }
 
 const expandParameterList = (
   parameters: readonly unknown[],
   context: ExpandContext,
+  scope: OperationScope,
 ): readonly unknown[] => {
+  const candidateCount = countCollapseCandidates(parameters, context);
+  const collapseBlocked =
+    context.emitThirtyTwo &&
+    candidateCount > 0 &&
+    hasQueryConflict({
+      parameters,
+      pathItemParameters: scope.pathItemParameters,
+      candidateCount,
+    });
+  if (collapseBlocked) {
+    warnQuerystringDegraded(scope, parameters, candidateCount);
+  }
   let result: unknown[] | undefined;
   for (let i = 0; i < parameters.length; i++) {
     const param = parameters[i];
@@ -137,35 +185,70 @@ const expandParameterList = (
     }
     const map = marker.io === 'output' ? context.outputSchemas : context.inputSchemas;
     const body = map.get(marker.dtoId);
-    result.push(...resolveMarker(marker, body, context));
+    result.push(...resolveMarker(marker, body, context, collapseBlocked));
   }
   return result ?? parameters;
 };
 
 /**
- * Decide whether a `'query'` marker collapses to a single schema-based
- * parameter (`ref`) or expands per-property. The per-marker `ref` override
- * wins; otherwise the global `queryParamStyle` decides. Ref mode is query-only
- * and needs the DTO's component to exist in the doc — `collectUsage` adds the
- * marker's dtoId to `inputExposedIds` so `mergeSchemas` emits it. If it somehow
- * still isn't present, fall back to expansion so the contract ships rather than
- * dangling.
+ * Whether this marker collapses at all. Needs the DTO's component to exist —
+ * `collectUsage` seeds it into `inputExposedIds` so `mergeSchemas` emits it, but
+ * if it somehow isn't there, expansion ships a contract rather than a dangling ref.
  */
-const resolveMarker = (marker: MarkerParam, body: unknown, context: ExpandContext): unknown[] => {
-  const useRef = marker.ref ?? context.queryParamStyle === 'ref';
-  if (marker.in === 'query' && useRef && context.componentIds.has(marker.dtoId)) {
-    return [buildRefQueryParam(marker, body)];
+const wouldCollapse = (marker: MarkerParam, context: ExpandContext): boolean =>
+  marker.in === 'query' &&
+  prefersCollapse(marker, context) &&
+  context.componentIds.has(marker.dtoId);
+
+/** First match wins: the per-marker flag, then the global option, then the version. */
+const prefersCollapse = (marker: MarkerParam, context: ExpandContext): boolean => {
+  if (marker.ref !== undefined) {
+    return marker.ref;
   }
-  return expandOne(marker, body);
+  if (context.queryParamStyle !== undefined) {
+    return context.queryParamStyle === 'ref';
+  }
+  return context.emitThirtyTwo;
+};
+
+const countCollapseCandidates = (
+  parameters: readonly unknown[],
+  context: ExpandContext,
+): number => {
+  let count = 0;
+  for (const param of parameters) {
+    const marker = readMarker(param);
+    if (marker !== undefined && wouldCollapse(marker, context)) {
+      count += 1;
+    }
+  }
+  return count;
+};
+
+/** Collapse to one parameter, or expand per-property. 3.2 renders a collapse as
+ * `in: 'querystring'`; 3.1 as the `style: 'form'` approximation of it. */
+const resolveMarker = (
+  marker: MarkerParam,
+  body: unknown,
+  context: ExpandContext,
+  collapseBlocked: boolean,
+): unknown[] => {
+  if (marker.ref !== undefined && context.emitThirtyTwo) {
+    warnDeprecatedRefOption(marker.dtoId);
+  }
+  if (collapseBlocked || !wouldCollapse(marker, context)) {
+    return expandOne(marker, body);
+  }
+  if (context.emitThirtyTwo) {
+    return [buildQuerystringParam({ dtoId: marker.dtoId, body })];
+  }
+  return [buildRefQueryParam(marker, body)];
 };
 
 /**
- * Build the single schema-based query parameter for `ref` mode. References the
- * DTO's `components.schemas` entry via `$ref`, with `style: 'form'` +
- * `explode: true` so the wire format matches the per-property expansion
- * (`?a=1&b=2`). The parameter is marked `required` when the schema has at
- * least one required field; per-field requiredness stays in the referenced
- * component's `required` array.
+ * The 3.1 approximation of `in: 'querystring'`: `style: 'form'` + `explode: true`
+ * so the wire format still reads `?a=1&b=2`. `required` follows the Zod schema —
+ * true when at least one field is required.
  */
 const buildRefQueryParam = (marker: MarkerParam, body: unknown): Record<string, unknown> => {
   const required = isPlainRecord(body) && Array.isArray(body.required) && body.required.length > 0;
@@ -263,6 +346,53 @@ const buildParameter = (
 };
 
 const capitalize = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1);
+
+const warnQuerystringDegraded = (
+  scope: OperationScope,
+  parameters: readonly unknown[],
+  candidateCount: number,
+): void => {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[zod-nest] Expanded the query DTO on \`${scope.method.toUpperCase()} ${scope.path}\` ` +
+      `per-property instead of emitting \`in: 'querystring'\`: ` +
+      `${degradeReason(scope, parameters, candidateCount)} ` +
+      'The expanded form is spec-valid, so the document still ships.',
+  );
+};
+
+const degradeReason = (
+  scope: OperationScope,
+  parameters: readonly unknown[],
+  candidateCount: number,
+): string => {
+  if (candidateCount > 1) {
+    return `OpenAPI 3.2 allows at most one \`querystring\` parameter per operation, and this one has ${candidateCount} query DTOs.`;
+  }
+  const names = conflictingQueryNames(parameters, scope.pathItemParameters);
+  return (
+    "OpenAPI 3.2 forbids a `querystring` parameter alongside `in: 'query'` parameters " +
+    `(${names.map((name) => `\`${name}\``).join(', ')}).`
+  );
+};
+
+const warnDeprecatedQueryParamStyle = (): void => {
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[zod-nest] `queryParamStyle` is deprecated and will be removed in the next major: ' +
+      "OpenAPI 3.2 emits `in: 'querystring'` for named query DTOs by default, which is what " +
+      'this option approximated. Drop it to take the default.',
+  );
+};
+
+const warnDeprecatedRefOption = (dtoId: string): void => {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[zod-nest] \`@ZodQuery({ ref })\` on \`${dtoId}\` is deprecated and will be removed in ` +
+      "the next major: OpenAPI 3.2 emits `in: 'querystring'` for named query DTOs by default. " +
+      'Drop the option to take the default.',
+  );
+};
 
 const pruneOrphanObjectSchema = (doc: OpenAPIObject): void => {
   const schemas = doc.components?.schemas as Record<string, unknown> | undefined;
