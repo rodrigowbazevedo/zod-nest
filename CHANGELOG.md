@@ -1,3 +1,10 @@
+# [3.8.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.7.0...v3.8.0) (2026-10-15)
+
+
+### Features
+
+* default errorCode on ZodValidationException / ZodSerializationException ([#188](https://github.com/rodrigowbazevedo/zod-nest/issues/188)) ([3ef9fda](https://github.com/rodrigowbazevedo/zod-nest/commit/3ef9fdae12f33e74ef735dd1f81b74c35ed17f96))
+
 # [3.7.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.6.0...v3.7.0) (2026-09-09)
 
 
