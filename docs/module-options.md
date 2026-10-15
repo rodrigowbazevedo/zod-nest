@@ -21,7 +21,7 @@ The module is marked `global` so the `ZOD_NEST_OPTIONS` token is injectable from
 type CreateValidationException = (err: z.ZodError, argMetadata: ArgumentMetadata) => unknown;
 ```
 
-Factory for the exception thrown by `ZodValidationPipe` on input validation failure. The default factory builds a `ZodValidationException` (HTTP 400, body `{ statusCode, message: 'Validation failed', errors: z.treeifyError(zodError) }`).
+Factory for the exception thrown by `ZodValidationPipe` on input validation failure. The default factory builds a `ZodValidationException` (HTTP 400, body `{ statusCode, message: 'Validation failed', errors: z.treeifyError(zodError), errorCode: 'VALIDATION_FAILED' }`; `errorCode` on `@nestjs/common` >= 12 only, see [error codes](exceptions.md#error-codes)).
 
 ```ts
 import { HttpException, HttpStatus } from '@nestjs/common';
@@ -48,7 +48,7 @@ type CreateSerializationException = (
 ) => unknown;
 ```
 
-Factory for the exception thrown by `ZodSerializerInterceptor` on output validation failure. The default factory builds a `ZodSerializationException` (HTTP 500, body `{ statusCode, message: 'Response validation failed' }` — the zod error tree is deliberately not in the body; see [`exceptions.md`](exceptions.md#why-the-response-body-has-no-errors-field)).
+Factory for the exception thrown by `ZodSerializerInterceptor` on output validation failure. The default factory builds a `ZodSerializationException` (HTTP 500, body `{ statusCode, message: 'Response validation failed', errorCode: 'SERIALIZATION_FAILED' }`, with `errorCode` on `@nestjs/common` >= 12 only — the zod error tree is deliberately not in the body; see [`exceptions.md`](exceptions.md#why-the-response-body-has-no-errors-field)).
 
 ```ts
 ZodNestModule.forRoot({

@@ -7,7 +7,8 @@ import { z } from 'zod';
 
 import type { INestApplication } from '@nestjs/common';
 
-import { createZodDto, ZodValidationPipe } from '../../src';
+import { createZodDto, ZodNestErrorCode, ZodValidationPipe } from '../../src';
+import { expectedErrorCode } from '../exceptions/nest-error-code-support';
 
 const CreateThingSchema = z.object({ name: z.string(), count: z.number().int().min(0) });
 class CreateThingDto extends createZodDto(CreateThingSchema, { id: 'Smoke_CreateThing' }) {}
@@ -53,6 +54,7 @@ describe('ZodValidationPipe — end-to-end smoke', () => {
     expect(res.status).toBe(HttpStatus.BAD_REQUEST);
     expect(res.body.statusCode).toBe(400);
     expect(res.body.message).toBe('Validation failed');
+    expect(res.body.errorCode).toBe(expectedErrorCode(ZodNestErrorCode.ValidationFailed));
     expect(res.body.errors).toBeDefined();
     expect(res.body.errors.properties).toBeDefined();
     expect(res.body.errors.properties.name).toBeDefined();

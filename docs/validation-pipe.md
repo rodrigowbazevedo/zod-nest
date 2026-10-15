@@ -71,6 +71,7 @@ new ZodValidationException(zodError, argMetadata);
   statusCode: 400,
   message: 'Validation failed',
   errors: z.treeifyError(zodError),
+  errorCode: 'VALIDATION_FAILED', // @nestjs/common >= 12 only
 }
 ```
 

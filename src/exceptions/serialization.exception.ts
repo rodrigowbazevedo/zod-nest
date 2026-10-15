@@ -3,6 +3,8 @@ import { HttpStatus, InternalServerErrorException } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import type { z } from 'zod';
 
+import { errorCodeOptions, mirrorErrorCodeOntoBody, ZodNestErrorCode } from './error-codes.js';
+
 /**
  * Default exception thrown by `ZodSerializerInterceptor` in strict mode
  * (i.e. when `@ZodResponse({ passthroughOnError: true })` is NOT set) on
@@ -13,6 +15,7 @@ import type { z } from 'zod';
  * {
  *   statusCode: 500,
  *   message: 'Response validation failed',
+ *   errorCode: 'SERIALIZATION_FAILED',
  * }
  * ```
  *
@@ -31,13 +34,12 @@ export class ZodSerializationException extends InternalServerErrorException {
   readonly executionContext?: ExecutionContext;
 
   constructor(zodError: z.ZodError, executionContext?: ExecutionContext) {
-    super(
-      {
-        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-        message: 'Response validation failed',
-      },
-      { cause: zodError },
-    );
+    const body: Record<string, unknown> = {
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+      message: 'Response validation failed',
+    };
+    super(body, errorCodeOptions(zodError, ZodNestErrorCode.SerializationFailed));
+    mirrorErrorCodeOntoBody(this, body);
     this.zodError = zodError;
     this.executionContext = executionContext;
   }

@@ -58,8 +58,8 @@ The `ExportRow` DTO documents the shape of **one line**, mirroring the paginated
 
 ## Under OpenAPI 3.2: one schema per item
 
-Under 3.1 there is only `schema`, so the two examples above document the event DTO as *the whole
-response body*. That's the best 3.1 can express, and it's not what the endpoint does — the body is a
+Under 3.1 there is only `schema`, so the two examples above document the event DTO as _the whole
+response body_. That's the best 3.1 can express, and it's not what the endpoint does — the body is a
 sequence. 3.2 added `itemSchema` for the case, and `applyZodNest` emits it whenever the document
 declares 3.2:
 
@@ -95,7 +95,7 @@ The rewrite is keyed on the media types 3.2 names as sequential. For anything el
 rows(): void {}
 ```
 
-An explicit `stream: true` reads as *a sequence of `type`*, so pick an opaque built-in
+An explicit `stream: true` reads as _a sequence of `type`_, so pick an opaque built-in
 (`application/octet-stream` and the `image/*` / `audio/*` / `video/*` families) for a custom body
 that is one indivisible blob — those are excluded from the rewrite by design.
 

@@ -34,7 +34,11 @@ export {
   ZOD_DTO_SYMBOL,
 } from './dto/index.js';
 export type { CreateZodDtoOptions, Io, ZodDto, ZodDtoMarker } from './dto/index.js';
-export { ZodSerializationException, ZodValidationException } from './exceptions/index.js';
+export {
+  ZodNestErrorCode,
+  ZodSerializationException,
+  ZodValidationException,
+} from './exceptions/index.js';
 export { ZodValidationPipe } from './pipes/index.js';
 export type {
   CreateValidationException,

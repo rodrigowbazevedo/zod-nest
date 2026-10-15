@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import type { ArgumentMetadata } from '@nestjs/common';
 
+import { errorCodeOptions, mirrorErrorCodeOntoBody, ZodNestErrorCode } from './error-codes.js';
+
 /**
  * Default exception thrown by `ZodValidationPipe` when input fails to parse.
  *
@@ -12,6 +14,7 @@ import type { ArgumentMetadata } from '@nestjs/common';
  *   statusCode: 400,
  *   message: 'Validation failed',
  *   errors: z.treeifyError(zodError),
+ *   errorCode: 'VALIDATION_FAILED',
  * }
  * ```
  *
@@ -23,14 +26,13 @@ export class ZodValidationException extends BadRequestException {
   readonly argMetadata?: ArgumentMetadata;
 
   constructor(zodError: z.ZodError, argMetadata?: ArgumentMetadata) {
-    super(
-      {
-        statusCode: HttpStatus.BAD_REQUEST,
-        message: 'Validation failed',
-        errors: z.treeifyError(zodError),
-      },
-      { cause: zodError },
-    );
+    const body: Record<string, unknown> = {
+      statusCode: HttpStatus.BAD_REQUEST,
+      message: 'Validation failed',
+      errors: z.treeifyError(zodError),
+    };
+    super(body, errorCodeOptions(zodError, ZodNestErrorCode.ValidationFailed));
+    mirrorErrorCodeOntoBody(this, body);
     this.zodError = zodError;
     this.argMetadata = argMetadata;
   }
