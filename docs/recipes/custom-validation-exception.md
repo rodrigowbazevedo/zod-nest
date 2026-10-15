@@ -1,6 +1,6 @@
 # Recipe: Custom validation exception
 
-Default behaviour: `ZodValidationPipe` throws `ZodValidationException` (HTTP 400, body `{ statusCode, message: 'Validation failed', errors: z.treeifyError(zodError) }`). When you need a different status, a different body shape, or want to attach correlation ids — supply a custom exception factory.
+Default behaviour: `ZodValidationPipe` throws `ZodValidationException` (HTTP 400, body `{ statusCode, message: 'Validation failed', errors: z.treeifyError(zodError), errorCode: 'VALIDATION_FAILED' }`; `errorCode` on `@nestjs/common` >= 12 only, see [error codes](../exceptions.md#error-codes)). When you need a different status, a different body shape, or want to attach correlation ids — supply a custom exception factory.
 
 ## Set it at module scope (one place, app-wide)
 

@@ -34,6 +34,7 @@ class ZodValidationException extends BadRequestException {
     statusCode: 400,
     message: 'Validation failed',
     errors: z.treeifyError(zodError),
+    errorCode: 'VALIDATION_FAILED', // @nestjs/common >= 12 only
   }
   ```
 
@@ -85,6 +86,7 @@ class ZodSerializationException extends InternalServerErrorException {
   {
     statusCode: 500,
     message: 'Response validation failed',
+    errorCode: 'SERIALIZATION_FAILED', // @nestjs/common >= 12 only
   }
   ```
 
@@ -311,6 +313,27 @@ Fix — pick one:
 - For one-off primitive parameters, drop the DTO entirely and inline the type: `@Query('q') q: string` is a no-op for `ZodValidationPipe` (validation only kicks in when the metatype is a zod-nest DTO class).
 
 See [`docs/recipes/query-param-dtos.md`](recipes/query-param-dtos.md) for the per-decorator expansion contract.
+
+## Error codes
+
+`@nestjs/common` 12 added `HttpExceptionOptions.errorCode`. On Nest 12, both HTTP exceptions set it, and it lands in two places: `exception.errorCode` and the response body's `errorCode` field. Clients can then branch on a stable string instead of matching `message`.
+
+| Exception                   | `errorCode`            | Constant                               |
+| --------------------------- | ---------------------- | -------------------------------------- |
+| `ZodValidationException`    | `VALIDATION_FAILED`    | `ZodNestErrorCode.ValidationFailed`    |
+| `ZodSerializationException` | `SERIALIZATION_FAILED` | `ZodNestErrorCode.SerializationFailed` |
+
+```ts
+import { ZodNestErrorCode } from 'zod-nest';
+
+if (body.errorCode === ZodNestErrorCode.ValidationFailed) {
+  showFieldErrors(body.errors);
+}
+```
+
+On Nest 11, neither the property nor the body field is set, so response bodies are byte-for-byte what they were before.
+
+Nest's own default filter only adds `errorCode` to string bodies. Both zod-nest exceptions send object bodies, so they copy the code into the body themselves. A custom `createValidationException` / `createSerializationException` factory builds its own body and gets no code unless it passes one.
 
 ## Catching multiple exception types
 

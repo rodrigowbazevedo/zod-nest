@@ -16,7 +16,8 @@ import { z } from 'zod';
 import type { INestApplication, LoggerService } from '@nestjs/common';
 import type { Mocked } from 'vitest';
 
-import { createZodDto, ZodNestModule, ZodResponse } from '../../src';
+import { createZodDto, ZodNestErrorCode, ZodNestModule, ZodResponse } from '../../src';
+import { expectedErrorCode } from '../exceptions/nest-error-code-support';
 
 class UserDto extends createZodDto(
   z.object({ id: z.string(), email: z.email().transform((v) => v.toLowerCase()) }),
@@ -143,6 +144,7 @@ describe('ZodSerializerInterceptor — end-to-end smoke', () => {
     expect(res.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(res.body.statusCode).toBe(500);
     expect(res.body.message).toBe('Response validation failed');
+    expect(res.body.errorCode).toBe(expectedErrorCode(ZodNestErrorCode.SerializationFailed));
     // 5xx is opaque to clients — the diagnostic tree goes to logs, not the wire.
     expect(res.body.errors).toBeUndefined();
   });

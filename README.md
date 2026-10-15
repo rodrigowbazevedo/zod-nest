@@ -279,7 +279,7 @@ class AppModule {}
 
 Or use `ZodNestModule.forRoot()` — see [Module options](#module-options) below — to wire the pipe globally along with the response interceptor.
 
-On failure the pipe throws `ZodValidationException` (HTTP 400, body `{ statusCode, message: 'Validation failed', errors: z.treeifyError(zodError) }`).
+On failure the pipe throws `ZodValidationException` (HTTP 400, body `{ statusCode, message: 'Validation failed', errors: z.treeifyError(zodError), errorCode: 'VALIDATION_FAILED' }`; `errorCode` on `@nestjs/common` >= 12 only, see [error codes](docs/exceptions.md#error-codes)).
 
 ### Custom validation exception
 
@@ -468,7 +468,7 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 
 **Validation** — [`docs/validation-pipe.md`](docs/validation-pipe.md)
 
-- `ZodValidationPipe`, `ZodValidationException`, `ZodValidationPipeOptions`, `CreateValidationException`
+- `ZodValidationPipe`, `ZodValidationException`, `ZodValidationPipeOptions`, `CreateValidationException`, `ZodNestErrorCode` ([error codes](docs/exceptions.md#error-codes), `@nestjs/common` >= 12)
 
 **Response** — [`docs/responses.md`](docs/responses.md)
 

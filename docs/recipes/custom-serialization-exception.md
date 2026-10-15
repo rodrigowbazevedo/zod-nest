@@ -1,6 +1,6 @@
 # Recipe: Custom serialization exception
 
-Default behaviour: `ZodSerializerInterceptor` in strict mode throws `ZodSerializationException` (HTTP 500, body `{ statusCode, message: 'Response validation failed' }` — the zod error tree is deliberately not in the body; see [the policy](../exceptions.md#why-the-response-body-has-no-errors-field)). Supply a custom factory to control how operators see the failure without changing what clients see.
+Default behaviour: `ZodSerializerInterceptor` in strict mode throws `ZodSerializationException` (HTTP 500, body `{ statusCode, message: 'Response validation failed', errorCode: 'SERIALIZATION_FAILED' }`, with `errorCode` on `@nestjs/common` >= 12 only — the zod error tree is deliberately not in the body; see [the policy](../exceptions.md#why-the-response-body-has-no-errors-field)). Supply a custom factory to control how operators see the failure without changing what clients see.
 
 ## A factory that forwards to your error tracker
 

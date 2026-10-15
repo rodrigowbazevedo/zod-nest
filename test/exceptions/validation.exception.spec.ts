@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 import type { ArgumentMetadata } from '@nestjs/common';
 
-import { ZodValidationException } from '../../src';
+import { ZodNestErrorCode, ZodValidationException } from '../../src';
+import { errorCodeOf, expectedErrorCode } from './nest-error-code-support';
 
 const failingError = (): z.ZodError => {
   const schema = z.object({ name: z.string() });
@@ -32,6 +33,20 @@ describe('ZodValidationException', () => {
       errors: z.treeifyError(zodErr),
     });
     expect(err.zodError).toBe(zodErr);
+  });
+
+  it('sets errorCode on the instance and body when Nest supports it', () => {
+    const zodErr = failingError();
+    const err = new ZodValidationException(zodErr);
+    const errorCode = expectedErrorCode(ZodNestErrorCode.ValidationFailed);
+
+    expect(errorCodeOf(err)).toBe(errorCode);
+    expect(err.getResponse()).toEqual({
+      statusCode: HttpStatus.BAD_REQUEST,
+      message: 'Validation failed',
+      errors: z.treeifyError(zodErr),
+      errorCode,
+    });
   });
 
   it('carries the argMetadata when provided', () => {

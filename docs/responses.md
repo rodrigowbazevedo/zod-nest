@@ -352,6 +352,7 @@ Soft-mode variants never invoke this factory.
 {
   statusCode: 500,
   message: 'Response validation failed',
+  errorCode: 'SERIALIZATION_FAILED', // @nestjs/common >= 12 only
 }
 ```
 

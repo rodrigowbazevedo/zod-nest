@@ -1,7 +1,8 @@
 import { HttpStatus } from '@nestjs/common';
 import { z } from 'zod';
 
-import { ZodSerializationException } from '../../src';
+import { ZodNestErrorCode, ZodSerializationException } from '../../src';
+import { errorCodeOf, expectedErrorCode } from './nest-error-code-support';
 
 const failingError = (): z.ZodError => {
   const schema = z.object({ name: z.string() });
@@ -26,10 +27,16 @@ describe('ZodSerializationException', () => {
     expect(body).toEqual({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Response validation failed',
+      errorCode: expectedErrorCode(ZodNestErrorCode.SerializationFailed),
     });
     expect(body.errors).toBeUndefined();
     // The zodError is still accessible on the instance for filters / logging.
     expect(err.zodError).toBe(zodErr);
+  });
+
+  it('sets errorCode on the instance when Nest supports it', () => {
+    const err = new ZodSerializationException(failingError());
+    expect(errorCodeOf(err)).toBe(expectedErrorCode(ZodNestErrorCode.SerializationFailed));
   });
 
   it('carries the executionContext when provided', () => {
