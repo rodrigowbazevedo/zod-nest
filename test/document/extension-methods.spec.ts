@@ -122,7 +122,7 @@ describe.skipIf(queryMethod === undefined)('applyZodNest — QUERY routes (RFC 1
   let doc: OpenAPIObject;
 
   beforeAll(async () => {
-    doc = await bootstrap(QueryController);
+    doc = await bootstrap(QueryController, '3.2.0');
   });
 
   it('emits the handler under the `query` path-item key', () => {

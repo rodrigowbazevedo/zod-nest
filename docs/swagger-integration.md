@@ -100,9 +100,10 @@ class UsersController {
 Because `QUERY` is safe, an omitted `@ZodResponse({ status })` resolves to `200` rather than `POST`'s
 `201` — see [Status resolution precedence](responses.md#status-resolution-precedence).
 
-`query` is a path-item field in OpenAPI **3.2** but not in 3.1, so a QUERY route only validates
-against a strict checker when the document is emitted as 3.2 — see
-[OpenAPI version](#openapi-version).
+`query` is a path-item field in OpenAPI **3.2** but not in 3.1, so declare 3.2 for any document with
+QUERY routes — see [OpenAPI version](#openapi-version). Below 3.2, `@nestjs/swagger` 12.0.2+ drops
+QUERY operations from the document itself; 12.0.0–12.0.1 keep them, and the document fails strict
+validation.
 
 ### `search` and the WebDAV methods
 
@@ -161,13 +162,13 @@ without changing how schemas are validated, and the Schema Object dialect (JSON 
 identical, so your component bodies are byte-for-byte the same either way. Five things in a
 `zod-nest` document do differ, and they are the reasons to choose 3.2:
 
-| Under 3.2                                                                                                                       | Under 3.1                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `query` is a path-item field ([RFC 10008](https://www.rfc-editor.org/info/rfc10008/), routed by NestJS 12+ as `@QueryMethod()`) | no such field — a QUERY route fails strict validation                |
-| `search` / WebDAV operations live under `additionalOperations`                                                                  | no conformant home — see [below](#search-and-the-webdav-methods)     |
-| SSE / NDJSON responses use `itemSchema`                                                                                         | `schema`, which overstates a stream as a single body                 |
-| Response Object `summary` is emitted                                                                                            | no such field — each one is dropped, with a warning                  |
-| Named query DTOs collapse to `in: querystring`                                                                                  | expanded per property, or the `queryParamStyle: 'ref'` approximation |
+| Under 3.2                                                                                                                       | Under 3.1                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `query` is a path-item field ([RFC 10008](https://www.rfc-editor.org/info/rfc10008/), routed by NestJS 12+ as `@QueryMethod()`) | no such field — `@nestjs/swagger` 12.0.2+ drops the route; earlier versions fail strict validation |
+| `search` / WebDAV operations live under `additionalOperations`                                                                  | no conformant home — see [below](#search-and-the-webdav-methods)                                   |
+| SSE / NDJSON responses use `itemSchema`                                                                                         | `schema`, which overstates a stream as a single body                                               |
+| Response Object `summary` is emitted                                                                                            | no such field — each one is dropped, with a warning                                                |
+| Named query DTOs collapse to `in: querystring`                                                                                  | expanded per property, or the `queryParamStyle: 'ref'` approximation                               |
 
 Keep 3.1 if your toolchain is 3.1-only; Swagger UI, Swagger Editor and Redocly all support 3.2,
 but coverage across generators is still uneven.

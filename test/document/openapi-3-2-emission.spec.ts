@@ -30,7 +30,10 @@ const noopDecorator: MethodDecorator = () => undefined;
 class CriteriaDto extends createZodDto(z.object({ term: z.string() }), { id: 'Criteria' }) {}
 class HitDto extends createZodDto(z.object({ id: z.string() }), { id: 'Hit' }) {}
 
-const bootstrap = async (controller: Type<unknown>, declared?: string): Promise<OpenAPIObject> => {
+const createRawDocument = async (
+  controller: Type<unknown>,
+  declared?: string,
+): Promise<OpenAPIObject> => {
   const moduleRef = await Test.createTestingModule({
     imports: [DiscoveryModule],
     controllers: [controller],
@@ -43,8 +46,31 @@ const bootstrap = async (controller: Type<unknown>, declared?: string): Promise<
   }
   const raw = SwaggerModule.createDocument(app, builder.build());
   await app.close();
-  return applyZodNest(raw);
+  return raw;
 };
+
+const bootstrap = async (controller: Type<unknown>, declared?: string): Promise<OpenAPIObject> =>
+  applyZodNest(await createRawDocument(controller, declared));
+
+@Controller('query-things')
+class QueryController {
+  @(queryMethod ?? noopDecorator)
+  @ZodResponse({ type: HitDto })
+  find(@Body() body: CriteriaDto): HitDto {
+    return { id: body.term };
+  }
+}
+
+const detectSwaggerStripsQueryBelow32 = async (): Promise<boolean> => {
+  if (queryMethod === undefined) {
+    return false;
+  }
+  const raw = await createRawDocument(QueryController, '3.1.0');
+  return !('/query-things' in raw.paths);
+};
+
+/** `@nestjs/swagger` 12.0.2+ drops QUERY operations from documents declared below 3.2. */
+const swaggerStripsQueryBelow32 = await detectSwaggerStripsQueryBelow32();
 
 @Controller('things')
 class ThingsController {
@@ -107,15 +133,6 @@ describe('applyZodNest — OpenAPI version from the document', () => {
 });
 
 describe.skipIf(queryMethod === undefined)('applyZodNest — QUERY under 3.2 (RFC 10008)', () => {
-  @Controller('query-things')
-  class QueryController {
-    @(queryMethod ?? noopDecorator)
-    @ZodResponse({ type: HitDto })
-    find(@Body() body: CriteriaDto): HitDto {
-      return { id: body.term };
-    }
-  }
-
   it('validates against the 3.2 schema', async () => {
     const doc = await bootstrap(QueryController, '3.2.0');
     expect(() => validateOpenApi(doc)).not.toThrow();
@@ -136,10 +153,20 @@ describe.skipIf(queryMethod === undefined)('applyZodNest — QUERY under 3.2 (RF
   });
 
   // The whole point: 3.2 defines `query` as a path-item field, 3.1 does not.
-  it('does not validate against the 3.1 schema', async () => {
+  it.skipIf(swaggerStripsQueryBelow32)('does not validate against the 3.1 schema', async () => {
     const doc = await bootstrap(QueryController, '3.1.0');
     expect(() => validateOpenApi(doc)).toThrow(/schema validation failed/);
   });
+
+  it.skipIf(!swaggerStripsQueryBelow32)(
+    'is dropped by @nestjs/swagger under 3.1, leaving a valid document',
+    async () => {
+      const doc = await bootstrap(QueryController, '3.1.0');
+      expect(doc.paths).toEqual({});
+      expect(doc.components?.schemas ?? {}).toEqual({});
+      expect(() => validateOpenApi(doc)).not.toThrow();
+    },
+  );
 });
 
 @Controller('streams')
