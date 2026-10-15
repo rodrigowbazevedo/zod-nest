@@ -9,7 +9,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "7.6.0",
-      "reflect-metadata": "0.2.0"
+      "reflect-metadata": "0.2.0",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "floor-node24",
@@ -19,7 +21,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "7.6.0",
-      "reflect-metadata": "0.2.0"
+      "reflect-metadata": "0.2.0",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "zod-latest-node22",
@@ -29,7 +33,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "7.6.0",
-      "reflect-metadata": "0.2.0"
+      "reflect-metadata": "0.2.0",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "zod-latest-node24",
@@ -39,7 +45,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "7.6.0",
-      "reflect-metadata": "0.2.0"
+      "reflect-metadata": "0.2.0",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "zod-4.5-node22",
@@ -49,7 +57,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "7.6.0",
-      "reflect-metadata": "0.2.0"
+      "reflect-metadata": "0.2.0",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "zod-4.5-node24",
@@ -59,7 +69,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "7.6.0",
-      "reflect-metadata": "0.2.0"
+      "reflect-metadata": "0.2.0",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "nest-latest-node22",
@@ -117,7 +129,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "latest",
-      "reflect-metadata": "0.2.0"
+      "reflect-metadata": "0.2.0",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "rxjs-latest-node24",
@@ -127,7 +141,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "latest",
-      "reflect-metadata": "0.2.0"
+      "reflect-metadata": "0.2.0",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "reflect-metadata-latest-node22",
@@ -137,7 +153,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "7.6.0",
-      "reflect-metadata": "latest"
+      "reflect-metadata": "latest",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "reflect-metadata-latest-node24",
@@ -147,7 +165,9 @@
       "@nestjs/core": "11.0.1",
       "@nestjs/swagger": "11.0.0",
       "rxjs": "7.6.0",
-      "reflect-metadata": "latest"
+      "reflect-metadata": "latest",
+      "@nestjs/platform-express": "11.0.1",
+      "@nestjs/testing": "11.0.1"
     },
     {
       "name": "all-latest-node22",
