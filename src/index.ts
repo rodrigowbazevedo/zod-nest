@@ -79,6 +79,7 @@ export {
 export type {
   CreateSerializationException,
   NormalizedZodNestOptions,
+  ParseMode,
   ZodNestModuleOptions,
 } from './module/index.js';
 export { applyZodNest, ZodNestDocumentError } from './document/index.js';

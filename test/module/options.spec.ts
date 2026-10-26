@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import type { LoggerService } from '@nestjs/common';
 import type { Mocked } from 'vitest';
+import type { ParseMode } from '../../src';
 
 import { noopLogValidationFailure } from '../../src/logging/validation-logger.js';
 import {
@@ -192,5 +193,16 @@ describe('normalizeZodNestOptions', () => {
     // ...and the built-in defaults are never dropped.
     expect(matchesStream('text/event-stream', opts.streamMatcher)).toBe(true);
     expect(matchesStream('application/x-ndjson', opts.streamMatcher)).toBe(true);
+  });
+
+  it("defaults parseMode to 'auto'", () => {
+    expect(normalizeZodNestOptions().parseMode).toBe('auto');
+  });
+
+  it('passes each explicit parseMode through', () => {
+    const modes = ['auto', 'sync-first', 'async'] as const satisfies readonly ParseMode[];
+    for (const parseMode of modes) {
+      expect(normalizeZodNestOptions({ parseMode }).parseMode).toBe(parseMode);
+    }
   });
 });

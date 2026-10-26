@@ -201,6 +201,33 @@ The constant is exported so you can introspect, extend, or replace it programmat
 
 That first row is a different kind of stream from the two below it: a sequence of discrete items rather than one opaque payload. The distinction only matters when emitting OpenAPI 3.2, where the item-oriented types document each item with `itemSchema` — see [`SEQUENTIAL_MEDIA_TYPES`](swagger-integration.md#sequential-media-types-itemschema), also exported, which lists them along with the other sequential types 3.2 names.
 
+## `parseMode`
+
+```ts
+type ParseMode = 'auto' | 'sync-first' | 'async';
+parseMode?: ParseMode;
+```
+
+Default: `'auto'`.
+
+How `ZodValidationPipe` and `ZodSerializerInterceptor` run a schema. zod's compiled fast path ([`z.compile` / `zod/compile`](https://zod.dev/blog/introducing-z-compile), zod 4.5+) only runs on a **sync** parse, so `safeParseAsync` never reaches it.
+
+| Mode           | Behavior                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------- |
+| `'auto'`       | Sync-first when `zod/compile` is active (or the schema is a `z.compile` clone); `safeParseAsync` otherwise |
+| `'sync-first'` | Always `safeParse` first                                                                                   |
+| `'async'`      | Always `safeParseAsync` — the pre-3.9 behavior                                                             |
+
+Sync-first falls back to `safeParseAsync` when a schema has an async refinement or transform, so results and errors are identical in every mode. `zod/compile` counts as active when its global hook is installed and `z.config({ jitless: true })` is not set.
+
+```ts
+import 'zod/compile'; // app entry point, before any schema is built
+
+ZodNestModule.forRoot({ parseMode: 'auto' }); // the default — nothing to configure
+```
+
+`@ZodMultipartBody`, `@ZodUploadedFile` and `@ZodUploadedFiles` are param decorators with no access to module options, so they always use `'auto'`. See [the `zod/compile` recipe](recipes/zod-compile.md).
+
 ## `ZOD_NEST_OPTIONS` token
 
 ```ts
@@ -227,5 +254,6 @@ class MyPipe {
 | Logger instance  | `logger`                       | none — module-scope only                               |
 | Redaction set    | `redactKeys`                   | none — module-scope only                               |
 | Truncation cap   | `maxLoggedValueBytes`          | none — module-scope only                               |
+| Parse mode       | `parseMode`                    | none — module-scope only                               |
 
 Only the input exception has a per-pipe override; everything else is module-scope by design — logging, redaction, and truncation are cross-cutting concerns whose value comes from being consistent across the app.

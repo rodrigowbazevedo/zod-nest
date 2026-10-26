@@ -406,10 +406,11 @@ class AppModule {}
 | `logger`                       | `LoggerService`                      | NestJS `Logger`                  | Replace the logger (pino, winston, …)                       |
 | `redactKeys`                   | `readonly string[]`                  | `DEFAULT_REDACT_KEYS`            | Keys redacted in logs (replaces default list, no merge)     |
 | `maxLoggedValueBytes`          | `number`                             | `4096`                           | Truncate oversize logged values                             |
+| `parseMode`                    | `'auto' \| 'sync-first' \| 'async'`  | `'auto'`                         | Parse sync-first so `zod/compile`'s fast path runs          |
 
 `DEFAULT_REDACT_KEYS` includes `password`, `secret`, `apiKey`, `authorization`, `bearer`, `token`, `accessToken`, `refreshToken`, `jwt`, `cookie`, `set-cookie`. Matching is case-insensitive and applied at any depth in the logged value.
 
-Full reference (with every interaction note) lives in [`docs/module-options.md`](docs/module-options.md).
+Full reference (with every interaction note) lives in [`docs/module-options.md`](docs/module-options.md). Using `zod/compile`? See [`docs/recipes/zod-compile.md`](docs/recipes/zod-compile.md).
 
 ## Logging
 
@@ -484,7 +485,7 @@ A compact, link-out index. Type signatures and detailed semantics live in the co
 
 **Module** — [`docs/module-options.md`](docs/module-options.md) / [`docs/logging.md`](docs/logging.md)
 
-- `ZodNestModule.forRoot(options?)`, `ZodNestModuleOptions`, `DEFAULT_REDACT_KEYS`, `DEFAULT_MAX_LOGGED_VALUE_BYTES`, `DEFAULT_STREAM_CONTENT_TYPES`, `SEQUENTIAL_MEDIA_TYPES`, `ZOD_NEST_OPTIONS`
+- `ZodNestModule.forRoot(options?)`, `ZodNestModuleOptions`, `DEFAULT_REDACT_KEYS`, `DEFAULT_MAX_LOGGED_VALUE_BYTES`, `DEFAULT_STREAM_CONTENT_TYPES`, `SEQUENTIAL_MEDIA_TYPES`, `ZOD_NEST_OPTIONS`, `ParseMode`
 
 **Schema engine** — single-schema mode and extension points
 
