@@ -129,6 +129,10 @@ never overwritten, and wins on a key collision.
 > there is nothing to move them to. `zod-nest` emits the operation NestJS actually routed: the
 > document describes your API correctly and Swagger UI renders it, but a strict 3.1 validator
 > rejects the key. Emit 3.2 if you route these methods and need a conformant document.
+>
+> `@nestjs/swagger` 12.0.4+ changes both sides of this. Below 3.2 it drops these operations from
+> the document. Under 3.2 it emits `additionalOperations` itself, so `applyZodNest` has nothing to
+> relocate.
 
 ## OpenAPI version
 
