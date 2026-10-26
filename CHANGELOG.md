@@ -1,3 +1,10 @@
+# [3.9.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.8.0...v3.9.0) (2026-10-26)
+
+
+### Features
+
+* parse sync-first so zod/compile's fast path runs ([#196](https://github.com/rodrigowbazevedo/zod-nest/issues/196)) ([399206b](https://github.com/rodrigowbazevedo/zod-nest/commit/399206b9ba7361df7e595aee542845647c9d47a4)), closes [#195](https://github.com/rodrigowbazevedo/zod-nest/issues/195)
+
 # [3.8.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.7.0...v3.8.0) (2026-10-15)
 
 
