@@ -11,4 +11,5 @@ export type {
   NormalizedZodNestOptions,
   ZodNestModuleOptions,
 } from './options.js';
+export type { ParseMode } from '../schema/parse.js';
 export { ZodNestModule } from './zod-nest.module.js';

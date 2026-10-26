@@ -60,7 +60,10 @@ const noopDecorator: MethodDecorator = () => undefined;
 class CriteriaDto extends createZodDto(z.object({ term: z.string() }), { id: 'Criteria' }) {}
 class HitDto extends createZodDto(z.object({ id: z.string() }), { id: 'Hit' }) {}
 
-const bootstrap = async (controller: Type<unknown>, declared = '3.1.0'): Promise<OpenAPIObject> => {
+const createRawDocument = async (
+  controller: Type<unknown>,
+  declared = '3.1.0',
+): Promise<OpenAPIObject> => {
   const moduleRef = await Test.createTestingModule({
     imports: [DiscoveryModule],
     controllers: [controller],
@@ -72,19 +75,30 @@ const bootstrap = async (controller: Type<unknown>, declared = '3.1.0'): Promise
     new DocumentBuilder().setTitle('t').setVersion('v').setOpenAPIVersion(declared).build(),
   );
   await app.close();
-  return applyZodNest(raw);
+  return raw;
 };
 
-describe('applyZodNest — SEARCH routes', () => {
-  @Controller('search-things')
-  class SearchController {
-    @Search()
-    @ZodResponse({ type: HitDto })
-    find(@Body() body: CriteriaDto): HitDto {
-      return { id: body.term };
-    }
-  }
+const bootstrap = async (controller: Type<unknown>, declared = '3.1.0'): Promise<OpenAPIObject> =>
+  applyZodNest(await createRawDocument(controller, declared));
 
+@Controller('search-things')
+class SearchController {
+  @Search()
+  @ZodResponse({ type: HitDto })
+  find(@Body() body: CriteriaDto): HitDto {
+    return { id: body.term };
+  }
+}
+
+const detectSwaggerStripsSearchBelow32 = async (): Promise<boolean> => {
+  const raw = await createRawDocument(SearchController, '3.1.0');
+  return !('/search-things' in raw.paths);
+};
+
+/** `@nestjs/swagger` 12.0.4+ drops SEARCH operations from documents declared below 3.2. */
+const swaggerStripsSearchBelow32 = await detectSwaggerStripsSearchBelow32();
+
+describe.skipIf(swaggerStripsSearchBelow32)('applyZodNest — SEARCH routes', () => {
   let doc: OpenAPIObject;
 
   beforeAll(async () => {
@@ -152,16 +166,7 @@ describe.skipIf(queryMethod === undefined)('applyZodNest — QUERY routes (RFC 1
 });
 
 describe('applyZodNest — SEARCH relocation under 3.2', () => {
-  @Controller('search-things')
-  class SearchController {
-    @Search()
-    @ZodResponse({ type: HitDto })
-    find(@Body() body: CriteriaDto): HitDto {
-      return { id: body.term };
-    }
-  }
-
-  it('stays an inline path-item key under 3.1', async () => {
+  it.skipIf(swaggerStripsSearchBelow32)('stays an inline path-item key under 3.1', async () => {
     const doc = await bootstrap(SearchController, '3.1.0');
 
     expect(sortedKeys(recordAt(doc.paths, '/search-things'))).toEqual(['search']);

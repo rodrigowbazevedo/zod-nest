@@ -4,6 +4,7 @@ import type { ArgumentMetadata, ExecutionContext, LoggerService } from '@nestjs/
 import type { z } from 'zod';
 import type { LogValidationFailure } from '../logging/validation-logger.js';
 import type { StreamContentTypeMatcher } from '../response/stream.js';
+import type { ParseMode } from '../schema/parse.js';
 
 import {
   createValidationLogger,
@@ -11,6 +12,7 @@ import {
   noopLogValidationFailure,
 } from '../logging/validation-logger.js';
 import { DEFAULT_STREAM_CONTENT_TYPES, normalizeStreamMatcher } from '../response/stream.js';
+import { DEFAULT_PARSE_MODE } from '../schema/parse.js';
 
 /**
  * Module-scope factory for the exception thrown by `ZodValidationPipe` on
@@ -59,6 +61,11 @@ export interface ZodNestModuleOptions {
    * always retained. A trailing `/*` entry matches a media-type family.
    */
   streamContentTypes?: readonly string[];
+  /**
+   * `'auto'` (default) parses sync-first only when `zod/compile` is active, so its
+   * fast path runs. Async schemas always fall back to `safeParseAsync`.
+   */
+  parseMode?: ParseMode;
 }
 
 /**
@@ -75,6 +82,7 @@ export interface NormalizedZodNestOptions {
   logOutputFailure: LogValidationFailure;
   /** Built-in defaults ∪ `streamContentTypes`, used by the interceptor's stream check. */
   streamMatcher: StreamContentTypeMatcher;
+  parseMode: ParseMode;
 }
 
 export const DEFAULT_REDACT_KEYS: readonly string[] = [
@@ -131,5 +139,6 @@ export const normalizeZodNestOptions = (opts?: ZodNestModuleOptions): Normalized
     logInputFailure: flags.input ? createValidationLogger(loggerOpts) : noopLogValidationFailure,
     logOutputFailure: flags.output ? createValidationLogger(loggerOpts) : noopLogValidationFailure,
     streamMatcher,
+    parseMode: opts?.parseMode ?? DEFAULT_PARSE_MODE,
   };
 };

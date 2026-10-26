@@ -122,7 +122,7 @@ Peer dependencies (`@nestjs/common`, `@nestjs/core`, `@nestjs/swagger`, `rxjs`, 
 If your codebase still uses Zod v3 APIs, work through Zod's own [v3-to-v4 migration](https://zod.dev/v4) first. The big behavioural changes:
 
 - `z.string().email()` → `z.email()` (similar for `url`, `uuid`, `cuid`, `iso.datetime()`, etc.)
-- `z.string().refine(async ...)` requires `safeParseAsync` (the pipe already uses async parse).
+- `z.string().refine(async ...)` requires `safeParseAsync` (the pipe falls back to it automatically).
 - Metadata now lives on `.meta({ ... })` instead of `.describe(...)` / `.openapi(...)`.
 
 ### Step 2 — swap the package
@@ -280,7 +280,7 @@ Run your project's typecheck and test suite. zod-nest-specific gotchas to watch 
 - `ZodValidationPipe` global registration as `APP_PIPE` still works.
 - DTO classes are still classes (`instanceof` works for interceptors / guards).
 - Zod-level composition (`pick`, `omit`, `partial`, `extend`) still composes schemas the same way.
-- `safeParseAsync` is used for input validation — async refinements work without extra wiring.
+- Async refinements work without extra wiring — the pipe uses `safeParseAsync`, or falls back to it under [`parseMode`](docs/module-options.md#parsemode) sync-first parsing.
 
 ## New features available after migration
 
@@ -443,7 +443,7 @@ const UserId = overrideJSONSchema(z.custom<string>(), uuidFragment);
 For coercion shapes where the request and response sides need different fragments, pass `{ input, output }` instead of a raw fragment (additive overload, non-breaking). See [`docs/recipes/custom-openapi-overrides.md`](docs/recipes/custom-openapi-overrides.md) for the full helpers catalog and the I/O divergence pattern.
 
 **"My async validation refinements don't fire."**
-The pipe uses `safeParseAsync`, so async refinements work. Check that the schema is actually attached — `@Body() body: UserDto` (where `UserDto` is a `createZodDto` class) is the canonical wiring.
+The pipe parses async (or falls back to `safeParseAsync` when sync-first), so async refinements work. Check that the schema is actually attached — `@Body() body: UserDto` (where `UserDto` is a `createZodDto` class) is the canonical wiring.
 
 **"Cycle errors when emitting recursive schemas."**
 Set `cycles: 'ref'` in the schema's `.meta(...)` (Zod v4 picks it up) and ensure the schema has an `id` (`.meta({ id: 'Comment' })`). See [`docs/recipes/recursive-schemas.md`](docs/recipes/recursive-schemas.md).

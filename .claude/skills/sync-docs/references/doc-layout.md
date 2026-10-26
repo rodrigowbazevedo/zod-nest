@@ -44,6 +44,7 @@ One recipe per concrete usage pattern. Cross-linked from the relevant companion 
 | `docs/recipes/discriminated-unions.md`           | `z.discriminatedUnion` → `oneOf` + `discriminator` mapping, three-branch job-state example, what doesn't work.                                           |
 | `docs/recipes/custom-openapi-overrides.md`       | File uploads, opaque blobs, `z.date` → `format: date-time`, `z.bigint` → string with pattern, composing multiple overrides.                              |
 | `docs/recipes/multipart-uploads.md`              | Replacing a hand-rolled `z.custom` file schema, replacing `ParseFilePipe`, composing `FileTypeValidator` as a pipe, coerced text fields, optional files. |
+| `docs/recipes/zod-compile.md`                    | Enabling `zod/compile`, `parseMode` detection, async-schema fallback, import-order / `jitless` / multipart gotchas.                                       |
 
 ## Cross-cutting docs
 

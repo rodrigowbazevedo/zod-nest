@@ -5,6 +5,7 @@ import type { ExecutionContext } from '@nestjs/common';
 import type { MultipartMetadata, MultipartShape } from './metadata.js';
 
 import { ZodValidationException } from '../exceptions/validation.exception.js';
+import { DEFAULT_PARSE_MODE, safeParseWithMode } from '../schema/parse.js';
 import { MultipartFilesIn, ZOD_MULTIPART_METADATA_KEY } from './metadata.js';
 
 type ArgType = 'body' | 'custom';
@@ -59,7 +60,7 @@ const pick = (shape: MultipartShape, keys: readonly string[]): z.ZodType => {
 };
 
 const validate = async (schema: z.ZodType, value: unknown, argType: ArgType): Promise<unknown> => {
-  const result = await schema.safeParseAsync(value);
+  const result = await safeParseWithMode(schema, value, DEFAULT_PARSE_MODE);
   if (result.success) {
     return result.data;
   }

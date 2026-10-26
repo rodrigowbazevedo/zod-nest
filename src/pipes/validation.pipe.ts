@@ -4,6 +4,7 @@ import type { ArgumentMetadata, PipeTransform } from '@nestjs/common';
 import type { z } from 'zod';
 import type { LogValidationFailure } from '../logging/validation-logger.js';
 import type { NormalizedZodNestOptions } from '../module/options.js';
+import type { ParseMode } from '../schema/parse.js';
 import type {
   CreateValidationException,
   ZodValidationPipeArg,
@@ -14,6 +15,7 @@ import { isZodDto } from '../dto/predicates.js';
 import { ZodValidationException } from '../exceptions/validation.exception.js';
 import { noopLogValidationFailure } from '../logging/validation-logger.js';
 import { ZOD_NEST_OPTIONS } from '../module/options.js';
+import { DEFAULT_PARSE_MODE, safeParseWithMode } from '../schema/parse.js';
 
 const isZodSchema = (value: unknown): value is z.ZodType =>
   value !== null && typeof value === 'object' && '_zod' in value;
@@ -36,6 +38,7 @@ export class ZodValidationPipe implements PipeTransform {
   private readonly explicitDtoName: string | undefined;
   private readonly createValidationException: CreateValidationException;
   private readonly logInputFailure: LogValidationFailure;
+  private readonly parseMode: ParseMode;
 
   constructor(
     @Optional() arg?: ZodValidationPipeArg,
@@ -47,6 +50,7 @@ export class ZodValidationPipe implements PipeTransform {
     this.createValidationException =
       parsed.factory ?? moduleOptions?.createValidationException ?? defaultExceptionFactory;
     this.logInputFailure = moduleOptions?.logInputFailure ?? noopLogValidationFailure;
+    this.parseMode = moduleOptions?.parseMode ?? DEFAULT_PARSE_MODE;
   }
 
   async transform(value: unknown, metadata: ArgumentMetadata): Promise<unknown> {
@@ -54,7 +58,7 @@ export class ZodValidationPipe implements PipeTransform {
     if (schema === undefined) {
       return value;
     }
-    const result = await schema.safeParseAsync(value);
+    const result = await safeParseWithMode(schema, value, this.parseMode);
     if (result.success) {
       return result.data;
     }
