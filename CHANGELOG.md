@@ -1,3 +1,10 @@
+## [3.9.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.9.0...v3.9.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* warn when @nestjs/swagger 12.1 drops a @ZodResponse link ([#202](https://github.com/rodrigowbazevedo/zod-nest/issues/202)) ([24ae664](https://github.com/rodrigowbazevedo/zod-nest/commit/24ae66452472f86b08a6404dc9c64b5ae98700e2)), closes [#197](https://github.com/rodrigowbazevedo/zod-nest/issues/197) [#198](https://github.com/rodrigowbazevedo/zod-nest/issues/198) [#199](https://github.com/rodrigowbazevedo/zod-nest/issues/199) [#200](https://github.com/rodrigowbazevedo/zod-nest/issues/200)
+
 # [3.9.0](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.8.0...v3.9.0) (2026-10-26)
 
 
