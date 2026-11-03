@@ -74,6 +74,7 @@
     "build:watch": "tsup --watch",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
+    "bench": "vitest bench --run",
     "lint": "eslint --cache .",
     "lint:fix": "eslint --cache --fix .",
     "format": "prettier --write .",

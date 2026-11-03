@@ -4,6 +4,8 @@ import type { Override } from '../schema/override.js';
 import type { ZodNestRegistry } from '../schema/registry.js';
 
 import { buildToJsonSchemaOptions } from '../schema/engine.js';
+import { registryRevision } from '../schema/registry.js';
+import { singleton } from '../schema/singleton.js';
 
 export interface BulkEmitOptions {
   registry: ZodNestRegistry;
@@ -36,12 +38,39 @@ const URI = (id: string): string => `#/components/schemas/${id}`;
  * defs table whose refs would dangle against `components.schemas`.
  */
 export const bulkEmit = (opts: BulkEmitOptions): BulkEmitResult => {
+  const revision = registryRevision(opts.registry);
+  const strict = opts.strict ?? true;
+  const cached = cache().get(opts.registry);
+  if (
+    cached !== undefined &&
+    cached.revision === revision &&
+    cached.override === opts.override &&
+    cached.strict === strict
+  ) {
+    return structuredClone(cached.result);
+  }
+
   const knownIds = new Set(opts.registry.ids());
-  return {
+  const result: BulkEmitResult = {
     inputSchemas: runPass(opts, 'input', knownIds),
     outputSchemas: runPass(opts, 'output', knownIds),
   };
+  if (revision !== undefined) {
+    cache().set(opts.registry, { revision, override: opts.override, strict, result });
+  }
+  return structuredClone(result);
 };
+
+interface CacheEntry {
+  revision: number;
+  override: Override | undefined;
+  strict: boolean;
+  result: BulkEmitResult;
+}
+
+// Callers mutate the bodies they receive, so the stored result is never handed out.
+const cache = (): WeakMap<ZodNestRegistry, CacheEntry> =>
+  singleton('bulk-emit-cache', () => new WeakMap<ZodNestRegistry, CacheEntry>());
 
 // Scoping the input — not just filtering the output — keeps a third-party
 // `.meta({ id })` schema from being strict-checked on its way to being
