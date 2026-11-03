@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { Body, Controller, Get, Post, Query, Type, UseInterceptors } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ApiOperation, DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { z } from 'zod';
 
@@ -358,6 +358,12 @@ describe('OpenAPI 3.1 conformance', () => {
       })
       findOne(): ConformLinkedUserDto {
         return { id: '00000000-0000-4000-8000-000000000000' };
+      }
+
+      @Get(':id/address')
+      @ApiOperation({ operationId: 'getAddress' })
+      address(): string {
+        return 'address';
       }
     }
 

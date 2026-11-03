@@ -194,6 +194,13 @@ untouched**. `zod-nest` never inspects, validates or rewrites them — the paylo
 payload the document carries, so a malformed Header or Link Object reaches your consumers unflagged.
 Validate the emitted document if that matters to you; `zod-nest` does not do it at runtime.
 
+From `@nestjs/swagger` 12.1, `SwaggerModule.createDocument` drops any link whose `operationId`
+names an operation missing from the document. `applyZodNest` warns once per link it drops,
+naming the route, response and `operationId`. To fix it, set that id on the target route, for example
+`@ApiOperation({ operationId: 'getUserAddress' })`. If the target is deliberately left out of this
+document (a split `include` document, `@ApiExcludeEndpoint`), the warning is expected. Only links
+declared through `@ZodResponse` are reported; `@ApiResponse({ links })` and `@ApiLink` drop silently.
+
 The typing is deliberately loose so 3.1 / 3.2 / extension shapes pass without a cast. Both objects
 are version-safe in the direction that matters: **anything valid under 3.1 is valid under 3.2**. See
 [OpenAPI version](swagger-integration.md#openapi-version) for the two 3.2-only header fields that do
