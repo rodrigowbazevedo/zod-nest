@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { createZodDto } from '../../src';
 import { ZodResponse } from '../../src/decorators/zod-response.decorator.js';
+import { ZOD_NEST_LINKS_EXTENSION } from '../../src/schema/constants.js';
 
 const API_RESPONSE_METADATA_KEY = 'swagger/apiResponse';
 
@@ -17,6 +18,7 @@ interface ApiResponseMeta {
     summary?: string;
     headers?: Record<string, unknown>;
     links?: Record<string, unknown>;
+    [ZOD_NEST_LINKS_EXTENSION]?: Record<string, string>;
   };
 }
 
@@ -102,6 +104,32 @@ class Controller {
     },
   })
   descWithLinks(): void {}
+
+  @Get('desc-links-mixed')
+  @ZodResponse({
+    status: HttpStatus.OK,
+    type: UserDto,
+    description: {
+      description: 'mixed links',
+      links: {
+        ById: { operationId: 'getUser' },
+        ByRef: { operationRef: '#/paths/~1users/get' },
+        Odd: 'not a link object',
+      },
+    },
+  })
+  descWithMixedLinks(): void {}
+
+  @Get('desc-links-ref-only')
+  @ZodResponse({
+    status: HttpStatus.OK,
+    type: UserDto,
+    description: {
+      description: 'operationRef links only',
+      links: { ByRef: { operationRef: '#/paths/~1users/get' } },
+    },
+  })
+  descWithRefOnlyLinks(): void {}
 }
 
 const apiResponseMeta = (handler: object): ApiResponseMeta | undefined =>
@@ -194,5 +222,18 @@ describe('@ZodResponse — composite swagger application', () => {
     const meta = apiResponseMeta(Controller.prototype.descWithLinks);
     expect(meta?.['200']?.description).toBe('with links');
     expect(meta?.['200']?.links).toEqual({ GetUserById: { operationId: 'getUser' } });
+    expect(meta?.['200']?.[ZOD_NEST_LINKS_EXTENSION]).toEqual({ GetUserById: 'getUser' });
+  });
+
+  it('records only the links that carry a string `operationId`', () => {
+    const meta = apiResponseMeta(Controller.prototype.descWithMixedLinks);
+    expect(meta?.['200']?.[ZOD_NEST_LINKS_EXTENSION]).toEqual({ ById: 'getUser' });
+    expect(meta?.['200']?.links).toHaveProperty('ByRef');
+  });
+
+  it('records no marker when no link carries an `operationId`', () => {
+    const meta = apiResponseMeta(Controller.prototype.descWithRefOnlyLinks);
+    expect(meta?.['200']?.links).toEqual({ ByRef: { operationRef: '#/paths/~1users/get' } });
+    expect(meta?.['200']).not.toHaveProperty(ZOD_NEST_LINKS_EXTENSION);
   });
 });
