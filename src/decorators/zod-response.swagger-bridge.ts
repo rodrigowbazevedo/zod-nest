@@ -9,8 +9,9 @@ import type {
   ZodResponseDescription,
 } from '../response/metadata.js';
 
+import { markLinksDeclared } from '../response/declared-links.js';
 import { DEFAULT_CONTENT_TYPE, isItemStreamVariant } from '../response/stream.js';
-import { ZOD_NEST_ITEM_STREAM_EXTENSION } from '../schema/constants.js';
+import { ZOD_NEST_ITEM_STREAM_EXTENSION, ZOD_NEST_LINKS_EXTENSION } from '../schema/constants.js';
 
 /**
  * Minimal shape for an OpenAPI 3.1 tuple schema. `@nestjs/swagger`'s
@@ -31,7 +32,21 @@ interface DescriptionFields {
   summary?: string;
   headers?: Record<string, unknown>;
   links?: Record<string, unknown>;
+  [ZOD_NEST_LINKS_EXTENSION]?: Record<string, string>;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object';
+
+const declaredLinkTargets = (links: Record<string, unknown>): Record<string, string> => {
+  const targets: Record<string, string> = {};
+  for (const [name, link] of Object.entries(links)) {
+    if (isRecord(link) && typeof link.operationId === 'string') {
+      targets[name] = link.operationId;
+    }
+  }
+  return targets;
+};
 
 const extractDescriptionFields = (desc: ZodResponseDescription | undefined): DescriptionFields => {
   if (desc === undefined) {
@@ -47,8 +62,14 @@ const extractDescriptionFields = (desc: ZodResponseDescription | undefined): Des
   if (desc.headers !== undefined) {
     out.headers = desc.headers;
   }
-  if (desc.links !== undefined) {
-    out.links = desc.links;
+  if (desc.links === undefined) {
+    return out;
+  }
+  out.links = desc.links;
+  const targets = declaredLinkTargets(desc.links);
+  if (Object.keys(targets).length > 0) {
+    out[ZOD_NEST_LINKS_EXTENSION] = targets;
+    markLinksDeclared();
   }
   return out;
 };

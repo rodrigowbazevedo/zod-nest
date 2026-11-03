@@ -21,3 +21,6 @@ export const ZOD_NEST_DTO_EXTENSION = 'x-zod-nest-dto';
 /** Transient marker on a Media Type Object: this custom stream carries discrete
  * items, so the 3.2 pass rewrites its `schema` to `itemSchema`. Always stripped. */
 export const ZOD_NEST_ITEM_STREAM_EXTENSION = 'x-zod-nest-item-stream';
+
+/** Response Object marker (link name → `operationId`); always stripped. */
+export const ZOD_NEST_LINKS_EXTENSION = 'x-zod-nest-links';

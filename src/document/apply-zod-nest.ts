@@ -4,11 +4,13 @@ import type { ZodNestRegistry } from '../schema/registry.js';
 import type { CollectedUsage } from './collect-usage.js';
 import type { QueryParamStyle } from './expand-param-markers.js';
 
+import { anyLinksDeclared } from '../response/declared-links.js';
 import { defaultRegistry } from '../schema/registry.js';
 import { relocateExtensionOperations } from './additional-operations.js';
 import { bulkEmit } from './bulk-emit.js';
 import { collectUsage } from './collect-usage.js';
 import { assertNoDanglingRefs } from './dangling-refs.js';
+import { reportDroppedLinks } from './dropped-links.js';
 import { expandParamMarkers } from './expand-param-markers.js';
 import { extendExposureViaRefs } from './expose-closure.js';
 import { inlineAnonymousBodies } from './inline-anon.js';
@@ -120,6 +122,8 @@ export interface ApplyZodNestOptions {
  *   so a streamed body documents one item rather than the whole sequence.
  * - Response Object `summary` survives only under 3.2; emitting 3.1 drops each
  *   one with a warning naming the operation, since 3.1 forbids the field.
+ * - Warns for each `@ZodResponse` link `@nestjs/swagger` 12.1+ removed for an
+ *   unknown `operationId`.
  * - Under 3.2 a named query DTO collapses to `in: 'querystring'`, degrading to
  *   per-property expansion (with a warning) where that version's coexistence
  *   rules forbid it — a sibling `in: 'query'` parameter, or a second candidate.
@@ -170,6 +174,9 @@ export const applyZodNest = (doc: OpenAPIObject, opts: ApplyZodNestOptions = {})
   }
   applyItemSchema(doc, { emit: emitThirtyTwo });
   applyResponseSummary(doc, { emit: emitThirtyTwo });
+  if (anyLinksDeclared()) {
+    reportDroppedLinks(doc);
+  }
   doc.openapi = openApiVersion;
 
   return doc;

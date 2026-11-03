@@ -2,7 +2,7 @@ import 'reflect-metadata';
 
 import { Controller, Get, HttpCode, Type } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ApiOperation, DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { z } from 'zod';
 
@@ -151,6 +151,7 @@ class ThingDto extends createZodDto(z.object({ id: z.string() }), { id: 'Thing' 
 @Controller('things')
 class SummaryController {
   @Get('one')
+  @ApiOperation({ operationId: 'getThing' })
   @ZodResponse({ type: ThingDto, description: { description: 'the thing', summary: 'One thing' } })
   one(): ThingDto {
     return { id: 'a' };
