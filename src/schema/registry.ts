@@ -76,17 +76,25 @@ export const createRegistry = (): ZodNestRegistry => {
     }
   };
 
-  return {
+  let revision = 0;
+  const advance = (): void => {
+    revision++;
+    revisions().set(registry, revision);
+  };
+
+  const registry: ZodNestRegistry = {
     zodRegistry: z.globalRegistry,
     register: (schema, id, flags) => {
       // Flags are sticky: a later plain re-register of the same id (e.g. the
       // idempotent call inside `createZodDto`) must not clear an earlier
       // `expose` / `anonymous`.
-      if (flags?.expose === true) {
+      if (flags?.expose === true && !forceExposed.has(id)) {
         forceExposed.add(id);
+        advance();
       }
-      if (flags?.anonymous === true) {
+      if (flags?.anonymous === true && !anonymous.has(id)) {
         anonymous.add(id);
+        advance();
       }
       // `globalRegistry.add` overwrites the schema's entire meta entry; we
       // must merge so user-supplied fields (`title`, `description`,
@@ -101,13 +109,16 @@ export const createRegistry = (): ZodNestRegistry => {
         const existing = z.globalRegistry.get(schema) ?? {};
         if (existing.id !== id) {
           z.globalRegistry.add(schema, { ...existing, id });
+          advance();
         }
       } else {
         z.globalRegistry.add(schema, { id });
+        advance();
       }
       if (!recordOnce(schema, id)) {
         return;
       }
+      advance();
       // Queue, don't walk: forcing `z.lazy` getters here reads forward
       // references still in their temporal dead zone (throws under ESM,
       // yields `undefined` under CJS). Draining on first read is always safe.
@@ -136,7 +147,17 @@ export const createRegistry = (): ZodNestRegistry => {
     forceExposedIds: () => [...forceExposed],
     anonymousIds: () => [...anonymous],
   };
+  revisions().set(registry, 0);
+  return registry;
 };
+
+const revisions = (): WeakMap<ZodNestRegistry, number> =>
+  singleton('registry-revisions', () => new WeakMap<ZodNestRegistry, number>());
+
+/** Bumped on every registration that changes what the registry emits; `undefined`
+ * for a registry `createRegistry` did not build. */
+export const registryRevision = (registry: ZodNestRegistry): number | undefined =>
+  revisions().get(registry);
 
 /** Process-wide default registry. Shared so subpath ids reach `applyZodNest`. */
 export const defaultRegistry: ZodNestRegistry = singleton('default-registry', createRegistry);
