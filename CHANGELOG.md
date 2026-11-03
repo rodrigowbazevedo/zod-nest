@@ -1,3 +1,10 @@
+## [3.9.2](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.9.1...v3.9.2) (2026-11-03)
+
+
+### Performance Improvements
+
+* cache bulk Zod emission across applyZodNest calls ([#203](https://github.com/rodrigowbazevedo/zod-nest/issues/203)) ([3a8c72f](https://github.com/rodrigowbazevedo/zod-nest/commit/3a8c72fe7a710ba6165698bd549ffdbf891475ef)), closes [#201](https://github.com/rodrigowbazevedo/zod-nest/issues/201)
+
 ## [3.9.1](https://github.com/rodrigowbazevedo/zod-nest/compare/v3.9.0...v3.9.1) (2026-11-03)
 
 
